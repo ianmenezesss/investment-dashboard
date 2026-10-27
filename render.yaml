@@ -1,0 +1,28 @@
+# Modelo para revisão futura. NÃO cria banco Supabase ou contas autorizadas.
+services:
+  - type: web
+    name: investment-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.lock.txt && pip install --no-deps .
+    preDeployCommand: python -m alembic upgrade head
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --no-access-log
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: ENVIRONMENT
+        value: production
+      - key: AUTH_MODE
+        value: supabase
+      - key: DATABASE_URL
+        sync: false
+      - key: MIGRATION_DATABASE_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: ALLOWED_USER_IDS
+        sync: false

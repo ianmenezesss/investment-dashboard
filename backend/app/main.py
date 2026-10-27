@@ -1,0 +1,126 @@
+from datetime import date
+from decimal import Decimal
+from typing import Literal
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+from .database import ensure_production_role, get_db, settings
+from .finance import summarize
+from .models import Operation
+from .auth import authenticate
+from .access import private_db
+
+app = FastAPI(title="Investment Dashboard", version="0.1.5", docs_url=None if settings.environment == "production" else "/docs", redoc_url=None, openapi_url=None if settings.environment == "production" else "/openapi.json")
+app.add_middleware(CORSMiddleware, allow_origins=[settings.cors_origin], allow_methods=["GET", "POST", "DELETE"], allow_headers=["Authorization", "Content-Type"])
+@app.middleware("http")
+async def privacy_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Frame-Options"] = "DENY"
+    if settings.environment == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
+    return response
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_error(request, exc):
+    # Não devolver SQL, parâmetros, credenciais ou stack traces ao cliente.
+    return JSONResponse(status_code=503, content={"detail": "Banco de dados temporariamente indisponível"})
+
+
+@app.exception_handler(Exception)
+async def unexpected_error(request, exc):
+    return JSONResponse(status_code=500, content={"detail": "Erro interno ao processar a solicitação"}, headers={"Cache-Control": "no-store"})
+
+
+class OperationInput(BaseModel):
+    ticker: str = Field(pattern=r"^[A-Z0-9]{4,20}$")
+    kind: Literal["BUY", "SELL"]
+    date: date
+    quantity: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
+    price: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
+    fees: Decimal = Field(default=Decimal(0), ge=0, max_digits=20, decimal_places=8)
+
+    @field_validator("date")
+    @classmethod
+    def historical(cls, value):
+        if value > date.today():
+            raise ValueError("A operação não pode ter data futura")
+        return value
+
+
+def records(db):
+    return list(db.scalars(select(Operation).where(Operation.owner_id == db.info.get("owner_id")).order_by(Operation.date, Operation.id)))
+
+
+def serialize(op):
+    return {key: str(getattr(op, key)) if isinstance(getattr(op, key), Decimal) else getattr(op, key) for key in ("id", "ticker", "kind", "date", "quantity", "price", "fees")}
+
+
+@app.get("/health")
+def health(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1"))
+    ensure_production_role(db)
+    return {"status": "ok"}
+
+
+@app.get("/api/dashboard", dependencies=[Depends(authenticate)])
+def dashboard(db: Session = Depends(private_db)):
+    def decimal_strings(value):
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, dict):
+            return {key: decimal_strings(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [decimal_strings(item) for item in value]
+        return value
+    return decimal_strings(summarize(records(db)))
+
+
+@app.get("/api/operations", dependencies=[Depends(authenticate)])
+def operations(db: Session = Depends(private_db)):
+    return [serialize(op) for op in records(db)]
+
+
+@app.post("/api/operations", status_code=201, dependencies=[Depends(authenticate)])
+def create(data: OperationInput, db: Session = Depends(private_db)):
+    # Serializa mutações inclusive quando a tabela ainda está vazia.
+    db.execute(text("LOCK TABLE operations IN EXCLUSIVE MODE"))
+    op = Operation(**data.model_dump(), owner_id=db.info.get("owner_id"))
+    db.add(op)
+    db.flush()
+    try:
+        summarize(records(db))
+    except ValueError as error:
+        db.rollback()
+        raise HTTPException(422, str(error))
+    payload = serialize(op)
+    db.commit()
+    return payload
+
+
+@app.delete("/api/operations/{operation_id}", status_code=204, dependencies=[Depends(authenticate)])
+def delete(operation_id: int, db: Session = Depends(private_db)):
+    db.execute(text("LOCK TABLE operations IN EXCLUSIVE MODE"))
+    op = db.scalar(select(Operation).where(Operation.id == operation_id, Operation.owner_id == db.info.get("owner_id")))
+    if not op:
+        raise HTTPException(404, "Operação não encontrada")
+    db.delete(op)
+    db.flush()
+    try:
+        summarize(records(db))
+    except ValueError as error:
+        db.rollback()
+        raise HTTPException(422, str(error))
+    db.commit()
+
+
+@app.get("/api/export", dependencies=[Depends(authenticate)])
+def export(db: Session = Depends(private_db)):
+    return {"schema_version": 1, "operations": [serialize(op) for op in records(db)]}
