@@ -20,7 +20,8 @@ SIGNATURES = [
 
 
 def git(*args, **kwargs):
-    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, **kwargs)
+    # Exceção limitada a esta execução; não altera a configuração global do Git.
+    return subprocess.run(["git", "-c", f"safe.directory={ROOT.as_posix()}", *args], cwd=ROOT, capture_output=True, **kwargs)
 
 
 def main():

@@ -49,6 +49,8 @@ def authenticate(credentials: HTTPAuthorizationCredentials | None = Depends(bear
     try:
         # Não aceitar URL de chave indicada pelo token, apenas JWKS configurado.
         header = jwt.get_unverified_header(token)
+        if header.get("alg") == "HS256":
+            raise HTTPException(401, "Assinatura HS256 não suportada. Configure uma chave assimétrica ES256 ou RS256 no Supabase.")
         if header.get("alg") not in ("ES256", "RS256") or not header.get("kid"):
             raise HTTPException(401, "Credencial inválida")
         key = jwks_client().get_signing_key_from_jwt(token).key

@@ -2,6 +2,8 @@
 
 Não executar deploy como parte da Fase 1.5. Os arquivos são modelos revisáveis; não há serviços remotos criados ou credenciais externas configuradas.
 
+Atualização 1.6: login Supabase no frontend foi implementado. A configuração e os testes manuais locais estão em [supabase-auth.md](supabase-auth.md). O projeto Supabase foi criado pelo proprietário, mas não foi configurado automaticamente no checkout. Nenhum deploy ou push foi executado nesta etapa.
+
 ## GitHub público
 
 Na raiz, depois de revisar os arquivos:
@@ -34,7 +36,7 @@ Esses comandos não foram executados automaticamente. Ative secret scanning e pu
 - Framework: Vite; instalação: `npm ci`; build: `npm run build`; saída: `dist`.
 - Variáveis: `VITE_PUBLIC_DEMO=true` para clareza operacional. Nenhum token, senha, URL privada ou chave Supabase é necessário.
 - `frontend/vercel.json` inclui rewrite para React Router e headers de segurança. A CSP permite scripts próprios e estilos inline usados pelos gráficos, mas bloqueia conexões de rede.
-- O código também força demonstração em qualquer build de produção. A opção false não habilita carteira privada. Uma futura interface privada precisará de configuração e revisão próprias.
+- O código usa demonstração por padrão em produção. Desde a Fase 1.6, um projeto privado separado pode habilitar explicitamente `VITE_APP_MODE=private` e configurar Supabase; `VITE_PUBLIC_DEMO=true` continua forçando demonstração. A CSP privada deve ser revisada pelo modelo separado, sem alterar a configuração pública.
 - Preview deployments também devem usar apenas demonstração. Não cadastrar segredos em variáveis `VITE_*`: são incorporadas ao JavaScript público.
 
 Verificar rotas `/`, `/acoes` e `/historico` em refresh, identificação visual de demonstração, exportação fictícia e zero chamadas à API. Não apontar um rewrite da demonstração para o backend pessoal.
@@ -93,7 +95,7 @@ O proxy do provedor deve terminar TLS; não expor HTTP direto publicamente. A AP
 
 ## Condições para ativação futura
 
-Homologar login por e-mail/senha numa interface privada separada, testar o fluxo real de JWKS e rotação de chaves, validar SSL e rede entre Render/Supabase, verificar inscrições bloqueadas, testar dois usuários e negações, preparar backup/restauração, revisar limites de requisição e confirmar as configurações de logs. Ainda não há login Supabase no frontend atual.
+Homologar o login por e-mail/senha implementado na Fase 1.6, testar o fluxo real de JWKS e rotação de chaves, validar SSL e rede entre Render/Supabase, verificar inscrições bloqueadas, testar dois usuários e negações, preparar backup/restauração, revisar limites de requisição e confirmar as configurações de logs. O modelo `frontend/vercel.private.example.json` precisa de origens reais explícitas antes de ser adotado em um projeto privado separado.
 
 A Fase 2 deve começar com regressão da persistência local, concluir o fluxo privado de autenticação em homologação e só então evoluir ações/cotações/proventos. Não acrescentar CDBs antes de validar essa fronteira de segurança.
 

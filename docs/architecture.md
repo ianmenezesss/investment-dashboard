@@ -4,6 +4,8 @@ Aplicação pessoal local, com frontend React/TypeScript/Vite e API FastAPI. Pos
 
 Atualização da Fase 1.5: o build público é sempre uma demonstração sem rede privada. O acesso local por token foi preservado, e o backend ganhou um modo Supabase opt-in, autorização por proprietário e RLS. Veja [separação público/privado](demo-and-private.md), [auditoria](security-audit.md) e [deploy futuro](deployment.md). A integração externa não foi ativada.
 
+Atualização da Fase 1.6: frontend privado com Supabase Auth implementado em `src/auth`, sem cadastro. Sessões por aba, recuperação via SDK/getUser, renovação, logout e tratamento de 401. A demonstração permanece padrão de produção, com opt-in explícito para o build privado. Configuração externa e homologação com a conta real ainda são necessárias; consulte [Supabase Auth](supabase-auth.md).
+
 ## Estrutura
 
 ```text

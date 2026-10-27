@@ -1,4 +1,18 @@
-# Verificação da Fase 1.5
+# Verificação da Fase 1.6
+
+Em 27/10/2026:
+
+- **18 testes backend aprovados**; o teste opcional de PostgreSQL foi ignorado na execução unitária e executado separadamente: **1 integração aprovada** em container efêmero.
+- **15 testes frontend aprovados**: demonstração pública, configuração de cliente, login/logout, rejeição de credenciais, recuperação validada por getUser, sessão expirada/inválida, renovação/encerramento remoto, JWT enviado à API e reação a 401.
+- Builds TypeScript/Vite dos modos privado e público aprovados, sem credenciais reais. O artefato final permanece em demonstração pública.
+- Auditoria npm: 0 vulnerabilidades reportadas. Scanner local verificou 61 candidatos, 3 artefatos públicos e o histórico Git, sem detectar segredos conhecidos. `git diff --check` passou.
+- Leituras autenticadas da API com PostgreSQL local retornaram 200; Alembic continua em `002`. Nenhuma nova migração, atribuição de proprietário, gravação financeira ou alteração de DATABASE_URL foi executada.
+- SDK Supabase simulado nos testes frontend; assinatura e JWKS testados com chaves criptográficas efêmeras no backend. O projeto Supabase real não foi usado, pois suas variáveis locais ainda não estavam preenchidas.
+- Nenhum push, deploy, reset de banco ou remoção de volume pessoal.
+
+Limites: teste real de login com a conta do proprietário, algoritmo ativo no projeto Supabase, configuração remota de inscrições, CSP privada com domínios reais e homologação em navegador permanecem pendentes. As instruções estão em [Supabase Auth](supabase-auth.md). Os avisos não bloqueantes de tamanho do bundle e depreciação do adaptador Starlette/httpx continuam.
+
+## Histórico: Fase 1.5
 
 Verificado em 27/10/2026, sem publicação externa:
 

@@ -2,13 +2,14 @@
 
 Plataforma full stack para acompanhamento de investimentos em ações brasileiras. Reúne operações, posições por custo médio, resultados realizados e visualizações em uma interface responsiva em português, com valores em reais e persistência PostgreSQL.
 
-**Fase atual: 1.5 — segurança e preparação para publicação.** O código foi preparado para um repositório público e uma demonstração sem conexão com dados pessoais. Nenhum repositório remoto ou deploy foi criado nesta etapa.
+**Fase atual: 1.6 — integração do Supabase Auth.** Login por e-mail/senha, recuperação e renovação de sessão, logout e envio de JWT ao FastAPI implementados. A demonstração permanece independente e o token local continua disponível somente para desenvolvimento. Não foi executado push ou deploy nesta etapa.
 
 Tecnologias: React 19, TypeScript, Vite, Tailwind, componentes shadcn/Radix, Recharts, Lucide, React Router, TanStack Query; Python 3.12+, FastAPI, SQLAlchemy, Alembic, Pydantic, PostgreSQL 17, Pytest e PyJWT com criptografia.
 
 Documentação:
 
 - [Arquitetura, fórmulas e próximas fases](docs/architecture.md).
+- [Configurar e testar Supabase Auth localmente](docs/supabase-auth.md).
 - [Separação entre demonstração e carteira privada](docs/demo-and-private.md).
 - [Auditoria de segurança e arquivos alterados](docs/security-audit.md).
 - [Configuração futura de Vercel, Render e Supabase](docs/deployment.md).
@@ -62,7 +63,9 @@ npm run dev
 
 Abra http://localhost:5173. Digite o `API_TOKEN` configurado e clique em **Conectar**. Ou clique em **Explorar demonstração** para conferir o dashboard sem backend. A demonstração desabilita gravações. Ao alternar para demonstração ou desconectar, as consultas são canceladas e o cache privado é descartado.
 
-Para testar somente a demonstração pública localmente, copie `frontend/.env.public.example` para `frontend/.env.local` e reinicie o Vite. Não coloque segredos em variáveis `VITE_*`. Todo build de produção desta fase inicia na demonstração e bloqueia chamadas à API privada, mesmo sem essa variável.
+Para testar somente a demonstração pública localmente, copie `frontend/.env.public.example` para `frontend/.env.local` e reinicie o Vite. Não coloque segredos em variáveis `VITE_*`. O build de produção continua demonstrativo por padrão; `VITE_APP_MODE=private` habilita explicitamente a interface Supabase e exige configuração própria. `VITE_PUBLIC_DEMO=true` sempre força demonstração e bloqueia chamadas privadas.
+
+Para usar o usuário Supabase que você criou, siga [docs/supabase-auth.md](docs/supabase-auth.md): configure `AUTH_MODE=supabase`, `SUPABASE_URL` e `ALLOWED_USER_IDS` no backend, sem alterar `DATABASE_URL`; use o modelo `frontend/.env.supabase.example` no frontend. O login não atribui registros locais antigos à conta: eles continuam preservados com proprietário nulo.
 
 API: http://127.0.0.1:8000/docs. Diagnóstico com banco: http://127.0.0.1:8000/health. Endpoints `/api/*` exigem `Authorization: Bearer <API_TOKEN>`.
 
@@ -105,7 +108,7 @@ Guarde o backup fora do repositório. Para restaurar, use `pg_restore` em um ban
 
 Os comandos locais e o Compose usam somente loopback. O token fica apenas na memória da página e é descartado ao recarregar. Não exponha o servidor Vite como servidor de produção. Não há APIs financeiras externas ou cotações automáticas.
 
-O backend possui um modo Supabase opt-in com verificação criptográfica de JWT, allowlist de UUIDs, filtros por proprietário e RLS. Está desativado por padrão e ainda depende da configuração externa descrita em [deploy](docs/deployment.md). O frontend privado com login por e-mail/senha é uma próxima etapa: o build público atual nunca serve como interface para a carteira privada.
+O backend possui um modo Supabase opt-in com verificação criptográfica de JWT, allowlist de UUIDs, filtros por proprietário e RLS. O frontend privado agora possui login por e-mail/senha, sem cadastro público, e sessão por aba em sessionStorage. A configuração externa ainda é necessária; o modelo de deploy público continua exclusivo da demonstração. Assinaturas HS256 são recusadas; use chaves assimétricas ES256/RS256 no Supabase.
 
 Produção rejeita o token local, exige CORS HTTPS exato, PostgreSQL com TLS verificável e papel de runtime sem superusuário, bypass RLS ou propriedade da tabela. Todos os endpoints financeiros exigem autenticação. Erros de banco retornam mensagens genéricas e respostas da API usam `Cache-Control: no-store`.
 

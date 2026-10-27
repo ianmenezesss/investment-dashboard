@@ -11,9 +11,9 @@
 | Banco | Nenhum | Registros `owner_id IS NULL` | Registros com UUID do usuário |
 | Exportação | Apenas fixtures fictícias | Registros do usuário local | Registros do usuário autenticado |
 
-O frontend de produção desta fase é sempre público e demonstrativo. Não contém login privado, URL obrigatória de API ou qualquer credencial. O arquivo `vercel.json` acrescenta CSP com `connect-src 'none'`, defesa adicional para impedir rede nesse artefato.
+Desde a Fase 1.6, o frontend privado possui login Supabase. Produção permanece demonstrativa por padrão; somente `VITE_APP_MODE=private` habilita explicitamente a interface privada. `VITE_PUBLIC_DEMO=true` sempre prevalece, sem criar cliente Supabase. O arquivo `vercel.json` continua exclusivo da demonstração, com CSP `connect-src 'none'`. O modelo privado é separado. Veja [configuração de Auth](supabase-auth.md).
 
-O modo local via `npm run dev` continua oferecendo token e demonstração. A mudança de modo cancela requisições, descarta o cache e remove o token da memória do estado. As chaves das consultas não contêm tokens. Nenhuma sessão privada é salva em localStorage ou cookies.
+O modo local via `npm run dev` continua oferecendo token e demonstração com `VITE_AUTH_MODE=local`. O modo `supabase` usa login e sessão em sessionStorage por aba. A mudança de modo cancela requisições, descarta o cache e encerra a sessão Supabase ao entrar na demonstração. As chaves das consultas contêm identidade do usuário, nunca tokens. Nenhuma sessão privada é salva em localStorage ou cookies.
 
 Os mesmos componentes renderizam os dois conjuntos de dados. Não há cópia de registros pessoais nos fixtures. Os valores de ITUB4, BBAS3 e B3SA3 da demonstração são inventados e não devem ser apresentados como cotações reais. O histórico demonstrativo é de operações de compra; não existe um livro de aportes externos implementado.
 
@@ -27,6 +27,6 @@ A política RLS usa `app.user_id` e `app.auth_mode`, definidos por `set_config(.
 
 ## Antes de abrir uma interface privada na internet
 
-Configurar Supabase Auth, desativar inscrições públicas, criar contas manualmente, revisar allowlist, migrar um banco separado, configurar papel restrito, validar RLS e implementar login por e-mail/senha numa interface privada separada. Apenas então avaliar a migração explícita dos registros locais, com backup e conferência. O build público permanece independente.
+Configurar Supabase Auth, desativar inscrições públicas, criar contas manualmente, revisar allowlist, configurar papel restrito/TLS, validar RLS e homologar o login implementado. Apenas então avaliar a migração explícita dos registros locais, com backup e conferência. O build público permanece independente. Para testar localmente a identidade Supabase, manter o PostgreSQL Docker atual e sua DATABASE_URL.
 
 O teste frontend verifica navegação sem login, ausência do campo de token, bloqueio de escrita e zero chamadas HTTP mesmo quando a API está indisponível. Os testes backend verificam assinatura, expiração, issuer, audience, role, allowlist e separação de carteiras. A integração PostgreSQL verifica a política RLS com um papel não privilegiado.

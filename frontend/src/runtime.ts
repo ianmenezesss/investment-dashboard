@@ -1,5 +1,6 @@
-// Todo build de produção desta fase é uma demonstração sem acesso privado.
-export const PUBLIC_DEMO = import.meta.env.PROD || import.meta.env.VITE_PUBLIC_DEMO === 'true'
+// Produção continua pública por padrão; carteira privada exige opt-in explícito.
+export const PUBLIC_DEMO = import.meta.env.VITE_PUBLIC_DEMO === 'true' || (import.meta.env.PROD && import.meta.env.VITE_APP_MODE !== 'private')
+export const SUPABASE_AUTH = import.meta.env.VITE_AUTH_MODE === 'supabase' || import.meta.env.PROD
 
 export function apiBase(): string {
   const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
