@@ -1,5 +1,7 @@
 # Arquitetura e plano
 
+Atualização 1.6.2: demonstração interativa com `DemoRepository` local e `PrivateRepository` HTTP separados. Somente a primeira usa localStorage; nenhum token ou dado privado é persistido ali. O cálculo Decimal.js foi alinhado ao contexto Decimal Python e possui casos de contrato em `shared/finance-cases.json`, executados pelos dois runtimes. Consulte [demonstração interativa](interactive-demo.md).
+
 Aplicação pessoal local, com frontend React/TypeScript/Vite e API FastAPI. PostgreSQL é a fonte dos registros reais; a demonstração existe apenas em memória no frontend. Não há dependência de localStorage nem integração financeira externa nesta fase.
 
 Atualização da Fase 1.5: o build público é sempre uma demonstração sem rede privada. O acesso local por token foi preservado, e o backend ganhou um modo Supabase opt-in, autorização por proprietário e RLS. Veja [separação público/privado](demo-and-private.md), [auditoria](security-audit.md) e [deploy futuro](deployment.md). A integração externa não foi ativada.

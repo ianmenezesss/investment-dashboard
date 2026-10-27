@@ -1,0 +1,38 @@
+{
+  "demonstration_only": true,
+  "cases": [
+    {
+      "name": "weighted-cost-fees-partial-sale",
+      "operations": [
+        {"id": 1, "ticker": "TEST4", "kind": "BUY", "date": "2026-01-01", "quantity": "10", "price": "20", "fees": "2"},
+        {"id": 2, "ticker": "TEST4", "kind": "BUY", "date": "2026-01-02", "quantity": "10", "price": "30", "fees": "0"},
+        {"id": 3, "ticker": "TEST4", "kind": "SELL", "date": "2026-01-03", "quantity": "5", "price": "40", "fees": "1"}
+      ],
+      "expected": {"acquisition_cost": "376.5", "total_purchases": "502", "sale_proceeds": "199", "realized_profit": "73.5", "holdings": [{"ticker": "TEST4", "quantity": "15", "cost": "376.5", "average_price": "25.1"}]}
+    },
+    {
+      "name": "decimal-full-liquidation",
+      "operations": [
+        {"id": 1, "ticker": "TEST4", "kind": "BUY", "date": "2026-01-01", "quantity": "3", "price": "0.1", "fees": "0"},
+        {"id": 2, "ticker": "TEST4", "kind": "SELL", "date": "2026-01-02", "quantity": "3", "price": "0.2", "fees": "0"}
+      ],
+      "expected": {"acquisition_cost": "0", "total_purchases": "0.3", "sale_proceeds": "0.6", "realized_profit": "0.3", "holdings": []}
+    },
+    {
+      "name": "cannot-sell-before-purchase",
+      "operations": [
+        {"id": 1, "ticker": "TEST4", "kind": "BUY", "date": "2026-01-02", "quantity": "10", "price": "20", "fees": "0"},
+        {"id": 2, "ticker": "TEST4", "kind": "SELL", "date": "2026-01-01", "quantity": "1", "price": "30", "fees": "0"}
+      ],
+      "invalid": true
+    },
+    {
+      "name": "same-day-insertion-order",
+      "operations": [
+        {"id": 2, "ticker": "TEST4", "kind": "BUY", "date": "2026-01-01", "quantity": "10", "price": "20", "fees": "0"},
+        {"id": 1, "ticker": "TEST4", "kind": "SELL", "date": "2026-01-01", "quantity": "1", "price": "30", "fees": "0"}
+      ],
+      "invalid": true
+    }
+  ]
+}

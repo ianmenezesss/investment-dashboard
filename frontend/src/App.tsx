@@ -1,25 +1,24 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ArrowDownLeft, ArrowUpRight, ChartNoAxesCombined, LayoutDashboard, Wallet, Landmark, History, FlaskConical, Flag, Plus, Download, X, ShieldCheck, ChevronRight, Eye, Trash2 } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from './components/ui/button'
-import { request, ApiError, type Operation, type Summary } from './api'
+import { ApiError } from './api'
 import './style.css'
 import { PUBLIC_DEMO, SUPABASE_AUTH } from './runtime'
 import { useAuth } from './auth/useAuth'
 import { LoginPage } from './auth/LoginPage'
+import { DemoRepository } from './repositories/DemoRepository'
+import { PrivateRepository } from './repositories/PrivateRepository'
+import type { OperationInput } from './demo/finance'
+import { DemoAccessPage } from './demo/DemoAccessPage'
 
 const money = (v: string | number) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const number = (v: string | number) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 4 })
-const demoOps: Operation[] = [
-  { id: 1, ticker: 'ITUB4', kind: 'BUY', date: '2026-01-15', quantity: '100', price: '32.50', fees: '0' },
-  { id: 2, ticker: 'BBAS3', kind: 'BUY', date: '2026-03-10', quantity: '200', price: '25.20', fees: '0' },
-  { id: 3, ticker: 'B3SA3', kind: 'BUY', date: '2026-05-06', quantity: '300', price: '12.40', fees: '0' },
-  { id: 4, ticker: 'ITUB4', kind: 'BUY', date: '2026-07-20', quantity: '150', price: '34.00', fees: '0' },
-]
-const demoSummary: Summary = { acquisition_cost: '17110', total_purchases: '17110', sale_proceeds: '0', realized_profit: '0', market_value: null, holdings: [{ ticker: 'ITUB4', quantity: '250', cost: '8350', average_price: '33.4' }, { ticker: 'BBAS3', quantity: '200', cost: '5040', average_price: '25.2' }, { ticker: 'B3SA3', quantity: '300', cost: '3720', average_price: '12.4' }] }
+const noSubscription = () => () => {}
+const emptySnapshot = () => null
 const nav = [{ to: '/', label: 'Visão geral', icon: LayoutDashboard }, { to: '/acoes', label: 'Ações', icon: ChartNoAxesCombined }, { to: '/cdbs', label: 'Renda fixa', icon: Landmark }, { to: '/historico', label: 'Histórico', icon: History }, { to: '/simulador', label: 'Simulador', icon: FlaskConical }, { to: '/metas', label: 'Metas', icon: Flag }]
 
 export default function App() {
@@ -39,12 +38,15 @@ export default function App() {
   const connected = !demo && (SUPABASE_AUTH ? auth.status === 'authenticated' && !!auth.session : localConnected)
   const activeToken = SUPABASE_AUTH ? auth.session?.access_token ?? '' : token
   const identity = SUPABASE_AUTH ? auth.session?.user.id ?? 'anonymous' : 'local'
+  const demoRepository = useMemo(() => demo ? new DemoRepository() : null, [demo])
+  const demoState = useSyncExternalStore(demoRepository?.subscribe ?? noSubscription, demoRepository?.getSnapshot ?? emptySnapshot)
+  const privateRepository = useMemo(() => new PrivateRepository(activeToken), [activeToken])
   const page = demo && !PUBLIC_DEMO ? location.pathname.slice(5) || '/' : location.pathname
   const routeTo = (path: string) => demo && !PUBLIC_DEMO ? '/demo' + (path === '/' ? '' : path) : path
-  const summary = useQuery({ queryKey: ['summary', identity], queryFn: ({ signal }) => request<Summary>('dashboard', activeToken, { signal }), enabled: connected && !demo, retry: false })
-  const operations = useQuery({ queryKey: ['operations', identity], queryFn: ({ signal }) => request<Operation[]>('operations', activeToken, { signal }), enabled: connected && !demo, retry: false })
-  const data = demo ? demoSummary : connected ? summary.data : undefined
-  const ops = demo ? demoOps : connected ? operations.data ?? [] : []
+  const summary = useQuery({ queryKey: ['summary', identity], queryFn: ({ signal }) => privateRepository.summary(signal), enabled: connected && !demo, retry: false })
+  const operations = useQuery({ queryKey: ['operations', identity], queryFn: ({ signal }) => privateRepository.list(signal), enabled: connected && !demo, retry: false })
+  const data = demo ? demoState?.summary : connected ? summary.data : undefined
+  const ops = demo ? demoState?.operations ?? [] : connected ? operations.data ?? [] : []
   const busy = summary.isFetching || operations.isFetching
   const apiError = demo ? null : summary.error || operations.error
   useEffect(() => {
@@ -70,22 +72,27 @@ export default function App() {
   let running = 0
   const series = [...ops].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id).map(o => { running += (o.kind === 'BUY' ? 1 : -1) * Number(o.quantity) * Number(o.price); return { date: o.date, value: running } }).filter(o => !months || o.date >= cutoff.toISOString().slice(0, 10))
   async function save(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (demo || !connected || PUBLIC_DEMO) return; setError('')
+    event.preventDefault(); if (!demo && !connected) return; setError('')
     const form = new FormData(event.currentTarget)
-    try { await request('operations', activeToken, { method: 'POST', body: JSON.stringify(Object.fromEntries(form)) }); setModal(false); await refresh() } catch (e) { reportError(e) }
+    try { const input = Object.fromEntries(form) as OperationInput; if (demo) demoRepository!.create(input); else await privateRepository.create(input); setModal(false); if (!demo) await refresh() } catch (e) { reportError(e) }
   }
   async function remove(id: number) {
-    if (demo || !connected || PUBLIC_DEMO) return
+    if (!demo && !connected) return
     if (!window.confirm('Excluir esta operação e recalcular a carteira?')) return
-    try { await request(`operations/${id}`, activeToken, { method: 'DELETE' }); await refresh() } catch (e) { reportError(e) }
+    try { if (demo) demoRepository!.delete(id); else { await privateRepository.delete(id); await refresh() } } catch (e) { reportError(e) }
   }
   async function exportData() {
     try {
-      const payload = demo ? { demonstration: true, operations: demoOps } : await request('export', activeToken)
+      const payload = demo ? { demonstration: true, operations: demoState?.operations ?? [] } : await privateRepository.export()
       const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
       const a = document.createElement('a'); a.href = url; a.download = demo ? 'investment-demo.json' : 'investment-registros.json'; a.click(); URL.revokeObjectURL(url)
     } catch (e) { reportError(e) }
   }
+  function resetDemo() {
+    if (!demoRepository || !window.confirm('Restaurar a carteira fictícia inicial? Suas alterações demonstrativas serão substituídas.')) return
+    try { demoRepository.reset(); setError('') } catch (cause) { reportError(cause) }
+  }
+  if (PUBLIC_DEMO && location.pathname === '/login') return <DemoAccessPage/>
   const authorized = connected && summary.isSuccess && operations.isSuccess && !apiError
   const logout = () => { clearPrivate(); setConnected(false); setToken(''); if (SUPABASE_AUTH) void auth.logout(); navigate('/login', { replace: true }) }
   if (!demo && !authorized) {
@@ -94,11 +101,12 @@ export default function App() {
   }
   if (!demo && location.pathname === '/login') return <Navigate to="/" replace/>
   return <div className="shell">
-    <aside className="sidebar"><a className="brand" href="/"><span className="brand-icon"><ChartNoAxesCombined size={23}/></span> investment<span className="brand-dot">.</span></a><div className="workspace"><div className="avatar">IP</div><div>Meu patrimônio<small>Carteira pessoal</small></div><ChevronRight size={16}/></div><p className="nav-caption">WORKSPACE</p><nav>{nav.map(n => <NavLink end to={routeTo(n.to)} key={n.to}><n.icon size={19}/>{n.label}</NavLink>)}</nav><div className="sidebar-bottom"><ShieldCheck size={22}/><p>Seu futuro começa aqui.<small>Uma decisão de cada vez.</small></p></div><div className="profile"><div className="avatar">EU</div><div>Investidor pessoal<small>Ambiente local · Fase 1</small></div><span className="status-dot"/></div></aside>
+    <aside className="sidebar"><a className="brand" href="/"><span className="brand-icon"><ChartNoAxesCombined size={23}/></span> investment<span className="brand-dot">.</span></a><div className="workspace"><div className="avatar">IP</div><div>Meu patrimônio<small>Carteira pessoal</small></div><ChevronRight size={16}/></div><p className="nav-caption">WORKSPACE</p><nav>{nav.filter(n => !demo || ['/', '/acoes', '/historico'].includes(n.to)).map(n => <NavLink end to={routeTo(n.to)} key={n.to}><n.icon size={19}/>{n.label}</NavLink>)}</nav><div className="sidebar-bottom"><ShieldCheck size={22}/><p>Seu futuro começa aqui.<small>Uma decisão de cada vez.</small></p></div><div className="profile"><div className="avatar">EU</div><div>Investidor pessoal<small>Ambiente local · Fase 1</small></div><span className="status-dot"/></div></aside>
     <main><header><div className="breadcrumb">Workspace <ChevronRight size={13}/> <span>{nav.find(n => n.to === page)?.label}</span></div><span className="local-badge"><span className="status-dot"/> {PUBLIC_DEMO ? 'Modo Demonstração' : 'Ambiente pessoal'}</span></header>
       {!demo && <div className="access-confirmation" role="status"><span>Acesso autorizado. Sua carteira está conectada.</span><span className="account-email">{auth.session?.user.email ?? (SUPABASE_AUTH ? auth.session?.user.id : 'Desenvolvimento local')}</span></div>}
-      <section className="page-title"><div><p className="eyebrow">CLAREZA PARA O SEU PRÓXIMO PASSO</p><h1>{nav.find(n => n.to === page)?.label ?? 'Página não encontrada'}</h1><p>Acompanhe suas escolhas. Construa seu amanhã.</p></div><div className="actions"><Button variant="outline" onClick={exportData} disabled={!demo && !connected}><Download size={16}/> Exportar</Button><Button onClick={() => setModal(true)} disabled={demo || !connected}><Plus size={17}/> Nova operação</Button></div></section>
-      <div className="connection"><div><span className={`status-dot ${demo ? 'amber' : ''}`}/><strong>{demo ? 'Modo Demonstração · dados fictícios' : connected ? 'Carteira pessoal' : 'Conecte sua carteira'}</strong><span>{demo ? 'Sem cotações externas. Nenhum registro real é alterado.' : SUPABASE_AUTH ? 'Acesso privado com Supabase Auth.' : 'Token mantido somente nesta sessão da página.'}</span></div><div className="connection-actions">{!connected && !demo && !SUPABASE_AUTH && <><input aria-label="Token da API" type="password" placeholder="Token da API" value={token} onChange={e => setToken(e.target.value)}/><Button variant="outline" disabled={!token} onClick={() => setConnected(true)}>Conectar</Button></>}<button hidden={PUBLIC_DEMO} className="text-button" onClick={() => { void toggleDemo() }}>{demo ? 'Voltar ao login' : 'Explorar demonstração'} <ArrowUpRight size={14}/></button>{connected && <button className="text-button" onClick={logout}>Desconectar</button>}</div></div>
+      <section className="page-title"><div><p className="eyebrow">CLAREZA PARA O SEU PRÓXIMO PASSO</p><h1>{nav.find(n => n.to === page)?.label ?? 'Página não encontrada'}</h1><p>Acompanhe suas escolhas. Construa seu amanhã.</p></div><div className="actions"><Button variant="outline" onClick={exportData} disabled={!demo && !connected}><Download size={16}/> Exportar</Button><Button onClick={() => setModal(true)} disabled={!demo && !connected}><Plus size={17}/> Nova operação</Button></div></section>
+      <div className="connection"><div><span className={`status-dot ${demo ? 'amber' : ''}`}/><strong>{demo ? 'Modo Demonstração · dados fictícios' : connected ? 'Carteira pessoal' : 'Conecte sua carteira'}</strong><span>{demo ? 'Dados fictícios salvos apenas neste navegador. Sem acesso à carteira privada.' : SUPABASE_AUTH ? 'Acesso privado com Supabase Auth.' : 'Token mantido somente nesta sessão da página.'}</span></div><div className="connection-actions">{!connected && !demo && !SUPABASE_AUTH && <><input aria-label="Token da API" type="password" placeholder="Token da API" value={token} onChange={e => setToken(e.target.value)}/><Button variant="outline" disabled={!token} onClick={() => setConnected(true)}>Conectar</Button></>}{demo && <button className="text-button" onClick={resetDemo}>Restaurar demonstração</button>}<button className="text-button" onClick={() => { void toggleDemo() }}>{demo ? 'Entrar na minha carteira' : 'Explorar demonstração'} <ArrowUpRight size={14}/></button>{connected && <button className="text-button" onClick={logout}>Desconectar</button>}</div></div>
+      {demoState?.notice && demo && <div className="connection" role="status">{demoState.notice}</div>}
       {(error || apiError) && <div className="error" role="alert">{error || (apiError as Error).message}<button onClick={() => {setError(''); void refresh()}}>Tentar novamente</button></div>}
       {busy && <p role="status">Carregando carteira…</p>}
       {(page === '/' || page === '/acoes') && <>
@@ -107,7 +115,7 @@ export default function App() {
         <article className="panel allocation"><div className="panel-heading"><div><h3>Composição em ações</h3><p>Distribuição pelo custo de aquisição</p></div><span className="tag">B3</span></div><div className="donut" style={{ background: data?.holdings.length ? `conic-gradient(${data.holdings.map((h, i) => { const start = data.holdings.slice(0, i).reduce((sum, item) => sum + Number(item.cost), 0) / Number(data.acquisition_cost) * 100; const end = start + Number(h.cost) / Number(data.acquisition_cost) * 100; return `${['#68e5b4', '#8298f8', '#e8c77c'][i % 3]} ${start}% ${end}%` }).join(', ')})` : '#253039' }}><div><span>Ativos em carteira</span><strong>{data?.holdings.length ?? 0}</strong></div></div><div className="allocation-list">{data?.holdings.map((h, i) => <div key={h.ticker}><span><i style={{ background: ['#68e5b4', '#8298f8', '#e8c77c'][i % 3] }}/>{h.ticker}</span><strong>{(Number(h.cost) / Number(data.acquisition_cost) * 100).toFixed(1)}%</strong></div>)}{!data?.holdings.length && <p>Nenhuma posição cadastrada.</p>}</div></article></div>
         {page === '/acoes' && <article className="panel"><div className="panel-heading"><h3>Posições por custo médio</h3></div><div className="table-scroll"><table><thead><tr><th>Ativo</th><th>Quantidade</th><th>Preço médio</th><th>Custo da posição</th></tr></thead><tbody>{data?.holdings.map(h => <tr key={h.ticker}><td>{h.ticker}</td><td>{number(h.quantity)}</td><td>{money(h.average_price)}</td><td>{money(h.cost)}</td></tr>)}</tbody></table></div></article>}
       </>}
-      {(page === '/' || page === '/historico') && <article className="panel transactions"><div className="panel-heading"><div><h3>{page === '/' ? 'Últimas movimentações' : 'Histórico de operações'}</h3><p>Cada movimento, uma parte da sua trajetória.</p></div><input aria-label="Pesquisar ticker" placeholder="Buscar ativo…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="table-scroll"><table><thead><tr><th>Ativo</th><th>Operação</th><th><button onClick={() => setSortAsc(!sortAsc)}>Data {sortAsc ? '↑' : '↓'}</button></th><th>Quantidade</th><th>Preço unitário</th><th>Taxas</th><th>Valor bruto</th><th/></tr></thead><tbody>{filtered.slice(0, page === '/' ? 5 : undefined).map(o => <tr key={o.id}><td><span className="ticker-icon">{o.ticker.slice(0, 2)}</span><strong>{o.ticker}</strong></td><td><span className={`operation-tag ${o.kind === 'SELL' ? 'sell' : ''}`}>{o.kind === 'BUY' ? <ArrowDownLeft size={12}/> : <ArrowUpRight size={12}/>} {o.kind === 'BUY' ? 'Compra' : 'Venda'}</span></td><td>{new Date(o.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td><td>{number(o.quantity)}</td><td>{money(o.price)}</td><td>{money(o.fees)}</td><td>{money(Number(o.quantity) * Number(o.price))}</td><td>{!demo && <button aria-label={`Excluir operação ${o.id}`} onClick={() => remove(o.id)}><Trash2 size={15}/></button>}</td></tr>)}</tbody></table></div>{!filtered.length && <div className="empty compact"><p>Nenhuma movimentação encontrada.</p></div>}<div className="table-footer">{filtered.length} operações encontradas <NavLink to={routeTo("/historico")}>Ver histórico completo <ArrowUpRight size={14}/></NavLink></div></article>}
+      {(page === '/' || page === '/historico') && <article className="panel transactions"><div className="panel-heading"><div><h3>{page === '/' ? 'Últimas movimentações' : 'Histórico de operações'}</h3><p>Cada movimento, uma parte da sua trajetória.</p></div><input aria-label="Pesquisar ticker" placeholder="Buscar ativo…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="table-scroll"><table><thead><tr><th>Ativo</th><th>Operação</th><th><button onClick={() => setSortAsc(!sortAsc)}>Data {sortAsc ? '↑' : '↓'}</button></th><th>Quantidade</th><th>Preço unitário</th><th>Taxas</th><th>Valor bruto</th><th/></tr></thead><tbody>{filtered.slice(0, page === '/' ? 5 : undefined).map(o => <tr key={o.id}><td><span className="ticker-icon">{o.ticker.slice(0, 2)}</span><strong>{o.ticker}</strong></td><td><span className={`operation-tag ${o.kind === 'SELL' ? 'sell' : ''}`}>{o.kind === 'BUY' ? <ArrowDownLeft size={12}/> : <ArrowUpRight size={12}/>} {o.kind === 'BUY' ? 'Compra' : 'Venda'}</span></td><td>{new Date(o.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td><td>{number(o.quantity)}</td><td>{money(o.price)}</td><td>{money(o.fees)}</td><td>{money(Number(o.quantity) * Number(o.price))}</td><td>{<button aria-label={`Excluir operação ${o.id}`} onClick={() => remove(o.id)}><Trash2 size={15}/></button>}</td></tr>)}</tbody></table></div>{!filtered.length && <div className="empty compact"><p>Nenhuma movimentação encontrada.</p></div>}<div className="table-footer">{filtered.length} operações encontradas <NavLink to={routeTo("/historico")}>Ver histórico completo <ArrowUpRight size={14}/></NavLink></div></article>}
       {['/cdbs', '/metas', '/simulador'].includes(page) && <article className="panel planned"><FlaskConical size={32}/><h2>{page === '/cdbs' ? 'Renda fixa, com precisão por lote' : page === '/metas' ? 'Seu próximo marco financeiro' : 'Planeje o que vem pela frente'}</h2><p>{page === '/cdbs' ? 'Cadastro de CDBs, aportes e resgates por lote serão implementados na Fase 3, junto aos cálculos e testes tributários.' : page === '/metas' ? 'Metas e projeções de conclusão estão planejadas para a Fase 5.' : 'Simulações com taxas hipotéticas e reinvestimento estão planejadas para a Fase 5.'}</p><span className="tag">Planejado · consulte docs/architecture.md</span></article>}
       <footer><span><ShieldCheck size={13}/> Seus registros. Suas decisões.</span><span>Investment Dashboard · Fase 1 {demo && '· Demonstração'}</span></footer>
     </main>

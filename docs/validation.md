@@ -1,4 +1,17 @@
-# Verificação da Fase 1.6
+# Verificação da Fase 1.6.2
+
+Em 27/10/2026, sem deploy ou push:
+
+- **48 testes frontend aprovados**: fluxo privado existente, demonstração interativa pela interface, recarga/restauração, escrita/exclusão local, validações, falha de quota, versões incompatíveis e separação dos repositórios.
+- **22 testes backend aprovados**, com a integração PostgreSQL opcional ignorada nessa execução; **1 integração PostgreSQL aprovada separadamente** em container temporário exclusivo de testes.
+- Quatro casos fictícios compartilhados entre Vitest e Pytest verificam custo médio, taxas, resultado realizado, liquidação e cronologia por data/ID.
+- Builds privado e público aprovados; artefato final em modo público demonstrativo. Aviso não bloqueante de bundle maior que 500 kB permanece.
+- Auditoria npm: **0 vulnerabilidades reportadas**. O aviso não bloqueante do adaptador Starlette/httpx nos testes backend permanece.
+- Nenhuma alteração de DATABASE_URL, registros financeiros pessoais, autenticação privada, migrations ou volumes Docker. A persistência nova é exclusiva de dados fictícios no navegador.
+
+Instruções e limites: [demonstração interativa](interactive-demo.md). A versão anterior já havia separado login/dashboard; essa fronteira permanece e os testes de autenticação existentes foram executados novamente.
+
+## Histórico: Fase 1.6
 
 Em 27/10/2026:
 

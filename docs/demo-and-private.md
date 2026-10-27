@@ -4,18 +4,20 @@
 
 | Aspecto | Demonstração pública | Carteira privada local | Backend Supabase preparado |
 | --- | --- | --- | --- |
-| Dados | Fictícios, definidos no código | PostgreSQL local | PostgreSQL separado por proprietário |
+| Dados | Fixtures e operações fictícias locais | PostgreSQL local | PostgreSQL separado por proprietário |
 | Autenticação | Nenhuma | Token em memória | JWT assimétrico + UUID autorizado |
 | Leitura da API | Bloqueada em `request()` | Permitida com token | Permitida após validação no backend |
-| Escrita | Bloqueada nos handlers e na camada HTTP | Compra/venda/exclusão autenticadas | Operações limitadas ao proprietário |
+| Escrita | DemoRepository em localStorage; HTTP bloqueado | Compra/venda/exclusão autenticadas | Operações limitadas ao proprietário |
 | Banco | Nenhum | Registros `owner_id IS NULL` | Registros com UUID do usuário |
-| Exportação | Apenas fixtures fictícias | Registros do usuário local | Registros do usuário autenticado |
+| Exportação | Apenas carteira demonstrativa do navegador | Registros do usuário local | Registros do usuário autenticado |
 
 Desde a Fase 1.6, o frontend privado possui login Supabase. Produção permanece demonstrativa por padrão; somente `VITE_APP_MODE=private` habilita explicitamente a interface privada. `VITE_PUBLIC_DEMO=true` sempre prevalece, sem criar cliente Supabase. O arquivo `vercel.json` continua exclusivo da demonstração, com CSP `connect-src 'none'`. O modelo privado é separado. Veja [configuração de Auth](supabase-auth.md).
 
 O modo local via `npm run dev` continua oferecendo token e demonstração com `VITE_AUTH_MODE=local`. O modo `supabase` usa login e sessão em sessionStorage por aba. A mudança de modo cancela requisições, descarta o cache e encerra a sessão Supabase ao entrar na demonstração. As chaves das consultas contêm identidade do usuário, nunca tokens. Nenhuma sessão privada é salva em localStorage ou cookies.
 
 Os mesmos componentes renderizam os dois conjuntos de dados. Não há cópia de registros pessoais nos fixtures. Os valores de ITUB4, BBAS3 e B3SA3 da demonstração são inventados e não devem ser apresentados como cotações reais. O histórico demonstrativo é de operações de compra; não existe um livro de aportes externos implementado.
+
+Desde a Fase 1.6.2, a demonstração aceita compras, vendas e exclusões fictícias, com persistência versionada na chave `investment-demo-portfolio`. O DemoRepository nunca acessa rede ou autenticação; o PrivateRepository nunca usa localStorage. Consulte [demonstração interativa](interactive-demo.md) para limites, recuperação de dados corrompidos e restauração.
 
 ## Autorização no servidor
 
@@ -29,4 +31,4 @@ A política RLS usa `app.user_id` e `app.auth_mode`, definidos por `set_config(.
 
 Configurar Supabase Auth, desativar inscrições públicas, criar contas manualmente, revisar allowlist, configurar papel restrito/TLS, validar RLS e homologar o login implementado. Apenas então avaliar a migração explícita dos registros locais, com backup e conferência. O build público permanece independente. Para testar localmente a identidade Supabase, manter o PostgreSQL Docker atual e sua DATABASE_URL.
 
-O teste frontend verifica navegação sem login, ausência do campo de token, bloqueio de escrita e zero chamadas HTTP mesmo quando a API está indisponível. Os testes backend verificam assinatura, expiração, issuer, audience, role, allowlist e separação de carteiras. A integração PostgreSQL verifica a política RLS com um papel não privilegiado.
+O teste frontend verifica navegação sem login, ausência do campo de token, escrita somente local e zero chamadas HTTP mesmo quando a API está indisponível. Os testes backend verificam assinatura, expiração, issuer, audience, role, allowlist e separação de carteiras. A integração PostgreSQL verifica a política RLS com um papel não privilegiado.

@@ -2,7 +2,7 @@
 
 Plataforma full stack para acompanhamento de investimentos em ações brasileiras. Reúne operações, posições por custo médio, resultados realizados e visualizações em uma interface responsiva em português, com valores em reais e persistência PostgreSQL.
 
-**Fase atual: 1.6 — integração do Supabase Auth.** Login por e-mail/senha, recuperação e renovação de sessão, logout e envio de JWT ao FastAPI implementados. A demonstração permanece independente e o token local continua disponível somente para desenvolvimento. Não foi executado push ou deploy nesta etapa.
+**Fase atual: 1.6.2 — demonstração interativa.** Visitantes podem comprar, vender e excluir operações fictícias, acompanhar custo médio, taxas e resultados e restaurar a carteira inicial. A demonstração persiste exclusivamente no navegador, sem login ou API privada. A autenticação Supabase existente foi preservada. Não foi executado push ou deploy nesta etapa.
 
 Tecnologias: React 19, TypeScript, Vite, Tailwind, componentes shadcn/Radix, Recharts, Lucide, React Router, TanStack Query; Python 3.12+, FastAPI, SQLAlchemy, Alembic, Pydantic, PostgreSQL 17, Pytest e PyJWT com criptografia.
 
@@ -11,6 +11,7 @@ Documentação:
 - [Arquitetura, fórmulas e próximas fases](docs/architecture.md).
 - [Configurar e testar Supabase Auth localmente](docs/supabase-auth.md).
 - [Separação entre demonstração e carteira privada](docs/demo-and-private.md).
+- [Como testar a demonstração interativa](docs/interactive-demo.md).
 - [Auditoria de segurança e arquivos alterados](docs/security-audit.md).
 - [Configuração futura de Vercel, Render e Supabase](docs/deployment.md).
 - [Testes e limites da verificação](docs/validation.md).
@@ -22,7 +23,7 @@ Documentação:
 - Cadastro de compras/vendas, custo médio com taxas e validação de posição cronológica.
 - Histórico com pesquisa, ordenação por data e exclusão confirmada.
 - Persistência PostgreSQL, migrações Alembic, exportação JSON e token de acesso local.
-- Demonstração opcional, em memória e separada dos registros reais.
+- Demonstração interativa opcional, com localStorage exclusivo para dados fictícios e separada dos registros reais.
 
 O patrimônio a mercado está indisponível até cadastrar cotações em uma fase posterior. Os valores da demonstração são fictícios, sem vínculo com preços reais. Compras de ativos não equivalem a aportes externos; o gráfico atual mostra fluxo de operações. CDBs, simulador, metas, proventos e benchmarks estão planejados; não foram implementados nesta fase.
 

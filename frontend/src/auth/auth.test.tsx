@@ -106,7 +106,7 @@ test('demonstração privada permite navegar e voltar ao login sem consultas fin
   const history = host.querySelector('a[href="/demo/historico"]')!
   await act(async () => history.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })))
   expect(host.textContent).toContain('Histórico de operações')
-  const back = [...host.querySelectorAll('button')].find(b => b.textContent?.includes('Voltar ao login'))!
+  const back = [...host.querySelectorAll('button')].find(b => b.textContent?.includes('Entrar na minha carteira'))!
   await act(async () => back.click())
   expect(host.querySelector('.sidebar')).toBeNull()
   expect(host.querySelector('form[aria-label="Login da carteira"]')).not.toBeNull()

@@ -1,5 +1,7 @@
 # Auditoria da Fase 1.5
 
+Atualização 1.6.2: a demonstração agora aceita operações fictícias persistidas exclusivamente na chave `investment-demo-portfolio`. `DemoRepository` não depende de API/Supabase; `PrivateRepository` não usa Storage. A criação/exclusão valida o histórico antes de persistir e a restauração toca somente a chave demonstrativa. Os testes confirmam ausência de chamadas financeiras HTTP na demonstração e ausência de acesso a localStorage no repositório privado. Isso não altera a autenticação privada existente.
+
 Escopo: código e arquivos locais do projeto, configuração de banco, autenticação, fronteira de demonstração e preparação para GitHub/Vercel/Render/Supabase. Nenhum segredo ou registro financeiro é reproduzido neste documento.
 
 Atualização da Fase 1.6: [login Supabase implementado](supabase-auth.md), sem cadastro, com sessão por aba, recuperação confirmada por getUser, renovação, limpeza de cache por identidade e tratamento de 401. O backend continua recusando HS256 e exige assinatura assimétrica verificável por JWKS. O repositório Git agora existe, criado pelo proprietário após a Fase 1.5; não foi executado push nesta etapa. A constatação anterior de ausência de Git refere-se à auditoria inicial.
