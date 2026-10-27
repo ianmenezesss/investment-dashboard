@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ArrowDownLeft, ArrowUpRight, ChartNoAxesCombined, LayoutDashboard, Wallet, Landmark, History, FlaskConical, Flag, Plus, Download, X, ShieldCheck, ChevronRight, Eye, Trash2 } from 'lucide-react'
@@ -9,7 +9,7 @@ import { request, ApiError, type Operation, type Summary } from './api'
 import './style.css'
 import { PUBLIC_DEMO, SUPABASE_AUTH } from './runtime'
 import { useAuth } from './auth/useAuth'
-import { LoginPanel } from './auth/LoginPanel'
+import { LoginPage } from './auth/LoginPage'
 
 const money = (v: string | number) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const number = (v: string | number) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 4 })
@@ -23,7 +23,9 @@ const demoSummary: Summary = { acquisition_cost: '17110', total_purchases: '1711
 const nav = [{ to: '/', label: 'Visão geral', icon: LayoutDashboard }, { to: '/acoes', label: 'Ações', icon: ChartNoAxesCombined }, { to: '/cdbs', label: 'Renda fixa', icon: Landmark }, { to: '/historico', label: 'Histórico', icon: History }, { to: '/simulador', label: 'Simulador', icon: FlaskConical }, { to: '/metas', label: 'Metas', icon: Flag }]
 
 export default function App() {
-  const [demo, setDemo] = useState(PUBLIC_DEMO)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const demo = PUBLIC_DEMO || location.pathname === '/demo' || location.pathname.startsWith('/demo/')
   const [token, setToken] = useState('')
   const [localConnected, setConnected] = useState(false)
   const [modal, setModal] = useState(false)
@@ -37,7 +39,8 @@ export default function App() {
   const connected = !demo && (SUPABASE_AUTH ? auth.status === 'authenticated' && !!auth.session : localConnected)
   const activeToken = SUPABASE_AUTH ? auth.session?.access_token ?? '' : token
   const identity = SUPABASE_AUTH ? auth.session?.user.id ?? 'anonymous' : 'local'
-  const page = useLocation().pathname
+  const page = demo && !PUBLIC_DEMO ? location.pathname.slice(5) || '/' : location.pathname
+  const routeTo = (path: string) => demo && !PUBLIC_DEMO ? '/demo' + (path === '/' ? '' : path) : path
   const summary = useQuery({ queryKey: ['summary', identity], queryFn: ({ signal }) => request<Summary>('dashboard', activeToken, { signal }), enabled: connected && !demo, retry: false })
   const operations = useQuery({ queryKey: ['operations', identity], queryFn: ({ signal }) => request<Operation[]>('operations', activeToken, { signal }), enabled: connected && !demo, retry: false })
   const data = demo ? demoSummary : connected ? summary.data : undefined
@@ -57,7 +60,7 @@ export default function App() {
   async function toggleDemo() {
     clearPrivate(); setConnected(false); setToken('')
     if (!demo && SUPABASE_AUTH) await auth.logout()
-    setDemo(!demo)
+    navigate(demo ? '/login' : '/demo')
   }
   const refresh = async () => { await client.invalidateQueries({ queryKey: ['summary'] }); await client.invalidateQueries({ queryKey: ['operations'] }) }
   const months = period === '1M' ? 1 : period === '3M' ? 3 : period === '6M' ? 6 : period === '1A' ? 12 : 0
@@ -83,12 +86,19 @@ export default function App() {
       const a = document.createElement('a'); a.href = url; a.download = demo ? 'investment-demo.json' : 'investment-registros.json'; a.click(); URL.revokeObjectURL(url)
     } catch (e) { reportError(e) }
   }
+  const authorized = connected && summary.isSuccess && operations.isSuccess && !apiError
+  const logout = () => { clearPrivate(); setConnected(false); setToken(''); if (SUPABASE_AUTH) void auth.logout(); navigate('/login', { replace: true }) }
+  if (!demo && !authorized) {
+    if (location.pathname !== '/login') return <Navigate to="/login" replace/>
+    return <LoginPage loading={SUPABASE_AUTH ? auth.status === 'loading' || connected && !apiError : localConnected && !apiError} error={auth.error || error || (apiError as Error | null)?.message || ''} onLogin={auth.login} local={!SUPABASE_AUTH} onLocalLogin={value => { clearPrivate(); setToken(value); setConnected(true) }} onDemo={() => { void toggleDemo() }} connected={connected} onLogout={logout}/>
+  }
+  if (!demo && location.pathname === '/login') return <Navigate to="/" replace/>
   return <div className="shell">
-    <aside className="sidebar"><a className="brand" href="/"><span className="brand-icon"><ChartNoAxesCombined size={23}/></span> investment<span className="brand-dot">.</span></a><div className="workspace"><div className="avatar">IP</div><div>Meu patrimônio<small>Carteira pessoal</small></div><ChevronRight size={16}/></div><p className="nav-caption">WORKSPACE</p><nav>{nav.map(n => <NavLink end to={n.to} key={n.to}><n.icon size={19}/>{n.label}</NavLink>)}</nav><div className="sidebar-bottom"><ShieldCheck size={22}/><p>Seu futuro começa aqui.<small>Uma decisão de cada vez.</small></p></div><div className="profile"><div className="avatar">EU</div><div>Investidor pessoal<small>Ambiente local · Fase 1</small></div><span className="status-dot"/></div></aside>
+    <aside className="sidebar"><a className="brand" href="/"><span className="brand-icon"><ChartNoAxesCombined size={23}/></span> investment<span className="brand-dot">.</span></a><div className="workspace"><div className="avatar">IP</div><div>Meu patrimônio<small>Carteira pessoal</small></div><ChevronRight size={16}/></div><p className="nav-caption">WORKSPACE</p><nav>{nav.map(n => <NavLink end to={routeTo(n.to)} key={n.to}><n.icon size={19}/>{n.label}</NavLink>)}</nav><div className="sidebar-bottom"><ShieldCheck size={22}/><p>Seu futuro começa aqui.<small>Uma decisão de cada vez.</small></p></div><div className="profile"><div className="avatar">EU</div><div>Investidor pessoal<small>Ambiente local · Fase 1</small></div><span className="status-dot"/></div></aside>
     <main><header><div className="breadcrumb">Workspace <ChevronRight size={13}/> <span>{nav.find(n => n.to === page)?.label}</span></div><span className="local-badge"><span className="status-dot"/> {PUBLIC_DEMO ? 'Modo Demonstração' : 'Ambiente pessoal'}</span></header>
+      {!demo && <div className="access-confirmation" role="status"><span>Acesso autorizado. Sua carteira está conectada.</span><span className="account-email">{auth.session?.user.email ?? (SUPABASE_AUTH ? auth.session?.user.id : 'Desenvolvimento local')}</span></div>}
       <section className="page-title"><div><p className="eyebrow">CLAREZA PARA O SEU PRÓXIMO PASSO</p><h1>{nav.find(n => n.to === page)?.label ?? 'Página não encontrada'}</h1><p>Acompanhe suas escolhas. Construa seu amanhã.</p></div><div className="actions"><Button variant="outline" onClick={exportData} disabled={!demo && !connected}><Download size={16}/> Exportar</Button><Button onClick={() => setModal(true)} disabled={demo || !connected}><Plus size={17}/> Nova operação</Button></div></section>
-      <div className="connection"><div><span className={`status-dot ${demo ? 'amber' : ''}`}/><strong>{demo ? 'Modo Demonstração · dados fictícios' : connected ? 'Carteira pessoal' : 'Conecte sua carteira'}</strong><span>{demo ? 'Sem cotações externas. Nenhum registro real é alterado.' : SUPABASE_AUTH ? 'Acesso privado com Supabase Auth.' : 'Token mantido somente nesta sessão da página.'}</span></div><div className="connection-actions">{!connected && !demo && !SUPABASE_AUTH && <><input aria-label="Token da API" type="password" placeholder="Token da API" value={token} onChange={e => setToken(e.target.value)}/><Button variant="outline" disabled={!token} onClick={() => setConnected(true)}>Conectar</Button></>}<button hidden={PUBLIC_DEMO} className="text-button" onClick={() => { void toggleDemo() }}>{demo ? 'Sair da demonstração' : 'Explorar demonstração'} <ArrowUpRight size={14}/></button>{connected && <button className="text-button" onClick={() => {clearPrivate(); setConnected(false); setToken(''); if (SUPABASE_AUTH) void auth.logout()}}>Desconectar</button>}</div></div>
-      {!demo && SUPABASE_AUTH && !connected && <LoginPanel loading={auth.status === 'loading'} error={auth.error} onLogin={auth.login}/>}
+      <div className="connection"><div><span className={`status-dot ${demo ? 'amber' : ''}`}/><strong>{demo ? 'Modo Demonstração · dados fictícios' : connected ? 'Carteira pessoal' : 'Conecte sua carteira'}</strong><span>{demo ? 'Sem cotações externas. Nenhum registro real é alterado.' : SUPABASE_AUTH ? 'Acesso privado com Supabase Auth.' : 'Token mantido somente nesta sessão da página.'}</span></div><div className="connection-actions">{!connected && !demo && !SUPABASE_AUTH && <><input aria-label="Token da API" type="password" placeholder="Token da API" value={token} onChange={e => setToken(e.target.value)}/><Button variant="outline" disabled={!token} onClick={() => setConnected(true)}>Conectar</Button></>}<button hidden={PUBLIC_DEMO} className="text-button" onClick={() => { void toggleDemo() }}>{demo ? 'Voltar ao login' : 'Explorar demonstração'} <ArrowUpRight size={14}/></button>{connected && <button className="text-button" onClick={logout}>Desconectar</button>}</div></div>
       {(error || apiError) && <div className="error" role="alert">{error || (apiError as Error).message}<button onClick={() => {setError(''); void refresh()}}>Tentar novamente</button></div>}
       {busy && <p role="status">Carregando carteira…</p>}
       {(page === '/' || page === '/acoes') && <>
@@ -97,7 +107,7 @@ export default function App() {
         <article className="panel allocation"><div className="panel-heading"><div><h3>Composição em ações</h3><p>Distribuição pelo custo de aquisição</p></div><span className="tag">B3</span></div><div className="donut" style={{ background: data?.holdings.length ? `conic-gradient(${data.holdings.map((h, i) => { const start = data.holdings.slice(0, i).reduce((sum, item) => sum + Number(item.cost), 0) / Number(data.acquisition_cost) * 100; const end = start + Number(h.cost) / Number(data.acquisition_cost) * 100; return `${['#68e5b4', '#8298f8', '#e8c77c'][i % 3]} ${start}% ${end}%` }).join(', ')})` : '#253039' }}><div><span>Ativos em carteira</span><strong>{data?.holdings.length ?? 0}</strong></div></div><div className="allocation-list">{data?.holdings.map((h, i) => <div key={h.ticker}><span><i style={{ background: ['#68e5b4', '#8298f8', '#e8c77c'][i % 3] }}/>{h.ticker}</span><strong>{(Number(h.cost) / Number(data.acquisition_cost) * 100).toFixed(1)}%</strong></div>)}{!data?.holdings.length && <p>Nenhuma posição cadastrada.</p>}</div></article></div>
         {page === '/acoes' && <article className="panel"><div className="panel-heading"><h3>Posições por custo médio</h3></div><div className="table-scroll"><table><thead><tr><th>Ativo</th><th>Quantidade</th><th>Preço médio</th><th>Custo da posição</th></tr></thead><tbody>{data?.holdings.map(h => <tr key={h.ticker}><td>{h.ticker}</td><td>{number(h.quantity)}</td><td>{money(h.average_price)}</td><td>{money(h.cost)}</td></tr>)}</tbody></table></div></article>}
       </>}
-      {(page === '/' || page === '/historico') && <article className="panel transactions"><div className="panel-heading"><div><h3>{page === '/' ? 'Últimas movimentações' : 'Histórico de operações'}</h3><p>Cada movimento, uma parte da sua trajetória.</p></div><input aria-label="Pesquisar ticker" placeholder="Buscar ativo…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="table-scroll"><table><thead><tr><th>Ativo</th><th>Operação</th><th><button onClick={() => setSortAsc(!sortAsc)}>Data {sortAsc ? '↑' : '↓'}</button></th><th>Quantidade</th><th>Preço unitário</th><th>Taxas</th><th>Valor bruto</th><th/></tr></thead><tbody>{filtered.slice(0, page === '/' ? 5 : undefined).map(o => <tr key={o.id}><td><span className="ticker-icon">{o.ticker.slice(0, 2)}</span><strong>{o.ticker}</strong></td><td><span className={`operation-tag ${o.kind === 'SELL' ? 'sell' : ''}`}>{o.kind === 'BUY' ? <ArrowDownLeft size={12}/> : <ArrowUpRight size={12}/>} {o.kind === 'BUY' ? 'Compra' : 'Venda'}</span></td><td>{new Date(o.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td><td>{number(o.quantity)}</td><td>{money(o.price)}</td><td>{money(o.fees)}</td><td>{money(Number(o.quantity) * Number(o.price))}</td><td>{!demo && <button aria-label={`Excluir operação ${o.id}`} onClick={() => remove(o.id)}><Trash2 size={15}/></button>}</td></tr>)}</tbody></table></div>{!filtered.length && <div className="empty compact"><p>Nenhuma movimentação encontrada.</p></div>}<div className="table-footer">{filtered.length} operações encontradas <NavLink to="/historico">Ver histórico completo <ArrowUpRight size={14}/></NavLink></div></article>}
+      {(page === '/' || page === '/historico') && <article className="panel transactions"><div className="panel-heading"><div><h3>{page === '/' ? 'Últimas movimentações' : 'Histórico de operações'}</h3><p>Cada movimento, uma parte da sua trajetória.</p></div><input aria-label="Pesquisar ticker" placeholder="Buscar ativo…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="table-scroll"><table><thead><tr><th>Ativo</th><th>Operação</th><th><button onClick={() => setSortAsc(!sortAsc)}>Data {sortAsc ? '↑' : '↓'}</button></th><th>Quantidade</th><th>Preço unitário</th><th>Taxas</th><th>Valor bruto</th><th/></tr></thead><tbody>{filtered.slice(0, page === '/' ? 5 : undefined).map(o => <tr key={o.id}><td><span className="ticker-icon">{o.ticker.slice(0, 2)}</span><strong>{o.ticker}</strong></td><td><span className={`operation-tag ${o.kind === 'SELL' ? 'sell' : ''}`}>{o.kind === 'BUY' ? <ArrowDownLeft size={12}/> : <ArrowUpRight size={12}/>} {o.kind === 'BUY' ? 'Compra' : 'Venda'}</span></td><td>{new Date(o.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td><td>{number(o.quantity)}</td><td>{money(o.price)}</td><td>{money(o.fees)}</td><td>{money(Number(o.quantity) * Number(o.price))}</td><td>{!demo && <button aria-label={`Excluir operação ${o.id}`} onClick={() => remove(o.id)}><Trash2 size={15}/></button>}</td></tr>)}</tbody></table></div>{!filtered.length && <div className="empty compact"><p>Nenhuma movimentação encontrada.</p></div>}<div className="table-footer">{filtered.length} operações encontradas <NavLink to={routeTo("/historico")}>Ver histórico completo <ArrowUpRight size={14}/></NavLink></div></article>}
       {['/cdbs', '/metas', '/simulador'].includes(page) && <article className="panel planned"><FlaskConical size={32}/><h2>{page === '/cdbs' ? 'Renda fixa, com precisão por lote' : page === '/metas' ? 'Seu próximo marco financeiro' : 'Planeje o que vem pela frente'}</h2><p>{page === '/cdbs' ? 'Cadastro de CDBs, aportes e resgates por lote serão implementados na Fase 3, junto aos cálculos e testes tributários.' : page === '/metas' ? 'Metas e projeções de conclusão estão planejadas para a Fase 5.' : 'Simulações com taxas hipotéticas e reinvestimento estão planejadas para a Fase 5.'}</p><span className="tag">Planejado · consulte docs/architecture.md</span></article>}
       <footer><span><ShieldCheck size={13}/> Seus registros. Suas decisões.</span><span>Investment Dashboard · Fase 1 {demo && '· Demonstração'}</span></footer>
     </main>

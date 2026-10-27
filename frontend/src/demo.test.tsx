@@ -12,6 +12,7 @@ test('build de produção permanece público mesmo com configuração local de d
   vi.resetModules()
   vi.stubEnv('PROD', true)
   vi.stubEnv('VITE_PUBLIC_DEMO', 'false')
+  vi.stubEnv('VITE_APP_MODE', 'demo')
   try {
     const runtime = await import('./runtime')
     expect(runtime.PUBLIC_DEMO).toBe(true)

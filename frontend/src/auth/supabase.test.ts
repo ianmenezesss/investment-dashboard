@@ -14,6 +14,13 @@ test('cliente usa armazenamento por aba e recuperação por URL fica desativada'
 test.each(['sb_secret_testOnly', 'legacy-token-not-accepted', ''])('configuração inadequada da chave é recusada sem criar cliente', async key => {
   vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', key)
   const { getSupabase } = await import('./supabase')
-  expect(() => getSupabase()).toThrow('Publishable Key pública')
+  expect(() => getSupabase()).toThrow('Publishable Key')
+  expect(create).not.toHaveBeenCalled()
+})
+
+test('URL de endpoint REST é recusada com instrução específica, sem criar cliente', async () => {
+  vi.stubEnv('VITE_SUPABASE_URL', 'https://project.example/rest/v1')
+  const { getSupabase } = await import('./supabase')
+  expect(() => getSupabase()).toThrow('sem /rest/v1 ou /auth/v1')
   expect(create).not.toHaveBeenCalled()
 })
