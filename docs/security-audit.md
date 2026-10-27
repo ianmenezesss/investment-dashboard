@@ -1,5 +1,7 @@
 # Auditoria da Fase 1.5
 
+Atualização 1.6.3: confirmações nativas foram substituídas por um modal com semântica alertdialog, confirmação explícita e foco inicial em Cancelar. Os mesmos endpoints e filtros continuam protegendo operações privadas. O conjunto fictício foi ampliado sem sobrescrever documentos válidos antigos: o schema v1 é lido sem gravação, e o novo seed só entra por instalação limpa ou restauração confirmada. Não foram alterados autenticação, credenciais, banco pessoal ou volumes.
+
 Atualização 1.6.2: a demonstração agora aceita operações fictícias persistidas exclusivamente na chave `investment-demo-portfolio`. `DemoRepository` não depende de API/Supabase; `PrivateRepository` não usa Storage. A criação/exclusão valida o histórico antes de persistir e a restauração toca somente a chave demonstrativa. Os testes confirmam ausência de chamadas financeiras HTTP na demonstração e ausência de acesso a localStorage no repositório privado. Isso não altera a autenticação privada existente.
 
 Escopo: código e arquivos locais do projeto, configuração de banco, autenticação, fronteira de demonstração e preparação para GitHub/Vercel/Render/Supabase. Nenhum segredo ou registro financeiro é reproduzido neste documento.

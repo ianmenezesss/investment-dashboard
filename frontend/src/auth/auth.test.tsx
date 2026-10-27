@@ -61,10 +61,10 @@ test('login por senha, envio do access token ao FastAPI e logout', async () => {
   expect(mock.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'investor@example.test', password: 'test-password-only' })
   expect(fetchMock).toHaveBeenCalled()
   expect(host.querySelector('.sidebar')).not.toBeNull()
-  expect(host.textContent).toContain('Acesso autorizado')
+  expect(host.textContent).toContain('Carteira conectada')
   expect(host.textContent).toContain('investor@example.test')
   expect(fetchMock.mock.calls.every(call => (call[1] as RequestInit).headers && ((call[1] as RequestInit).headers as Record<string, string>).Authorization === 'Bearer test-access-a')).toBe(true)
-  const disconnect = [...host.querySelectorAll('button')].find(button => button.textContent === 'Desconectar')!
+  const disconnect = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Sair')!
   await act(async () => disconnect.click())
   expect(mock.auth.signOut).toHaveBeenCalledWith({ scope: 'local' })
   expect(client.getQueryData(['summary', session.user.id])).toBeUndefined()
@@ -106,7 +106,7 @@ test('demonstração privada permite navegar e voltar ao login sem consultas fin
   const history = host.querySelector('a[href="/demo/historico"]')!
   await act(async () => history.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })))
   expect(host.textContent).toContain('Histórico de operações')
-  const back = [...host.querySelectorAll('button')].find(b => b.textContent?.includes('Entrar na minha carteira'))!
+  const back = [...host.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Entrar')!
   await act(async () => back.click())
   expect(host.querySelector('.sidebar')).toBeNull()
   expect(host.querySelector('form[aria-label="Login da carteira"]')).not.toBeNull()

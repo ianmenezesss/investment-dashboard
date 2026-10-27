@@ -1,4 +1,19 @@
-# Verificação da Fase 1.6.2
+# Verificação da Fase 1.6.3
+
+Em 27/10/2026, sem deploy ou push:
+
+- **53 testes frontend aprovados**. Incluem confirmação/cancelamento, Escape, retorno do foco, preservação de carteiras v1, gravação em schema v2, restauração para seed v2, novos dados com ganhos/perdas, Ações com posições e operações e exportação demonstrativa sem rede.
+- **22 testes backend aprovados**; integração opcional ignorada na suíte unitária e executada separadamente: **1 integração PostgreSQL aprovada**, em container efêmero independente.
+- Builds privado e público aprovados, com artefato final público demonstrativo. Aviso não bloqueante de bundle acima de 500 kB permanece.
+- Chrome headless com perfil vazio: inspeção visual em 1440×1050 e 390×844; documento móvel com largura 390, sem overflow horizontal de página. Tabelas mantêm rolagem própria.
+- Modal real: foco inicial em Cancelar; Tab segue para Restaurar carteira; segundo Tab volta a Cancelar. Escape fecha. Testes verificam também foco devolvido ao botão de origem e storage intacto após cancelamento.
+- Nenhum `window.alert`, `window.confirm` ou `window.prompt` permanece no código da interface. Nenhuma biblioteca nova foi instalada.
+- WCAG 2.2 AA foi usada como referência de contraste, alvos, foco e semântica. Não foi realizada certificação completa ou teste manual com todos os leitores de tela.
+- Nenhuma alteração de DATABASE_URL, autenticação Supabase, registros privados ou volumes Docker. Capturas de QA usam somente dados fictícios e ficam em diretório temporário ignorado pelo Git.
+
+O schema e o seed são versionados separadamente: visitantes existentes não recebem operações novas automaticamente. Para visualizar o conjunto de 26 operações, confirmar **Restaurar carteira**. Dados corrompidos/versões desconhecidas continuam recuperando a carteira fictícia com aviso.
+
+## Histórico: Fase 1.6.2
 
 Em 27/10/2026, sem deploy ou push:
 

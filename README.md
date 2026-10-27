@@ -2,7 +2,7 @@
 
 Plataforma full stack para acompanhamento de investimentos em ações brasileiras. Reúne operações, posições por custo médio, resultados realizados e visualizações em uma interface responsiva em português, com valores em reais e persistência PostgreSQL.
 
-**Fase atual: 1.6.2 — demonstração interativa.** Visitantes podem comprar, vender e excluir operações fictícias, acompanhar custo médio, taxas e resultados e restaurar a carteira inicial. A demonstração persiste exclusivamente no navegador, sem login ou API privada. A autenticação Supabase existente foi preservada. Não foi executado push ou deploy nesta etapa.
+**Fase atual: 1.6.3 — refinamento de UX/UI.** Confirmações acessíveis substituem diálogos nativos, ações e banners têm hierarquia mais clara e a carteira inicial inclui 26 operações fictícias em seis ativos. Carteiras demonstrativas existentes são preservadas; use **Restaurar** e confirme para conhecer o novo conjunto. Autenticação, dados privados e isolamento da API foram preservados. Não foi executado push ou deploy nesta etapa.
 
 Tecnologias: React 19, TypeScript, Vite, Tailwind, componentes shadcn/Radix, Recharts, Lucide, React Router, TanStack Query; Python 3.12+, FastAPI, SQLAlchemy, Alembic, Pydantic, PostgreSQL 17, Pytest e PyJWT com criptografia.
 

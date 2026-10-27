@@ -1,5 +1,7 @@
 # Demonstração pública e carteira privada
 
+Atualização 1.6.3: confirmações de restauração/exclusão usam modal acessível, inclusive para operações privadas. O schema demonstrativo 2 preserva carteiras válidas da versão 1 e separa `seedVersion`; novos visitantes recebem 26 operações fictícias e visitantes anteriores só as recebem após restauração confirmada. Não houve mudança de autenticação, autorização ou dados privados.
+
 ## Fronteiras
 
 | Aspecto | Demonstração pública | Carteira privada local | Backend Supabase preparado |

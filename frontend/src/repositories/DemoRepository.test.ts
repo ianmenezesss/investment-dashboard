@@ -1,6 +1,8 @@
 import { expect, test, vi } from 'vitest'
 import { DemoRepository, DEMO_STORAGE_KEY } from './DemoRepository'
 import { initialOperations } from '../demo/fixtures'
+import { summarizeDemo, validateOperation } from '../demo/finance'
+import Decimal from 'decimal.js'
 
 function storage() {
   const values = new Map<string, string>()
@@ -10,13 +12,14 @@ const buy = { ticker: 'TEST4', kind: 'BUY' as const, date: '2026-01-01', quantit
 
 test('compra, venda parcial, taxas e atualização imediata dos indicadores', () => {
   const repo = new DemoRepository(storage())
+  const initialProfit = repo.getSnapshot().summary.realized_profit
   const listener = vi.fn(); repo.subscribe(listener)
   repo.create(buy)
   repo.create({ ...buy, date: '2026-01-02', price: '30', fees: '0' })
   repo.create({ ...buy, kind: 'SELL', date: '2026-01-03', quantity: '5', price: '40', fees: '1' })
   const { summary } = repo.getSnapshot()
   expect(summary.holdings.find(h => h.ticker === 'TEST4')).toMatchObject({ quantity: '15', cost: '376.5', average_price: '25.1' })
-  expect(summary.realized_profit).toBe('73.5')
+  expect(new Decimal(summary.realized_profit).minus(initialProfit).toFixed(8)).toBe('73.50000000')
   expect(listener).toHaveBeenCalledTimes(3)
 })
 
@@ -37,10 +40,40 @@ test('persistência após recarga e restauração ficam restritas à chave demon
   const reloaded = new DemoRepository(store)
   expect(reloaded.getSnapshot().operations).toContainEqual(created)
   reloaded.reset()
-  expect(new DemoRepository(store).getSnapshot().operations).toEqual(initialOperations.map(op => ({ ...op, price: String(Number(op.price)) })))
+  expect(new DemoRepository(store).getSnapshot().operations).toEqual(initialOperations.map(validateOperation))
   expect(store.values.get('private-sentinel')).toBe('do-not-touch')
   expect(store.getItem.mock.calls.every(([key]) => key === DEMO_STORAGE_KEY)).toBe(true)
   expect(store.setItem.mock.calls.every(([key]) => key === DEMO_STORAGE_KEY)).toBe(true)
+})
+
+test('carteira da versão 1 é preservada sem escrita e migra somente ao salvar', () => {
+  const store = storage()
+  const old = { kind: 'investment-demo', version: 1, operations: [{ ...buy, id: 99 }] }
+  const raw = JSON.stringify(old); store.values.set(DEMO_STORAGE_KEY, raw)
+  const repo = new DemoRepository(store)
+  expect(repo.getSnapshot().operations).toEqual(old.operations)
+  expect(repo.getSnapshot().seedVersion).toBe(1)
+  expect(store.values.get(DEMO_STORAGE_KEY)).toBe(raw)
+  expect(store.setItem).not.toHaveBeenCalled()
+  repo.create({ ...buy, date: '2026-01-02' })
+  const saved = JSON.parse(store.values.get(DEMO_STORAGE_KEY)!)
+  expect(saved).toMatchObject({ version: 2, seedVersion: 1 })
+  expect(saved.operations).toContainEqual(old.operations[0])
+  expect(new DemoRepository(store).getSnapshot().operations).toHaveLength(2)
+  repo.reset()
+  expect(JSON.parse(store.values.get(DEMO_STORAGE_KEY)!)).toMatchObject({ version: 2, seedVersion: 2 })
+  expect(repo.getSnapshot().operations).toHaveLength(26)
+})
+
+test('novo conjunto fictício possui seis posições, taxas e vendas positivas e negativas', () => {
+  expect(initialOperations).toHaveLength(26)
+  const complete = summarizeDemo(initialOperations)
+  expect(complete.holdings).toHaveLength(6)
+  expect(complete.market_value).toBeNull()
+  expect(initialOperations.filter(op => op.kind === 'SELL')).toHaveLength(6)
+  const deltas = initialOperations.map((op, i) => op.kind === 'SELL' ? new Decimal(summarizeDemo(initialOperations.slice(0, i + 1)).realized_profit).minus(summarizeDemo(initialOperations.slice(0, i)).realized_profit) : new Decimal(0))
+  expect(deltas.some(delta => delta.gt(0))).toBe(true)
+  expect(deltas.some(delta => delta.lt(0))).toBe(true)
 })
 
 test('exclusão recalcula carteira e bloqueia remoção que invalidaria venda posterior', () => {

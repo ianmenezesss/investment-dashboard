@@ -1,4 +1,4 @@
-# Demonstração interativa — Fase 1.6.2
+# Demonstração interativa — Fase 1.6.3
 
 ## Testar
 
@@ -16,13 +16,21 @@ No ambiente privado local, abra http://localhost:5173/login e clique em **Explor
 4. Tente vender acima da posição ou numa data anterior à compra. A operação deve ser recusada sem modificar a carteira.
 5. Navegue por visão geral, ações e histórico; os cards, a composição e o gráfico são recalculados imediatamente. Use o botão de exclusão e confirme. Excluir uma compra que invalidaria vendas posteriores é bloqueado.
 6. Atualize a página: suas operações demonstrativas continuam no mesmo navegador/origem.
-7. Clique em **Restaurar demonstração** e confirme: somente a carteira fictícia retorna aos dados iniciais.
+7. Clique em **Restaurar**: o modal **Restaurar carteira demonstrativa?** abre com foco em **Cancelar**. Somente **Restaurar carteira** substitui as operações fictícias. Escape ou Cancelar preservam a carteira e devolvem o foco ao botão de origem.
 
-No ambiente privado, **Entrar na minha carteira** retorna à página de login. No endereço de demonstração pública, o botão informa que o login exige o ambiente privado, sem solicitar senha nem criar cliente Supabase. Não há URL privada inventada ou redirecionamento para um serviço não configurado.
+No banner de demonstração, **Entrar** retorna ao login do ambiente privado. No endereço de demonstração pública, o botão informa que o login exige o ambiente privado, sem solicitar senha nem criar cliente Supabase. Não há URL privada inventada ou redirecionamento para um serviço não configurado. No modo autenticado, o banner mostra conta conectada, **Explorar demonstração** e **Sair**, sem repetir avisos.
+
+## Novo conjunto fictício
+
+O conjunto inicial 2 contém 26 operações entre janeiro e outubro de 2026: 20 compras recorrentes e 6 vendas parciais, todas com taxas, em ITUB4, BBAS3, B3SA3, PETR4, WEGE3 e SBSP3. Inclui vendas com ganho e com perda realizados. Datas, quantidades e preços foram inventados; não são cotações históricas reais.
+
+As seis posições alimentam indicadores, gráfico e composição com cores distintas. A página Ações exibe posições e operações; Histórico reúne compras e vendas. Patrimônio a mercado continua **Indisponível**, sem inventar valorização. Recursos planejados permanecem identificados como **Em breve**; nenhum CDB, simulador ou meta foi implementado.
 
 ## Persistência e falhas
 
-Chave exclusiva: `investment-demo-portfolio`. O documento contém `kind: investment-demo`, versão `1` e somente os campos financeiros fictícios conhecidos. Nenhum token, e-mail, senha, identidade Supabase ou registro privado é armazenado nessa chave. O SDK privado continua usando seu sessionStorage separado.
+Chave exclusiva: `investment-demo-portfolio`. O documento agora contém `kind: investment-demo`, versão de schema `2`, `seedVersion` e somente os campos financeiros fictícios conhecidos. A versão do schema é independente da versão do conjunto inicial. Nenhum token, e-mail, senha, identidade Supabase ou registro privado é armazenado nessa chave. O SDK privado continua usando seu sessionStorage separado.
+
+Documentos válidos da versão 1 são carregados **sem escrita no storage e sem substituir operações**. Recebem origem de conjunto inicial 1. Ao salvar uma alteração, o documento migra para schema 2 preservando esse histórico e sua origem; somente uma restauração confirmada carrega o conjunto inicial 2. Isso também preserva visitantes que ainda usavam os quatro registros antigos sem personalização. O aviso informa como conhecer o novo conjunto, sem restaurá-lo automaticamente.
 
 O navegador/origem identifica a carteira local: pessoas que compartilham o mesmo perfil do navegador e a mesma origem compartilham a demonstração. Limpar dados do site ou mudar de navegador/origem perde a carteira fictícia. A atualização carrega o último documento salvo; sincronização simultânea entre abas não é implementada (a última gravação prevalece).
 

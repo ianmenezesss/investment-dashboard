@@ -1,5 +1,7 @@
 # Arquitetura e plano
 
+Atualização 1.6.3: `components/ui/ConfirmDialog.tsx` reutiliza Radix Dialog existente (papel alertdialog, foco inicial em Cancelar, Escape e retorno de foco). `dashboard-ux.css` concentra os refinamentos visuais. O DemoRepository aceita schema 1 sem sobrescrita, persiste schema 2 na próxima alteração e mantém `seedVersion` independente; restauração explícita carrega o conjunto 2 com 26 registros. Regras financeiras e autenticação permanecem as mesmas.
+
 Atualização 1.6.2: demonstração interativa com `DemoRepository` local e `PrivateRepository` HTTP separados. Somente a primeira usa localStorage; nenhum token ou dado privado é persistido ali. O cálculo Decimal.js foi alinhado ao contexto Decimal Python e possui casos de contrato em `shared/finance-cases.json`, executados pelos dois runtimes. Consulte [demonstração interativa](interactive-demo.md).
 
 Aplicação pessoal local, com frontend React/TypeScript/Vite e API FastAPI. PostgreSQL é a fonte dos registros reais; a demonstração existe apenas em memória no frontend. Não há dependência de localStorage nem integração financeira externa nesta fase.
