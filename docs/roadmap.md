@@ -48,6 +48,11 @@ Até a versão final serão usados exclusivamente dados fictícios, inclusive no
   somente pelo teste PostgreSQL descartável; não foi aplicada em ambiente persistente ou de
   produção. Ver [plano de arquivamento](phase-2.0.8.1-empty-cdb-archive.md).
 
+- **2.0.8.2-A (base local revisada):** revisões append-only REPLACE/VOID,
+  migration 006 e projeção efetiva compartilhada pelos leitores e validadores financeiros.
+  Integração descartável aprovada conforme resultado informado pelo usuário; sem endpoints
+  de escrita de revisão. Ver [arquitetura e inventário](phase-2.0.8.2-revision-foundation.md).
+
 ## Pós-lançamento — planejado, não implementado
 
 - Importação de extratos CSV com validação e revisão antes de persistir.

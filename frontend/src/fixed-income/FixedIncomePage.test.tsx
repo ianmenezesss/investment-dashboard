@@ -52,7 +52,7 @@ beforeEach(() => {
     }
     if (url.pathname.endsWith('/returns')) return returnError ? json({ detail: 'Falha de consulta' }, returnError) : json(fixture.returns)
     if (url.pathname.endsWith('/observations')) return json(observedRows)
-    if (url.pathname.endsWith('/movements')) return historyError ? json({ detail: 'Histórico indisponível' }, historyError) : json(fixture.movements.slice(Number(url.searchParams.get('offset')), Number(url.searchParams.get('offset')) + 100))
+    if (url.pathname.endsWith('/effective-movements')) return historyError ? json({ detail: 'Histórico indisponível' }, historyError) : json(fixture.movements.slice(Number(url.searchParams.get('offset')), Number(url.searchParams.get('offset')) + 100))
     if (url.pathname.endsWith('/investments')) return listError ? json({ detail: 'Lista indisponível' }, listError) : json(archived ? [] : [fixture.detail])
     return detailError ? json({ detail: 'Posição indisponível' }, detailError) : json(fixture.detail)
   })

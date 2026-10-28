@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import and_, exists, select
 from sqlalchemy.orm import Session
+from .projection import effective_movements
 from ..access import private_db
 from ..bcb_rates.router import rates_service
 from ..bcb_rates.schemas import Period, RateError
@@ -18,25 +19,31 @@ router = APIRouter(prefix="/api/fixed-income/investments", tags=["fixed-income-r
 def returns_snapshot(investment_id: int, db: Session = Depends(private_db)):
     owner = db.info.get("owner_id")
     # A single statement observes contract, lots and events in the same MVCC snapshot.
-    rows = db.execute(select(Investment, Lot, Movement, PositionObservation)
-        .outerjoin(Lot, and_(Lot.investment_id == Investment.id, Lot.owner_id == owner))
-        .outerjoin(Movement, and_(Movement.lot_id == Lot.id, Movement.owner_id == owner))
+    projected = effective_movements(db)
+    effective = projected.c
+    applications = select(projected.c.lot_id, projected.c.date, projected.c.investment_id, projected.c.owner_id).where(projected.c.kind == "APPLICATION").subquery("effective_applications")
+    rows = db.execute(select(Investment, Lot, PositionObservation, *projected.c, applications.c.date).select_from(Investment)
+        .outerjoin(applications, and_(applications.c.investment_id == Investment.id, applications.c.owner_id == owner))
+        .outerjoin(Lot, Lot.id == applications.c.lot_id)
+        .outerjoin(projected, and_(effective.lot_id == Lot.id, effective.owner_id == owner))
         .outerjoin(PositionObservation, and_(PositionObservation.investment_id == Investment.id, PositionObservation.kind == 'OPENING', PositionObservation.owner_id == owner))
         .where(Investment.id == investment_id, Investment.owner_id == owner,
             ~exists(select(InvestmentArchive.id).where(InvestmentArchive.investment_id == Investment.id)))
-        .order_by(Lot.id, Movement.date, Movement.id).limit(10001)).all()
+        .order_by(Lot.id, effective.date, effective.id).limit(10001)).all()
     if not rows:
         raise HTTPException(404, "Investimento não encontrado")
     if len(rows) > 10000:
         raise HTTPException(422, "Histórico excede o limite de 10000 registros desta consulta")
     lots, movements = {}, []
-    for _, lot, movement, _ in rows:
+    for row in rows:
+        lot = row[1]
         if lot is not None:
-            lots[lot.id] = LotSnapshot(lot.id, lot.application_date)
-        if movement is not None:
-            movements.append(MovementOutput.model_validate(movement))
+            lots[lot.id] = LotSnapshot(lot.id, row[-1])
+        values = dict(zip(projected.c.keys(), row[3:-1]))
+        if values["id"] is not None:
+            movements.append(MovementOutput.model_validate(values))
     contract = InvestmentOutput.model_validate(rows[0][0])
-    if rows[0][3] is not None:
+    if rows[0][2] is not None:
         contract.tracking_mode = "CONSOLIDATED"
     snapshot = ReturnsSnapshot(contract, tuple(lots.values()),
         tuple(movements), datetime.now(timezone.utc))

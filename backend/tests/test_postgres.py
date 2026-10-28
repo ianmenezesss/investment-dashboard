@@ -108,6 +108,8 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
             verify_opening_postgres(engine, client)
             from archive_empty_cdb_postgres import verify_archive_postgres
             verify_archive_postgres(engine, client)
+            from application_revisions_postgres import verify_revisions_postgres
+            verify_revisions_postgres(engine, client)
     finally:
         app.dependency_overrides.clear()
         # Banco exclusivamente de teste; não apagar tabelas ou reverter ownership.

@@ -1,5 +1,28 @@
 # Validação do Investment Dashboard
 
+## Fase 2.0.8.2-A — base de revisões de aplicações
+
+- Partida confirmada no commit local 5def47d e árvore limpa. Nenhum commit novo foi criado.
+- Backend executado: **275 passed, 1 skipped, 1 warning**. O skip é a integração opt-in
+  sem TEST_DATABASE_URL; warning conhecido TestClient/httpx.
+- Frontend executado: **128 passed** em 10 arquivos. TypeScript e build aprovados;
+  permanece o warning de chunk acima de 500 kB (~1.100 kB).
+- **Integração PostgreSQL descartável: 1 passed, 1 warning em 2.95s**, resultado
+  informado pelo usuário na revisão final. O agente não reexecutou essa integração.
+  O runner atual chama tests/test_postgres.py, que migra 001–002, depois 003 e head (006),
+  preserva registros anteriores e executa verify_fixed_income_postgres,
+  verify_opening_postgres, verify_archive_postgres e verify_revisions_postgres.
+  O verificador de renda fixa exige alembic_version=006. Esta confirmação é da cobertura
+  do código atual; o resultado de execução é atribuído ao usuário.
+- Verificações estáticas executadas: AST Python em 63 arquivos e git diff --check aprovados.
+  Auditoria de publicação analisou candidatos, 3 artefatos e histórico Git, sem assinatura
+  de segredo ou segredo conhecido detectado. Runner PowerShell executado: interrompeu no
+  preflight Docker com exit 1 na implementação anterior, gerando transcript. Na revisão final,
+  somente as suítes locais foram repetidas pelo agente; PostgreSQL permanece como relato do usuário.
+- Migrations 001–005 preservadas. A 006 não foi aplicada em banco persistente/remoto.
+  Sem endpoints de correção/anulação ou grants automáticos de escrita ao runtime.
+- [Arquitetura, inventário dos leitores, riscos e comando PowerShell](phase-2.0.8.2-revision-foundation.md).
+
 ## Implementação local 2.0.8.1 — arquivamento de contratos CDB vazios
 
 - Arquivamento implementado por tombstone append-only em migration 005, sem alterar ou

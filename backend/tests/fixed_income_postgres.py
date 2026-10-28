@@ -14,6 +14,8 @@ from test_fixed_income import CONTRACT, PATH, A, B
 def verify_fixed_income_postgres(engine, client):
     tables = ("fixed_income_investments", "fixed_income_lots", "fixed_income_movements")
     with engine.begin() as connection:
+        connection.execute(text("GRANT SELECT ON fixed_income_application_revisions TO investment_test_runtime"))
+        connection.execute(text("GRANT EXECUTE ON FUNCTION public.fi_effective_movements() TO investment_test_runtime"))
         connection.execute(text("GRANT SELECT, INSERT ON fixed_income_observations TO investment_test_runtime"))
         connection.execute(text("GRANT USAGE ON SEQUENCE fixed_income_observations_id_seq TO investment_test_runtime"))
         connection.execute(text("GRANT SELECT, INSERT ON fixed_income_investment_archives TO investment_test_runtime"))
@@ -31,7 +33,7 @@ def verify_fixed_income_postgres(engine, client):
                 assert leaked == 0
             connection.execute(text(f"GRANT SELECT, INSERT ON public.{table} TO investment_test_runtime"))
             connection.execute(text(f"GRANT USAGE ON SEQUENCE public.{table}_id_seq TO investment_test_runtime"))
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "005"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "006"
 
     @contextmanager
     def restricted(owner=None, isolation=None):

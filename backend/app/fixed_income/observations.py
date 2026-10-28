@@ -134,6 +134,8 @@ def validate_observation(db, investment, data, kind):
     elif not start:
         raise HTTPException(409, "Inicie o acompanhamento com saldo atual antes de conciliar")
     previous = latest(db, investment.id)
-    last_movement = db.scalar(select(func.max(Movement.date)).where(Movement.investment_id == investment.id, Movement.owner_id == db.info.get("owner_id")))
+    from .projection import effective_movements
+    effective = effective_movements(db)
+    last_movement = db.scalar(select(func.max(effective.c.date)).where(effective.c.investment_id == investment.id, effective.c.owner_id == db.info.get("owner_id")))
     if previous and data.as_of < previous.as_of or last_movement and data.as_of < last_movement:
         raise HTTPException(422, "Observações devem seguir a cronologia das posições e movimentações")

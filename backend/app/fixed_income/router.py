@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from ..access import private_db
 from .models import Investment, InvestmentArchive, Lot, Movement
 from .schemas import InvestmentInput, InvestmentOutput, InvestmentDetail, LotOutput, ApplicationInput, RedemptionInput, MovementOutput
+from types import SimpleNamespace
+from .projection import effective_movements
 from .ledger import principal_balances, total_principal
 from .observations import PositionObservation, ObservationOutput, opening, latest
 
@@ -26,8 +28,10 @@ def owned_investment(db, investment_id, *, include_archived=False):
 
 
 def history(db, investment_id):
-    return list(db.scalars(select(Movement).where(Movement.investment_id == investment_id,
-        Movement.owner_id == db.info.get("owner_id")).order_by(Movement.date, Movement.id)))
+    movements = effective_movements(db)
+    return [SimpleNamespace(**row) for row in db.execute(select(movements).where(
+        movements.c.investment_id == investment_id, movements.c.owner_id == db.info.get("owner_id")
+    ).order_by(movements.c.date, movements.c.id)).mappings()]
 
 
 def locked_history(db, investment_id, event_date):
@@ -72,13 +76,23 @@ def list_investments(offset: int = Query(0, ge=0), limit: int = Query(100, ge=1,
 def investment_detail(investment_id: int, db: Session = Depends(private_db)):
     investment = owned_investment(db, investment_id)
     start, observed = opening(db, investment_id), latest(db, investment_id)
-    balances = principal_balances(history(db, investment_id))
-    lots = db.scalars(select(Lot).where(Lot.investment_id == investment_id, Lot.owner_id == db.info.get("owner_id")).order_by(Lot.application_date, Lot.id))
+    movements = history(db, investment_id)
+    balances = principal_balances(movements)
+    lots = sorted((m for m in movements if m.kind == "APPLICATION"), key=lambda m: (m.date, m.lot_id))
     return InvestmentDetail(**InvestmentOutput.model_validate(investment).model_dump(exclude={"tracking_mode", "latest_observation"}),
         tracking_mode="CONSOLIDATED" if start else "LEDGER", opening_balance=ObservationOutput.model_validate(start) if start else None,
         latest_observation=ObservationOutput.model_validate(observed) if observed else None,
-        principal_balance=total_principal(balances), lots=[LotOutput(id=lot.id,
-            application_date=lot.application_date, principal_balance=balances.get(lot.id, Decimal(0))) for lot in lots])
+        principal_balance=total_principal(balances), lots=[LotOutput(id=lot.lot_id,
+            application_date=lot.date, principal_balance=balances.get(lot.lot_id, Decimal(0))) for lot in lots])
+
+
+@router.get("/investments/{investment_id}/effective-movements", response_model=list[MovementOutput])
+def list_effective_movements(investment_id: int, offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), db: Session = Depends(private_db)):
+    owned_investment(db, investment_id)
+    projected = effective_movements(db)
+    return [dict(row) for row in db.execute(select(projected).where(
+        projected.c.investment_id == investment_id, projected.c.owner_id == db.info.get("owner_id")
+    ).order_by(projected.c.date, projected.c.id).offset(offset).limit(limit)).mappings()]
 
 
 @router.get("/investments/{investment_id}/movements", response_model=list[MovementOutput])
@@ -148,7 +162,8 @@ def redeem_principal(investment_id: int, data: RedemptionInput, db: Session = De
         Lot.owner_id == db.info.get("owner_id")))
     if lot is None:
         raise HTTPException(404, "Lote não encontrado")
-    if data.date < lot.application_date or data.principal_amount > principal_balances(movements).get(lot.id, Decimal(0)):
+    application = next((m for m in movements if m.lot_id == lot.id and m.kind == "APPLICATION"), None)
+    if application is None or data.date < application.date or data.principal_amount > principal_balances(movements).get(lot.id, Decimal(0)):
         raise HTTPException(422, "Data inválida ou resgate de principal superior ao saldo do lote")
     movement = Movement(investment_id=investment_id, owner_id=db.info.get("owner_id"), kind="REDEMPTION", **data.model_dump())
     db.add(movement)

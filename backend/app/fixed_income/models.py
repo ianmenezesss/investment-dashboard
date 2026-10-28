@@ -68,3 +68,26 @@ class InvestmentArchive(Base):
     investment_id: Mapped[int] = mapped_column(ForeignKey("fixed_income_investments.id", ondelete="RESTRICT"), nullable=False)
     owner_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
     archived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class ApplicationRevision(Base):
+    """Immutable revisions of an original application; VOID is terminal."""
+    __tablename__ = "fixed_income_application_revisions"
+    __table_args__ = (
+        UniqueConstraint("application_id", "revision", name="fi_revision_number"),
+        Index("fi_revision_request_owner", "owner_id", "request_id", unique=True, postgresql_where=text("owner_id IS NOT NULL"), sqlite_where=text("owner_id IS NOT NULL")),
+        Index("fi_revision_request_local", "request_id", unique=True, postgresql_where=text("owner_id IS NULL"), sqlite_where=text("owner_id IS NULL")),
+        CheckConstraint("kind IN ('REPLACE','VOID')", name="fi_revision_kind"),
+        CheckConstraint("revision > 0 AND length(trim(reason)) BETWEEN 1 AND 1000", name="fi_revision_metadata"),
+        CheckConstraint("(kind='VOID' AND replacement_date IS NULL AND replacement_amount IS NULL) OR (kind='REPLACE' AND replacement_date IS NOT NULL AND replacement_amount IS NOT NULL AND replacement_amount > 0 AND replacement_amount <= 999999999999.99999999)", name="fi_revision_payload"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    application_id: Mapped[int] = mapped_column(ForeignKey("fixed_income_movements.id", ondelete="RESTRICT"), index=True)
+    owner_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)
+    revision: Mapped[int] = mapped_column()
+    kind: Mapped[str] = mapped_column(String(7))
+    replacement_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    replacement_amount: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
+    reason: Mapped[str] = mapped_column(String(1000))
+    request_id: Mapped[UUID] = mapped_column(Uuid)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))

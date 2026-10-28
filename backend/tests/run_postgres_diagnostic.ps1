@@ -1,4 +1,4 @@
-param()
+﻿param()
 
 $ErrorActionPreference = 'Continue'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -7,6 +7,7 @@ $dockerConfig = Join-Path $env:TEMP "investment-dashboard-docker-config-$stamp"
 $backend = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $backend '.venv\Scripts\python.exe'
 $exitCode = 1
+$previousDockerConfig = $env:DOCKER_CONFIG
 
 New-Item -ItemType Directory -Path $dockerConfig -Force | Out-Null
 $env:DOCKER_CONFIG = $dockerConfig
@@ -15,6 +16,8 @@ Start-Transcript -Path $log -Force | Out-Null
 try {
     Write-Host "Workspace: $backend"
     Write-Host "Log completo: $log"
+    Write-Host 'Integração 001–006; hashes dos arquivos em execução:'
+    Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $backend 'migrations/versions/006_application_revisions.py'), (Join-Path $PSScriptRoot 'test_postgres.py'), (Join-Path $PSScriptRoot 'application_revisions_postgres.py') | Format-List Path, Hash
     Write-Host 'Verificando Docker Engine e imagem local postgres:17-alpine (sem pull)...'
 
     docker info --format '{{.ServerVersion}}'
@@ -36,6 +39,7 @@ catch {
 }
 finally {
     Stop-Transcript | Out-Null
+    $env:DOCKER_CONFIG = $previousDockerConfig
 }
 
 Write-Host "Log completo salvo em: $log"
