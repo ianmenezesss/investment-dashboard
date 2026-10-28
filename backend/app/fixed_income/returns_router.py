@@ -1,12 +1,12 @@
 import asyncio
 from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import and_, select
+from sqlalchemy import and_, exists, select
 from sqlalchemy.orm import Session
 from ..access import private_db
 from ..bcb_rates.router import rates_service
 from ..bcb_rates.schemas import Period, RateError
-from .models import Investment, Lot, Movement
+from .models import Investment, InvestmentArchive, Lot, Movement
 from .observations import PositionObservation
 from .schemas import InvestmentOutput, MovementOutput, financial_today
 from .returns_engine import estimate_returns
@@ -22,7 +22,8 @@ def returns_snapshot(investment_id: int, db: Session = Depends(private_db)):
         .outerjoin(Lot, and_(Lot.investment_id == Investment.id, Lot.owner_id == owner))
         .outerjoin(Movement, and_(Movement.lot_id == Lot.id, Movement.owner_id == owner))
         .outerjoin(PositionObservation, and_(PositionObservation.investment_id == Investment.id, PositionObservation.kind == 'OPENING', PositionObservation.owner_id == owner))
-        .where(Investment.id == investment_id, Investment.owner_id == owner)
+        .where(Investment.id == investment_id, Investment.owner_id == owner,
+            ~exists(select(InvestmentArchive.id).where(InvestmentArchive.investment_id == Investment.id)))
         .order_by(Lot.id, Movement.date, Movement.id).limit(10001)).all()
     if not rows:
         raise HTTPException(404, "Investimento não encontrado")

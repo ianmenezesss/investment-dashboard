@@ -20,4 +20,5 @@ export class PrivateRepository {
   cdbReturns(id: number, input: ReturnsInput, signal?: AbortSignal) { return request<CdbReturns>(`fixed-income/investments/${id}/returns?${new URLSearchParams(input)}`, this.token, { signal }) }
   cdbObservations(id: number, offset = 0, signal?: AbortSignal) { return request<ObservedPosition[]>(`fixed-income/investments/${id}/observations?offset=${offset}&limit=100`, this.token, { signal }) }
   saveCdbObservation(id: number, input: ObservedPositionInput, opening: boolean, signal?: AbortSignal) { return request<ObservedPosition>(`fixed-income/investments/${id}/${opening ? 'opening-balance' : 'observations'}`, this.token, { method: 'POST', body: JSON.stringify(input), signal }) }
+  archiveCdb(id: number, signal?: AbortSignal) { return request<void>(`fixed-income/investments/${id}/archive`, this.token, { method: 'DELETE', signal }) }
 }

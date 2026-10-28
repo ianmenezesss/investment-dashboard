@@ -73,6 +73,26 @@ export function FixedIncomePage({ repository, identity, newOperationRequest, onA
     }catch(cause){if(!active.current)return;if(cause instanceof ApiError&&[401,403].includes(cause.status)){setManualMode(null);onAuthError(cause)}else{setWriteError((cause as Error).message+' Confira as posições antes de reenviar se o resultado não foi confirmado.');if(cause instanceof TypeError||cause instanceof ApiError&&cause.status>=500)invalidate()}}
     finally{submitting.current=false;if(active.current)setBusy(false)}
   }
+  async function archiveEmptyContract() {
+    if (submitting.current || !selected || !detail.data || detail.data.lots.length || detail.data.opening_balance || detail.data.latest_observation) return
+    const label = detail.data.product_name
+    if (!window.confirm(`Arquivar o contrato “${label}”? Esta ação apenas oculta o contrato vazio da lista ativa. Nenhum lançamento ou dado financeiro será apagado.`)) return
+    submitting.current = true; setBusy(true); setWriteError(''); setSuccess('')
+    controller.current = new AbortController()
+    try {
+      await repository.archiveCdb(selected, controller.current.signal)
+      if (!active.current) return
+      setParams({})
+      client.removeQueries({ queryKey: [...prefix, 'detail', selected] })
+      client.removeQueries({ queryKey: [...prefix, 'movements', selected] })
+      client.removeQueries({ queryKey: [...prefix, 'observations', selected] })
+      setSuccess('Contrato vazio arquivado e removido da lista ativa.'); invalidate()
+    } catch (error) {
+      if (!active.current) return
+      if (error instanceof ApiError && [401, 403].includes(error.status)) onAuthError(error)
+      else { setWriteError((error as Error).message); invalidate() }
+    } finally { submitting.current = false; if (active.current) setBusy(false) }
+  }
   async function save(kind: WriteMode, form: FormData) {
     if (submitting.current) return
     submitting.current = true; setBusy(true); setWriteError(''); setSuccess('')
@@ -129,7 +149,8 @@ export function FixedIncomePage({ repository, identity, newOperationRequest, onA
     {selected && detail.isPending && <p role="status">Carregando posição e lotes…</p>}
     {selected && detail.isError && <div role="alert" className="error">{(detail.error as Error).message}<Button variant="outline" onClick={() => { void detail.refetch() }}>Tentar carregar posição</Button></div>}
     {selected && detail.data && !detail.isError && <div className="fi-detail" aria-label={`Detalhes de ${detail.data.product_name}`}>
-      <div className="fi-heading"><div><h2>{detail.data.product_name}</h2><p>{detail.data.issuer} · {contractLabel(detail.data)} · Vencimento {dayLabel(detail.data.maturity_date)}</p></div><div className="fi-actions"><Button onClick={() => open('application')}>Nova aplicação</Button><Button variant="outline" disabled={!detail.data.lots.some(lot => positive(lot.principal_balance))} onClick={() => open('redemption')}>Resgatar principal</Button>{detail.data.tracking_mode==='CONSOLIDATED'&&<Button variant="outline" onClick={()=>openManual('observation')}>Registrar nova posição</Button>}<Button variant="outline" onClick={() => setParams({})}>Fechar detalhes</Button></div></div>
+      <div className="fi-heading"><div><h2>{detail.data.product_name}</h2><p>{detail.data.issuer} · {contractLabel(detail.data)} · Vencimento {dayLabel(detail.data.maturity_date)}</p></div><div className="fi-actions">{!detail.data.lots.length&&!detail.data.opening_balance&&!detail.data.latest_observation&&<Button variant="outline" disabled={busy} onClick={()=>void archiveEmptyContract()}>Arquivar contrato</Button>}<Button onClick={() => open('application')}>Nova aplicação</Button><Button variant="outline" disabled={!detail.data.lots.some(lot => positive(lot.principal_balance))} onClick={() => open('redemption')}>Resgatar principal</Button>{detail.data.tracking_mode==='CONSOLIDATED'&&<Button variant="outline" onClick={()=>openManual('observation')}>Registrar nova posição</Button>}<Button variant="outline" onClick={() => setParams({})}>Fechar detalhes</Button></div></div>
+      {writeError && <div className="error" role="alert">{writeError}</div>}
       {detail.data.latest_observation&&<ObservedPositionSummary position={detail.data.latest_observation}/>}
       {!detail.data.lots.length&&!detail.data.opening_balance&&<article className="panel fi-section fi-empty-position"><h3>Como deseja começar?</h3><p>Nenhuma aplicação registrada. Não há informação suficiente para apresentar patrimônio ou principal. A primeira aplicação deve ter a data inicial do contrato.</p><div className="fi-actions"><Button onClick={()=>open('application')}>Registrar nova aplicação</Button><Button variant="outline" onClick={()=>openManual('opening')}>Iniciar com saldo atual</Button></div><p><span className="fi-value-origin fi-origin-calculated">Aplicação registrada</span> Cria um lote e registra o principal no ledger. <span className="fi-value-origin fi-origin-user">Posição observada</span> Registra o saldo declarado do CDB inteiro, sem inventar aplicações históricas; valor não é somado ao principal dos lotes.</p></article>}
       {detail.data.lots.length>0&&<div className="fi-metrics"><article className="metric"><span>{detail.data.tracking_mode==='CONSOLIDATED'?'Aplicações dos novos lotes':'Principal aplicado acumulado'} <FinancialHint label="principal aplicado acumulado">Soma das aplicações registradas no histórico completo. Em CDB com posição observada, considera apenas os lotes criados depois dela; a posição observada do CDB inteiro não é incluída.</FinancialHint></span><h2>{marketMoney(completeHistory ? totalApplications(rows) : null)}</h2><small><span className="fi-value-origin fi-origin-calculated">Calculado do ledger</span> {completeHistory ? 'Soma das aplicações registradas; exclui a posição manual' : 'Depende de carregar o histórico completo'}</small></article><article className="metric"><span>{detail.data.tracking_mode==='CONSOLIDATED'?'Principal remanescente dos novos lotes':'Principal remanescente atual'} <FinancialHint label="principal remanescente">Principal ainda não amortizado dos lotes registrados, sem rendimentos nem posição observada.</FinancialHint></span><h2>{marketMoney(detail.data.principal_balance)}</h2><small><span className="fi-value-origin fi-origin-calculated">Calculado do ledger</span> Somente saldo do ledger. Não somar ao patrimônio observado do CDB inteiro.</small></article></div>}

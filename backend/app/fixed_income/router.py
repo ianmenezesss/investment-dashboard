@@ -1,9 +1,9 @@
 from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, text
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import exists, select, text
 from sqlalchemy.orm import Session
 from ..access import private_db
-from .models import Investment, Lot, Movement
+from .models import Investment, InvestmentArchive, Lot, Movement
 from .schemas import InvestmentInput, InvestmentOutput, InvestmentDetail, LotOutput, ApplicationInput, RedemptionInput, MovementOutput
 from .ledger import principal_balances, total_principal
 from .observations import PositionObservation, ObservationOutput, opening, latest
@@ -11,8 +11,15 @@ from .observations import PositionObservation, ObservationOutput, opening, lates
 router = APIRouter(prefix="/api/fixed-income", tags=["fixed-income"])
 
 
-def owned_investment(db, investment_id):
-    investment = db.scalar(select(Investment).where(Investment.id == investment_id, Investment.owner_id == db.info.get("owner_id")))
+def is_archived(db, investment_id):
+    return db.scalar(select(InvestmentArchive.id).where(InvestmentArchive.investment_id == investment_id).limit(1)) is not None
+
+
+def owned_investment(db, investment_id, *, include_archived=False):
+    query = select(Investment).where(Investment.id == investment_id, Investment.owner_id == db.info.get("owner_id"))
+    if not include_archived:
+        query = query.where(~exists(select(InvestmentArchive.id).where(InvestmentArchive.investment_id == Investment.id)))
+    investment = db.scalar(query)
     if investment is None:
         raise HTTPException(404, "Investimento não encontrado")
     return investment
@@ -28,6 +35,8 @@ def locked_history(db, investment_id, event_date):
     if db.bind.dialect.name == "postgresql":
         db.execute(text("SET LOCAL lock_timeout = '5s'"))
         db.execute(text("SELECT pg_advisory_xact_lock(20001, :id)"), {"id": investment_id})
+    if is_archived(db, investment_id):
+        raise HTTPException(404, "Investimento não encontrado")
     movements = history(db, investment_id)
     observed = latest(db, investment_id)
     if observed and (event_date < observed.as_of or event_date <= opening(db, investment_id).as_of):
@@ -52,7 +61,9 @@ def list_investments(offset: int = Query(0, ge=0), limit: int = Query(100, ge=1,
     last_id = select(PositionObservation.id).where(PositionObservation.investment_id == Investment.id,
         PositionObservation.owner_id == db.info.get("owner_id")).order_by(PositionObservation.as_of.desc(), PositionObservation.id.desc()).limit(1).correlate(Investment).scalar_subquery()
     rows = db.execute(select(Investment, PositionObservation).outerjoin(PositionObservation, PositionObservation.id == last_id)
-        .where(Investment.owner_id == db.info.get("owner_id")).order_by(Investment.id).offset(offset).limit(limit))
+        .where(Investment.owner_id == db.info.get("owner_id"),
+            ~exists(select(InvestmentArchive.id).where(InvestmentArchive.investment_id == Investment.id)))
+        .order_by(Investment.id).offset(offset).limit(limit))
     return [InvestmentOutput.model_validate(investment).model_copy(update={"tracking_mode": "CONSOLIDATED" if observed else "LEDGER",
         "latest_observation": ObservationOutput.model_validate(observed) if observed else None}) for investment, observed in rows]
 
@@ -85,6 +96,28 @@ def movement_detail(investment_id: int, movement_id: int, db: Session = Depends(
     if movement is None:
         raise HTTPException(404, "Movimentação não encontrada")
     return movement
+
+
+@router.delete("/investments/{investment_id}/archive", status_code=204)
+def archive_empty_investment(investment_id: int, db: Session = Depends(private_db)):
+    # Shared with child-write triggers; the lock remains held until commit.
+    if db.bind.dialect.name == "postgresql":
+        db.execute(text("SET LOCAL lock_timeout = '5s'"))
+        db.execute(text("SELECT pg_advisory_xact_lock(20001, :id)"), {"id": investment_id})
+    investment = owned_investment(db, investment_id, include_archived=True)
+    if is_archived(db, investment_id):
+        raise HTTPException(409, "Contrato já está arquivado")
+    dependencies = (
+        db.scalar(select(Lot.id).where(Lot.investment_id == investment_id).limit(1)),
+        db.scalar(select(Movement.id).where(Movement.investment_id == investment_id).limit(1)),
+        db.scalar(select(PositionObservation.id).where(PositionObservation.investment_id == investment_id).limit(1)),
+    )
+    if any(item is not None for item in dependencies):
+        raise HTTPException(409, "Somente contratos sem lotes, movimentações ou observações podem ser arquivados")
+    db.add(InvestmentArchive(investment_id=investment.id, owner_id=db.info.get("owner_id")))
+    db.flush()  # Database trigger repeats ownership, emptiness and concurrency checks.
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.post("/investments/{investment_id}/applications", status_code=201, response_model=MovementOutput)

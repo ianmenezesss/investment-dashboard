@@ -58,3 +58,13 @@ class Movement(Base):
     principal_amount: Mapped[Decimal] = mapped_column(Numeric(20, 8))
     cash_received: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class InvestmentArchive(Base):
+    """Append-only tombstone; original contract and financial rows remain intact."""
+    __tablename__ = "fixed_income_investment_archives"
+    __table_args__ = (UniqueConstraint("investment_id", name="fi_one_archive_per_investment"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    investment_id: Mapped[int] = mapped_column(ForeignKey("fixed_income_investments.id", ondelete="RESTRICT"), nullable=False)
+    owner_id: Mapped[UUID | None] = mapped_column(Uuid, index=True, nullable=True)
+    archived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

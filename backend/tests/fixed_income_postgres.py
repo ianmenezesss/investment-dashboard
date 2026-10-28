@@ -16,6 +16,8 @@ def verify_fixed_income_postgres(engine, client):
     with engine.begin() as connection:
         connection.execute(text("GRANT SELECT, INSERT ON fixed_income_observations TO investment_test_runtime"))
         connection.execute(text("GRANT USAGE ON SEQUENCE fixed_income_observations_id_seq TO investment_test_runtime"))
+        connection.execute(text("GRANT SELECT, INSERT ON fixed_income_investment_archives TO investment_test_runtime"))
+        connection.execute(text("GRANT USAGE ON SEQUENCE fixed_income_investment_archives_id_seq TO investment_test_runtime"))
         for table in tables:
             flags = connection.execute(text("SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = to_regclass(:name)"), {"name": "public." + table}).one()
             assert flags == (True, True)
@@ -29,7 +31,7 @@ def verify_fixed_income_postgres(engine, client):
                 assert leaked == 0
             connection.execute(text(f"GRANT SELECT, INSERT ON public.{table} TO investment_test_runtime"))
             connection.execute(text(f"GRANT USAGE ON SEQUENCE public.{table}_id_seq TO investment_test_runtime"))
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "004"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "005"
 
     @contextmanager
     def restricted(owner=None, isolation=None):

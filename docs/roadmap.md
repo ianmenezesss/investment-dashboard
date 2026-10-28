@@ -42,6 +42,11 @@ Até a versão final serão usados exclusivamente dados fictícios, inclusive no
   Testes backend focais e integração PostgreSQL descartável passaram segundo relato do
   responsável; conta secundária e verificação remota independente seguem pendentes.
   Ver [revisão final](phase-2.0.7-final-review.md).
+- **2.0.8.1 (implementação local para revisão):** arquivamento por tombstone append-only
+  apenas de contratos CDB sem lotes, movimentações ou observações. Contratos e histórico
+  original permanecem preservados; listagem ativa os omite. Migration 005 foi exercitada
+  somente pelo teste PostgreSQL descartável; não foi aplicada em ambiente persistente ou de
+  produção. Ver [plano de arquivamento](phase-2.0.8.1-empty-cdb-archive.md).
 
 ## Pós-lançamento — planejado, não implementado
 

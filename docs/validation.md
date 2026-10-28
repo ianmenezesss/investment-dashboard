@@ -1,5 +1,45 @@
 # Validação do Investment Dashboard
 
+## Implementação local 2.0.8.1 — arquivamento de contratos CDB vazios
+
+- Arquivamento implementado por tombstone append-only em migration 005, sem alterar ou
+  remover contratos, lotes, movimentações ou observações. RLS/FORCE RLS, grants mínimos,
+  lock transacional compartilhado e bloqueio de novas dependências estão cobertos no código
+  e no teste de integração descartável. A migration foi aplicada somente pelo teste em
+  PostgreSQL descartável; não foi aplicada em ambiente persistente ou de produção.
+- **Suíte backend completa: 266 aprovados, 1 ignorado** (267 coletados). O único skip é
+  `test_migrations_persistence_and_chronological_validation`, pois a execução direta não
+  recebe `TEST_DATABASE_URL`. Um aviso existente de depreciação do `TestClient`/httpx permanece.
+- **128 testes frontend aprovados** em 10 arquivos. Incluem confirmação explícita,
+  cancelamento, sucesso com ocultação da listagem ativa e conflito de elegibilidade.
+- **TypeScript e build privado aprovados** (`npm run build -- --configLoader native`).
+  Permanece o aviso conhecido de bundle acima de 500 kB (chunk principal ~1.100 kB).
+- A revisão da falha do runner encontrou uma asserção inválida no verifier de arquivamento:
+  ele esperava a lista de CDBs de A vazia, embora verificadores anteriores já tivessem
+  criado outros contratos ativos para A. A asserção foi corrigida para comparar o conjunto
+  anterior com o posterior e confirmar que somente o contrato arquivado desapareceu.
+- O código de integração PostgreSQL descartável foi ampliado para migration 005: isolamento,
+  grants e imutabilidade do tombstone; RLS A/B/sem identidade; rejeição de dependências;
+  preservação da linha original; e concorrência entre arquivamento e aplicação. **Resultado
+  informado pelo usuário: 1 teste aprovado e 1 warning** no runner descartável. A inspeção
+  confirma que `test_migrations_persistence_and_chronological_validation` migra até `head`
+  (005) e chama `verify_archive_postgres`; a asserção compara contratos ativos antes/depois.
+  O agente não repetiu a integração nesta revisão: Docker está instalado, mas o ambiente negou
+  acesso ao Docker Engine pelo named pipe. Nenhum container, download ou banco remoto foi
+  usado nesta revisão.
+- O runner agora exige a imagem já em cache (`--pull=never`) e mostra detalhes seguros do
+  erro Docker/traceback completo. Script PowerShell com transcript em `%TEMP%`:
+  `backend/tests/run_postgres_diagnostic.ps1`. Executar do diretório `backend` com
+  `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run_postgres_diagnostic.ps1`.
+- Nesta revisão, suíte backend: **266 aprovados, 1 ignorado** (o teste PostgreSQL opt-in sem
+  `TEST_DATABASE_URL`) e um warning conhecido de depreciação `TestClient`/httpx; frontend:
+  **128 aprovados**; TypeScript e build aprovados. O build mantém o warning conhecido de chunk
+  acima de 500 kB (~1.100 kB). Auditoria de publicação analisou 158 arquivos candidatos,
+  3 artefatos e histórico Git; nenhum segredo conhecido/assinatura foi detectado. `git diff
+  --check` aprovado, com avisos Git apenas de normalização LF/CRLF. Nenhum dado real, produção,
+  push ou deploy foi acessado/executado.
+- Plano e limites: [Fase 2.0.8.1](phase-2.0.8.1-empty-cdb-archive.md).
+
 ## Revisão final 2.0.7 — 28/10/2026
 
 - Auditoria estática direcionada da migration 004 já aplicada (sem conexão ao Supabase),

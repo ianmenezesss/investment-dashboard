@@ -14,20 +14,25 @@ import type { ObservedPosition } from './types'
 
 let host: HTMLDivElement, root: Root, queryClient: QueryClient
 let fixture: ReturnType<typeof fixedIncomeFixture>
-let listError: number, detailError: number, historyError: number, postError: number, returnError: number
+let listError: number, detailError: number, historyError: number, postError: number, returnError: number, archiveError: number, archived: boolean
 let fetchMock: ReturnType<typeof vi.fn>
 let observedRows: ObservedPosition[]
 const authError = vi.fn()
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } })
 async function pause() { await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) }) }
 beforeEach(() => {
-  fixture = fixedIncomeFixture(); observedRows=[]; listError = detailError = historyError = postError = returnError = 0; authError.mockClear()
+  fixture = fixedIncomeFixture(); observedRows=[]; listError = detailError = historyError = postError = returnError = archiveError = 0; archived = false; authError.mockClear()
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   fetchMock = vi.fn(async (path: string, init: RequestInit) => {
     expect((init.headers as Record<string, string>).Authorization).toMatch(/^Bearer token-/)
     expect(init.credentials).toBe('omit'); expect(init.cache).toBe('no-store')
     const url = new URL(path, 'https://test.invalid')
+    if (init.method === 'DELETE' && url.pathname.endsWith('/archive')) {
+      if (archiveError) return json({ detail: 'Contrato não pode ser arquivado' }, archiveError)
+      archived = true
+      return new Response(null, { status: 204 })
+    }
     if (init.method === 'POST') {
       if (postError) return json({ detail: 'Operação rejeitada: confira saldo e datas' }, postError)
       const input = JSON.parse(String(init.body))
@@ -48,12 +53,12 @@ beforeEach(() => {
     if (url.pathname.endsWith('/returns')) return returnError ? json({ detail: 'Falha de consulta' }, returnError) : json(fixture.returns)
     if (url.pathname.endsWith('/observations')) return json(observedRows)
     if (url.pathname.endsWith('/movements')) return historyError ? json({ detail: 'Histórico indisponível' }, historyError) : json(fixture.movements.slice(Number(url.searchParams.get('offset')), Number(url.searchParams.get('offset')) + 100))
-    if (url.pathname.endsWith('/investments')) return listError ? json({ detail: 'Lista indisponível' }, listError) : json([fixture.detail])
+    if (url.pathname.endsWith('/investments')) return listError ? json({ detail: 'Lista indisponível' }, listError) : json(archived ? [] : [fixture.detail])
     return detailError ? json({ detail: 'Posição indisponível' }, detailError) : json(fixture.detail)
   })
   vi.stubGlobal('fetch', fetchMock)
 })
-afterEach(async () => { await act(async () => root.unmount()); queryClient.clear(); host.remove(); vi.unstubAllGlobals() })
+afterEach(async () => { await act(async () => root.unmount()); queryClient.clear(); host.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 async function render(selected = true, counter = 0, identity = 'owner-a') {
   await act(async () => root.render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[selected ? '/cdbs?investment=1' : '/cdbs']}><FixedIncomePage key={identity} repository={new PrivateRepository('token-' + identity)} identity={identity} newOperationRequest={counter} onAuthError={authError}/></MemoryRouter></QueryClientProvider>))
   await pause()
@@ -82,6 +87,32 @@ test('lista contratos e detalhe real, preserva principal e histórico sem consul
   expect(fetchMock.mock.calls.some(([path]) => path.includes('/returns'))).toBe(false)
   expect(fetchMock.mock.calls.every(([path]) => path.startsWith('/api/fixed-income/'))).toBe(true)
   expect(host.textContent).toContain('Caixa de resgate não é rendimento')
+})
+
+test('arquiva contrato somente após confirmação explícita e oculta a linha ativa sem apagar dados', async () => {
+  fixture.detail.lots = []; fixture.detail.principal_balance = '0'; fixture.movements = []
+  const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  await render()
+  await click('Arquivar contrato')
+  expect(confirmation).toHaveBeenCalledWith(expect.stringContaining('CDB de teste'))
+  expect(fetchMock.mock.calls.some(([, init]) => init.method === 'DELETE')).toBe(false)
+  expect(host.textContent).toContain('Banco fictício')
+
+  confirmation.mockReturnValue(true)
+  await click('Arquivar contrato')
+  expect(fetchMock.mock.calls.some(([path, init]) => path.endsWith('/investments/1/archive') && init.method === 'DELETE')).toBe(true)
+  expect(host.textContent).toContain('Contrato vazio arquivado')
+  expect(host.textContent).toContain('Seu primeiro CDB começa aqui')
+  expect(fixture.movements).toHaveLength(0)
+  confirmation.mockRestore()
+})
+
+test('conflito ao arquivar mantém o detalhe e informa que o servidor recusou', async () => {
+  fixture.detail.lots = []; fixture.detail.principal_balance = '0'; fixture.movements = []; archiveError = 409
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  await render(); await click('Arquivar contrato')
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('Contrato não pode ser arquivado')
+  expect(host.querySelector('[aria-label="Detalhes de CDB de teste"]')).not.toBeNull()
 })
 
 test('dicas financeiras são acessíveis por foco e distinguem cálculo do ledger', async () => {

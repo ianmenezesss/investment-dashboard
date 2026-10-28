@@ -138,6 +138,35 @@ def test_first_application_matches_contract_date(client):
     assert client.get(f"{PATH}/{investment}").json()["lots"] == []
 
 
+def test_only_owned_empty_contract_can_be_archived_and_original_row_is_hidden_not_deleted(client):
+    investment = create(client)
+    app.dependency_overrides[authenticate] = lambda: Principal(B)
+    assert client.delete(f"{PATH}/{investment}/archive").status_code == 404
+    assert client.get(PATH).json() == []
+    app.dependency_overrides[authenticate] = lambda: Principal(A)
+    assert client.delete(f"{PATH}/{investment}/archive").status_code == 204
+    assert client.get(PATH).json() == []
+    assert client.get(f"{PATH}/{investment}").status_code == 404
+    assert client.get(f"{PATH}/{investment}/movements").status_code == 404
+    assert client.delete(f"{PATH}/{investment}/archive").status_code == 409
+    assert client.post(f"{PATH}/{investment}/applications", json={"date": "2025-01-01", "principal_amount": "1"}).status_code == 404
+    from test_opening_balances import POSITION
+    assert client.post(f"{PATH}/{investment}/opening-balance", json=POSITION).status_code == 404
+
+
+def test_contract_with_lot_or_observation_cannot_be_archived(client):
+    with_lot = create(client)
+    apply(client, with_lot)
+    assert client.delete(f"{PATH}/{with_lot}/archive").status_code == 409
+    assert any(row["id"] == with_lot for row in client.get(PATH).json())
+
+    from test_opening_balances import POSITION, contract
+    with_observation = contract(client)
+    assert client.post(f"{PATH}/{with_observation}/opening-balance", json=POSITION).status_code == 201
+    assert client.delete(f"{PATH}/{with_observation}/archive").status_code == 409
+    assert any(row["id"] == with_observation for row in client.get(PATH).json())
+
+
 def test_business_date_uses_brazil_timezone_at_utc_day_boundary(monkeypatch):
     from datetime import datetime, timezone
     from app.fixed_income import schemas

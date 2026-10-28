@@ -15,11 +15,16 @@ def main():
     def run(*args):
         result = subprocess.run([docker, *args], capture_output=True, text=True)
         if result.returncode:
-            # Não propagar comandos, DSNs ou saída potencialmente sensível.
-            raise RuntimeError("Falha no Docker durante a preparação do banco de testes")
+            # Do not include argv (it contains the disposable database password).
+            detail = (result.stderr or result.stdout or "sem diagnóstico do Docker").strip()
+            detail = detail.replace(password, "[redacted]")[:2000]
+            raise RuntimeError(f"Docker falhou em '{args[0]}': {detail}")
         return result.stdout.strip()
     try:
-        run("run", "-d", "--rm", "--name", name, "--env", f"POSTGRES_PASSWORD={password}",
+        run("info", "--format", "{{.ServerVersion}}")
+        # Never pull or contact a registry: integration runs only with a cached image.
+        run("image", "inspect", "--format", "{{.Id}}", "postgres:17-alpine")
+        run("run", "--pull=never", "-d", "--rm", "--name", name, "--env", f"POSTGRES_PASSWORD={password}",
             "--env", "POSTGRES_DB=investment_tests", "--publish", "127.0.0.1::5432",
             "--tmpfs", "/var/lib/postgresql/data", "postgres:17-alpine")
         for _ in range(60):
@@ -31,7 +36,7 @@ def main():
             raise RuntimeError("Banco de testes não iniciou")
         port = run("port", name, "5432/tcp").rsplit(":", 1)[1]
         env = dict(os.environ, TEST_DATABASE_URL=f"postgresql+psycopg://postgres:{password}@127.0.0.1:{port}/investment_tests")
-        return subprocess.call([sys.executable, "-m", "pytest", "-q", "tests/test_postgres.py"], env=env, cwd=Path(__file__).resolve().parents[1])
+        return subprocess.call([sys.executable, "-m", "pytest", "-vv", "--tb=long", "--show-capture=all", "tests/test_postgres.py"], env=env, cwd=Path(__file__).resolve().parents[1])
     finally:
         # Somente o container efêmero criado por este script; sem volumes persistentes.
         subprocess.run([docker, "stop", name], capture_output=True)

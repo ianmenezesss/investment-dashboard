@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from ..access import private_db
-from .router import owned_investment
+from .router import is_archived, owned_investment
 from .observations import PositionObservation, ObservationInput, ObservationOutput, observation_query, validate_observation
 
 router = APIRouter(prefix="/api/fixed-income/investments", tags=["manual-positions"])
@@ -13,6 +13,8 @@ def save_observation(investment_id, data, kind, db):
     if db.bind.dialect.name == "postgresql":
         db.execute(text("SET LOCAL lock_timeout='5s'"))
         db.execute(text("SELECT pg_advisory_xact_lock(20001,:id)"), {"id": investment_id})
+    if is_archived(db, investment_id):
+        raise HTTPException(404, "Investimento não encontrado")
     validate_observation(db, investment, data, kind)
     row = PositionObservation(**data.model_dump(), kind=kind, investment_id=investment_id, owner_id=db.info.get("owner_id"))
     db.add(row); db.flush()
