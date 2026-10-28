@@ -1,5 +1,18 @@
 # Validação do Investment Dashboard
 
+## Fase 1.9.5 — clareza financeira e homologação
+
+- 108 testes backend e 96 frontend aprovados, sem API real ou banco externo.
+- Novos cenários: valorização positiva com perda após taxas, compras múltiplas, vendas
+  parciais, recompra após encerramento, precisão Decimal, base zero e cotação ausente.
+- Resultado realizado/custo legados preservados; autenticação, isolamento e demo offline
+  continuam cobertos pelas suítes existentes. PostgreSQL opcional não executado.
+- Builds público e privado aprovados. Permanecem os avisos conhecidos de bundle >500 kB
+  e depreciação TestClient/httpx, sem falhas.
+- Fixture local Chrome 390×844: documento 390 px, tabela 1.456 px em região rolável de 340 px.
+  Homologação real de produção permanece manual; nenhum deploy, push, commit ou tag.
+- Ver [fórmulas, limites e checklist da Fase 1.9.5](phase-1.9.5-financial-clarity.md).
+
 ## Fase 1.9.4 — dashboard privado com avaliação de mercado
 
 - 92 testes frontend aprovados em 9 arquivos, com snapshots/HTTP simulados e zero brapi real.

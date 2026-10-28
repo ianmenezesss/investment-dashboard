@@ -73,14 +73,18 @@ def test_valuation_snapshot_isolated_by_owner_with_shared_quote_cache(provider_s
             assert Decimal(data["realized_profit"]) == Decimal("18.2")
             assert [h["ticker"] for h in data["holdings"]] == ["ITUB4"]
             assert Decimal(data["holdings"][0]["quantity"]) == 6
+            assert Decimal(data["holdings"][0]["average_trade_price"]) == 20
+            assert Decimal(data["holdings"][0]["purchase_cost_without_fees"]) == 120
             assert data["ledger_as_of"] and data["valuation"]["calculated_at"]
             if provider_status == 200:
                 assert Decimal(data["market_value"]) == 144
+                assert Decimal(data["holdings"][0]["price_appreciation_percent"]) == 20
                 assert Decimal(data["valuation"]["unrealized_profit"]) == Decimal("22.8")
                 assert data["valuation"]["status"] == "complete"
                 assert isinstance(data["holdings"][0]["cost"], str)
             else:
                 assert data["market_value"] is None
+                assert data["holdings"][0]["price_appreciation_percent"] is None
                 assert data["valuation"]["status"] == "unavailable"
                 assert data["valuation"]["unrealized_profit"] is None
             app.dependency_overrides[authenticate] = lambda: Principal(B)

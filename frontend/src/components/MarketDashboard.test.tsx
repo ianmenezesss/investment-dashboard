@@ -32,6 +32,67 @@ test('completo mostra o mesmo snapshot, estimativa, variação, cotação e hor�
   expect(host.querySelector('caption')!.textContent).toContain('mesmo snapshot')
 })
 
+test('distingue valorização sem taxas de perda financeira e mantém ajuda acessível', async () => {
+  const snapshot = marketSnapshot()
+  Object.assign(snapshot.holdings[0], { average_trade_price: '20', average_price: '22', cost: '220',
+    market_value: '210', unrealized_profit: '-10', return_percent: '-4.54545', price_appreciation_percent: '5' })
+  snapshot.holdings[0].quote.price = '21'
+  const { host } = await render(snapshot)
+  const row = host.querySelector('tbody')!
+  expect(row.textContent).toContain('R$ 20,00')
+  expect(row.textContent).toContain('R$ 22,00')
+  expect(row.textContent).toContain('5,00%')
+  expect(row.textContent).toContain('-R$ 10,00')
+  expect(row.textContent).toContain('-4,55%')
+  expect(host.textContent).toContain('tributos futuros')
+  const help = host.querySelector<HTMLButtonElement>('button[aria-label="Entender: preço de compra"]')!
+  await act(async () => help.focus())
+  const tooltip = document.getElementById(help.getAttribute('aria-describedby')!)!
+  expect(tooltip.getAttribute('role')).toBe('tooltip')
+  expect(tooltip.textContent).toContain('Vendas parciais reduzem a base proporcionalmente')
+  await act(async () => help.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  expect(document.querySelector('[role="tooltip"]')).toBeNull()
+  await act(async () => help.click())
+  expect(document.querySelector('[role="tooltip"]')).not.toBeNull()
+  await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  expect(document.querySelector('[role="tooltip"]')).toBeNull()
+})
+
+test('resposta anterior sem base sem taxas não inventa preço nem valorização', async () => {
+  const snapshot = marketSnapshot()
+  delete snapshot.holdings[0].average_trade_price
+  delete snapshot.holdings[0].price_appreciation_percent
+  const { host } = await render(snapshot)
+  const cells = host.querySelectorAll('tbody td')
+  expect(cells[1].textContent).toContain('Indisponível')
+  expect(cells[5].textContent).toContain('Indisponível')
+  expect(cells[2].textContent).toContain('R$ 20,00')
+})
+
+test('exibe bases remanescentes de compras múltiplas e venda parcial recebidas do backend', async () => {
+  const snapshot = marketSnapshot()
+  Object.assign(snapshot.holdings[0], { quantity: '20', average_trade_price: '25', average_price: '25.325',
+    cost: '506.5', purchase_cost_without_fees: '500', market_value: '600', unrealized_profit: '93.5',
+    return_percent: '18.4600197433', price_appreciation_percent: '20' })
+  snapshot.holdings[0].quote.price = '30'
+  const { host } = await render(snapshot)
+  const row = host.querySelector('tbody')!
+  expect(row.textContent).toContain('R$ 25,00')
+  expect(row.textContent).toContain('R$ 25,32') // half-even, presentation only
+  expect(row.textContent).toContain('R$ 93,50')
+  expect(row.textContent).toContain('20,00%')
+  expect(row.textContent).toContain('18,46%')
+})
+
+test('sem cotação preserva média negociada mas omite valorização mesmo em resposta incoerente', async () => {
+  const snapshot = marketSnapshot('unavailable')
+  snapshot.holdings[0].price_appreciation_percent = '20'
+  const { host } = await render(snapshot)
+  const cells = host.querySelectorAll('tbody td')
+  expect(cells[1].textContent).toContain('R$ 20,00')
+  expect(cells[5].textContent).toContain('Indisponível')
+})
+
 test('parcial não substitui totais null pelo subtotal nem por zero', async () => {
   const { host } = await render(marketSnapshot('partial'))
   expect(host.textContent).toContain('Cobertura parcial')

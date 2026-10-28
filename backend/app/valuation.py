@@ -12,6 +12,9 @@ class ValuedHolding(BaseModel):
     quantity: Decimal
     cost: Decimal
     average_price: Decimal
+    purchase_cost_without_fees: Decimal | None = None
+    average_trade_price: Decimal | None = None
+    price_appreciation_percent: Decimal | None = None
     quote: Quote
     market_value: Decimal | None
     unrealized_profit: Decimal | None
@@ -69,7 +72,7 @@ def usable_quote(ticker: str, quote: Quote | None, now: datetime) -> Quote:
 
 
 def value_portfolio(summary: dict, quotes: list[Quote], *, now: datetime | None = None,
-                    ledger_as_of: datetime | None = None) -> PortfolioValuation:
+                    ledger_as_of: datetime | None = None, price_basis: dict | None = None) -> PortfolioValuation:
     now = now or datetime.now(timezone.utc)
     counts = Counter(q.ticker for q in quotes)
     by_ticker = {q.ticker: q for q in quotes if counts[q.ticker] == 1}
@@ -85,16 +88,23 @@ def value_portfolio(summary: dict, quotes: list[Quote], *, now: datetime | None 
             if counts[ticker] > 1:
                 quote = Quote(ticker=ticker, status="unavailable", reason="ambiguous_quote")
             market_value = profit = percent = None
+            basis = (price_basis or {}).get(ticker)
+            gross_cost = basis["cost"] if basis and basis["quantity"] == holding["quantity"] else None
+            trade_price = gross_cost / holding["quantity"] if gross_cost is not None else None
+            appreciation = None
             if quote.price is not None:
                 market_value = holding["quantity"] * Decimal(quote.price)
                 profit = market_value - holding["cost"]
                 percent = profit / holding["cost"] * 100 if holding["cost"] > 0 else None
+                appreciation = (market_value - gross_cost) / gross_cost * 100 if gross_cost is not None and gross_cost > 0 else None
                 subtotal += market_value
                 covered_cost += holding["cost"]
                 timestamps.append(quote.quoted_at)
             else:
                 missing.append(ticker)
             positions.append(ValuedHolding(**holding, quote=quote, market_value=market_value,
+                                           purchase_cost_without_fees=gross_cost, average_trade_price=trade_price,
+                                           price_appreciation_percent=appreciation,
                                            unrealized_profit=profit, return_percent=percent))
         complete = not missing
         open_cost = sum((p.cost for p in positions), Decimal(0))

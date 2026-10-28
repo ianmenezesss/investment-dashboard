@@ -7,6 +7,7 @@ export type MarketQuote = {
   from_cache: boolean; is_stale: boolean; expected_delay_seconds: number; retry_after_seconds: number | null
 }
 export type ValuedHolding = Summary['holdings'][number] & {
+  purchase_cost_without_fees?: string | null; average_trade_price?: string | null; price_appreciation_percent?: string | null
   quote: MarketQuote; market_value: string | null; unrealized_profit: string | null; return_percent: string | null
 }
 export type PortfolioValuation = Omit<Summary, 'market_value' | 'holdings'> & {

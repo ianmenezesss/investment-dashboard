@@ -5,7 +5,7 @@ export function marketSnapshot(status: PortfolioValuation['valuation']['status']
   const time = '2026-10-28T16:00:00Z'
   const snapshot: PortfolioValuation = {
     ledger_as_of: time, acquisition_cost: '200', total_purchases: '200', sale_proceeds: '0', realized_profit: '0', market_value: '240',
-    holdings: [{ ticker: 'ITUB4', quantity: '10', cost: '200', average_price: '20', market_value: '240', unrealized_profit: '40', return_percent: '20',
+    holdings: [{ ticker: 'ITUB4', quantity: '10', cost: '200', average_price: '20', average_trade_price: '20', purchase_cost_without_fees: '200', price_appreciation_percent: '20', market_value: '240', unrealized_profit: '40', return_percent: '20',
       quote: { ticker: 'ITUB4', price: '24', currency: 'BRL', provider: 'brapi', status: 'ok', reason: null, quoted_at: time,
         fetched_at: time, from_cache: false, is_stale: false, expected_delay_seconds: 1800, retry_after_seconds: null } }],
     valuation: { status, calculated_at: time, is_complete: true, open_cost: '200', unrealized_profit: '40', return_percent: '20',
@@ -22,6 +22,7 @@ export function marketSnapshot(status: PortfolioValuation['valuation']['status']
     missing.ticker = missing.quote.ticker = status === 'partial' ? 'PETR4' : 'ITUB4'
     missing.quote = { ...missing.quote, status: 'no_data', reason: 'not_found', price: null, quoted_at: null }
     missing.market_value = missing.unrealized_profit = missing.return_percent = null
+    missing.price_appreciation_percent = null
     snapshot.holdings = status === 'partial' ? [...snapshot.holdings, missing] : [missing]
     snapshot.market_value = null
     Object.assign(snapshot.valuation, { is_complete: false, unrealized_profit: null, return_percent: null,

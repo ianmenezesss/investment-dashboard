@@ -18,6 +18,7 @@ from .access import private_db
 from .market_data.brapi import BrapiProvider
 from .market_data.service import QuoteService
 from .valuation import PortfolioValuation, value_portfolio
+from .price_basis import purchase_price_basis
 
 
 @asynccontextmanager
@@ -98,17 +99,19 @@ async def quotes(tickers: list[str] = Depends(held_tickers), service: QuoteServi
 
 
 def portfolio_snapshot(db: Session = Depends(private_db)):
-    summary = summarize(records(db))
+    operations = records(db)
+    summary = summarize(operations)
+    basis = purchase_price_basis(operations)
     captured_at = datetime.now(timezone.utc)
     db.rollback()  # Release the read transaction before external HTTP; no ledger writes.
-    return summary, captured_at
+    return summary, captured_at, basis
 
 
 @app.get("/api/dashboard/valuation", response_model=PortfolioValuation)
 async def portfolio_valuation(snapshot=Depends(portfolio_snapshot), service: QuoteService = Depends(quote_service)):
-    summary, captured_at = snapshot
+    summary, captured_at, basis = snapshot
     quotes = await service.get_many([h["ticker"] for h in summary["holdings"]])
-    return value_portfolio(summary, quotes, ledger_as_of=captured_at)
+    return value_portfolio(summary, quotes, ledger_as_of=captured_at, price_basis=basis)
 
 
 def serialize(op):
