@@ -1,7 +1,9 @@
 from datetime import date
+from contextlib import asynccontextmanager
+import httpx
 from decimal import Decimal
 from typing import Literal
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
@@ -13,8 +15,24 @@ from .finance import summarize
 from .models import Operation
 from .auth import authenticate
 from .access import private_db
+from .market_data.brapi import BrapiProvider
+from .market_data.service import QuoteService
 
-app = FastAPI(title="Investment Dashboard", version="0.1.5", docs_url=None if settings.environment == "production" else "/docs", redoc_url=None, openapi_url=None if settings.environment == "production" else "/openapi.json")
+
+@asynccontextmanager
+async def lifespan(app):
+    # Constructing the client makes no external request. No polling or startup fetch.
+    async with httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as client:
+        token = settings.brapi_token.get_secret_value().strip()
+        app.state.quote_service = QuoteService(BrapiProvider(client, token),
+            enabled=settings.market_data_enabled, configured=bool(token))
+        try:
+            yield
+        finally:
+            app.state.quote_service = None
+
+
+app = FastAPI(title="Investment Dashboard", version="0.1.5", lifespan=lifespan, docs_url=None if settings.environment == "production" else "/docs", redoc_url=None, openapi_url=None if settings.environment == "production" else "/openapi.json")
 app.add_middleware(CORSMiddleware, allow_origins=[settings.cors_origin], allow_methods=["GET", "POST", "DELETE"], allow_headers=["Authorization", "Content-Type"])
 @app.middleware("http")
 async def privacy_headers(request, call_next):
@@ -57,6 +75,25 @@ class OperationInput(BaseModel):
 
 def records(db):
     return list(db.scalars(select(Operation).where(Operation.owner_id == db.info.get("owner_id")).order_by(Operation.date, Operation.id)))
+
+
+def held_tickers(db: Session = Depends(private_db)):
+    tickers = [h["ticker"] for h in summarize(records(db))["holdings"]]
+    # Read-only snapshot: return the pooled connection before waiting on external HTTP.
+    db.rollback()
+    return tickers
+
+
+def quote_service(request: Request):
+    service = getattr(request.app.state, "quote_service", None)
+    if service is None:
+        raise HTTPException(503, "Serviço de cotações não inicializado")
+    return service
+
+
+@app.get("/api/quotes")
+async def quotes(tickers: list[str] = Depends(held_tickers), service: QuoteService = Depends(quote_service)):
+    return {"quotes": await service.get_many(tickers)}
 
 
 def serialize(op):

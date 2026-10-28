@@ -2,7 +2,7 @@
 name = "investment-api"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1", "sqlalchemy>=2.0,<3", "psycopg[binary]>=3.2,<4", "alembic>=1.14,<2", "pydantic-settings>=2.7,<3", "PyJWT[crypto]>=2.10,<3"]
+dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1", "sqlalchemy>=2.0,<3", "psycopg[binary]>=3.2,<4", "alembic>=1.14,<2", "pydantic-settings>=2.7,<3", "PyJWT[crypto]>=2.10,<3", "httpx>=0.28,<1"]
 
 [build-system]
 requires = ["setuptools>=75"]
@@ -12,7 +12,7 @@ build-backend = "setuptools.build_meta"
 include = ["app*"]
 
 [project.optional-dependencies]
-test = ["pytest>=8,<10", "httpx>=0.28,<1"]
+test = ["pytest>=8,<10"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

@@ -1,5 +1,16 @@
 # Validação do Investment Dashboard
 
+## Fase 1.9.2 — infraestrutura de cotações gratuitas
+
+- 73 testes backend aprovados, com HTTPX MockTransport/SQLite em memória; PostgreSQL opcional
+  excluído. Cobre cache de 30 min, concorrência, quota, deadline, dados ausentes/inválidos,
+  cooldown, stale fallback, segurança do token e isolamento por proprietário no novo endpoint.
+- 78 testes frontend e builds demo/privado aprovados, sem chamadas reais de mercado ou chaves reais.
+- Sem alteração de autenticação, RLS, banco, migrations, cálculos de patrimônio ou frontend.
+  Fases 1.9.1 e 1.8.4 preservadas. Nenhum deploy/push/tag.
+- Ver [documentação da Fase 1.9.2](phase-1.9.2-market-data.md) para configuração, limites,
+  isolamento do dotenv nos testes e homologação manual futura.
+
 ## Fase 1.8.4 — sessão e navegação
 
 Verificado em 27/10/2026, sem deploy, push ou tag:
