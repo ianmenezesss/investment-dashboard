@@ -24,16 +24,16 @@ function LedgerForm({ mode, detail, busy, onSave }: { mode: WriteMode; detail?: 
         <label>Nome do produto<input name="product_name" required maxLength={160}/></label>
         <label>Remuneração<select name="remuneration" value={remuneration} onChange={event => setRemuneration(event.target.value)}><option value="CDI">Percentual do CDI</option><option value="FIXED">Prefixado</option></select></label>
         <label>{remuneration === 'CDI' ? 'Percentual do CDI (%)' : 'Taxa prefixada (% ao ano)'}<input name="contracted_rate" type="number" min="0.00000001" max="9999.99999999" step="0.00000001" required placeholder={remuneration === 'CDI' ? '110' : '12.5'}/></label>
-        <label>Data da primeira aplicação<input name="application_date" type="date" required max={financialToday()} value={applicationDate} onChange={event => setApplicationDate(event.target.value)}/></label>
+        <label>Data inicial da aplicação ou acompanhamento<input name="application_date" type="date" required max={financialToday()} value={applicationDate} onChange={event => setApplicationDate(event.target.value)}/></label>
         <label>Vencimento<input name="maturity_date" type="date" required min={applicationDate}/></label>
-        <p className="fi-full">Cadastrar o contrato não movimenta dinheiro. Registre a primeira aplicação depois, na data informada. Termos e movimentos não podem ser editados ou excluídos.</p>
+        <p className="fi-full">Cadastrar o contrato não movimenta dinheiro. Para investimento existente, use a data em que deseja iniciar o acompanhamento e depois escolha “Iniciar com saldo atual”; não é necessário reconstruir aquisições antigas. Para nova aplicação, a primeira usa a data informada. Termos e registros são imutáveis.</p>
       </> : <>
         {mode === 'redemption' && <label className="fi-full">Lote de origem<select name="lot_id" value={lotId} required onChange={event => { setLotId(event.target.value); setPrincipal('') }}>
           <option value="" disabled>Escolha um lote com principal</option>{available.map(item => <option key={item.id} value={item.id}>Lote {item.id} · {dayLabel(item.application_date)} · {marketMoney(item.principal_balance)}</option>)}
         </select></label>}
         <label>Data<input name="date" type="date" required max={mode === 'application' && detail ? [financialToday(), detail.maturity_date].sort()[0] : financialToday()}
           min={mode === 'redemption' ? lot?.application_date : detail?.application_date}
-          defaultValue={mode === 'application' && detail ? detail.lots.length === 0 ? detail.application_date : [financialToday(), detail.maturity_date].sort()[0] : financialToday()}/></label>
+          defaultValue={mode === 'application' && detail ? detail.lots.length === 0 && !detail.opening_balance ? detail.application_date : [financialToday(), detail.maturity_date].sort()[0] : financialToday()}/></label>
         <label>{mode === 'application' ? 'Principal da aplicação (R$)' : 'Principal amortizado (R$)'}<input name="principal_amount" type="number" min="0.00000001" step="0.00000001" required value={principal} onChange={event => setPrincipal(event.target.value)} max={mode === 'redemption' ? lot?.principal_balance : undefined}/></label>
         {mode === 'redemption' && <>
           <Button className="fi-full" variant="outline" disabled={!lot} onClick={() => setPrincipal(lot!.principal_balance)}>Resgatar todo o principal do lote</Button>

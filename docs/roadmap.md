@@ -1,6 +1,6 @@
 # Roadmap do Investment Dashboard
 
-Registro atualizado na Fase **2.0.4**, em 28/10/2026. As funcionalidades da Fase 3
+Registro atualizado na Fase **2.0.5**, em 28/10/2026. As funcionalidades da Fase 3
 continuam planejadas e não foram implementadas nesta entrega.
 
 ## Fase 2 — renda fixa
@@ -16,6 +16,21 @@ continuam planejadas e não foram implementadas nesta entrega.
 - **2.0.4 (implementada para revisão):** interface privada CDB com listagem/cadastro,
   lotes, aplicações, resgates e histórico; estimativa explícita com premissas confirmadas,
   dados indisponíveis preservados e demo offline. Ver [fluxos e contratos](phase-2.0.4-fixed-income-ui.md).
+
+- **2.0.5 (implementada para revisão):** saldo inicial consolidado como snapshot imutável,
+  novas observações/conciliação manual sem presumir principal ou tributos, novos lotes
+  separados e cards/formulários BRL. Migration 004 local; produção aguarda autorização.
+  Ver [semântica, contratos e implantação](phase-2.0.5-opening-balance.md).
+
+## Pós-lançamento — planejado, não implementado
+
+- Importação de extratos CSV com validação e revisão antes de persistir.
+- Integrações bancárias, respeitando consentimento, privacidade e fontes viáveis.
+- Conciliação automatizada, sem sobrescrever ledger ou presumir impostos/principal.
+- Reconstrução opcional de históricos a partir de documentos efetivamente disponíveis.
+
+Snapshot não substitui histórico de aquisição. Essas funcionalidades exigirão escopo e
+validação próprios; nenhuma está disponível como operação funcional nesta fase.
 
 ## Fase 3 — exploração de ativos e histórico
 

@@ -29,6 +29,9 @@ export async function request<T>(path: string, token: string, init?: RequestInit
   const response = await fetch(`${apiBase()}/api/${path}`, { ...init, cache: 'no-store', credentials: 'omit', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } })
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
+    if (/\/(opening-balance|observations)(\?|$)/.test(path) && response.status === 422 && Array.isArray(body.detail)) {
+      throw new ApiError(422, body.detail.slice(0, 3).map((error: { msg?: string }) => String(error.msg ?? 'Confira os campos').replace(/^Value error, /, '')).join(' '))
+    }
     throw new ApiError(response.status, response.status === 401 ? 'Sessão inválida ou expirada. Entre novamente.' : response.status === 403 ? 'Sua conta não está autorizada a acessar esta carteira.' : typeof body.detail === 'string' ? body.detail : `Não foi possível concluir a solicitação (${response.status}). Confira os campos e a conexão com a API.`)
   }
   return response.status === 204 ? undefined as T : response.json()

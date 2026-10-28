@@ -21,9 +21,11 @@ export function FixedIncomeReturns({ detail, repository, identity, onAuthError }
     retry: false, staleTime: 15 * 60 * 1000, refetchOnWindowFocus: false, refetchInterval: false })
   useEffect(() => { if (query.error instanceof ApiError && [401, 403].includes(query.error.status)) onAuthError(query.error) }, [query.error, onAuthError])
   const data = query.isError ? undefined : query.data
+  if (detail.tracking_mode === 'CONSOLIDATED' && !detail.lots.length) return <article className="panel fi-section"><h3>Estimativa calculada pelo Investment Dashboard</h3><p>Rentabilidade histórica indisponível. Não calculamos CDI nem tributação retroativa sobre a posição manual, mesmo que o principal tenha sido informado. Estimativa tributária não disponível.</p></article>
   if (detail.remuneration !== 'CDI') return <article className="panel fi-section"><h3>Rentabilidade</h3><p>O contrato prefixado pode receber aplicações e resgates. O motor atual estima somente CDBs percentuais do CDI; não há cálculo prefixado disponível.</p></article>
+  if (!detail.lots.length) return <article className="panel fi-section"><h3>Estimativa calculada pelo Investment Dashboard</h3><p>Registre uma aplicação real para estimar os novos lotes. Posição manual sem histórico de aquisição não permite calcular rentabilidade histórica ou tributação retroativa.</p></article>
   return <article className="panel fi-section" aria-label="Estimativa de rentabilidade">
-    <h3>Rentabilidade estimada</h3><p>Consulta pontual da posição aberta, sem garantia de liquidação. Confirme que as premissas correspondem ao seu contrato.</p>
+    <h3>Estimativa calculada pelo Investment Dashboard</h3><p>{detail.tracking_mode === 'CONSOLIDATED' ? 'Somente os novos lotes registrados: capital consolidado excluído. Não some esta estimativa ao patrimônio observado, que pode já incluir esses lotes.' : 'Consulta pontual da posição aberta, sem garantia de liquidação.'} Confirme que as premissas correspondem ao seu contrato.</p>
     <form className="fi-premises" onChange={() => setInput(null)} onSubmit={event => {
       event.preventDefault()
       const form = new FormData(event.currentTarget)

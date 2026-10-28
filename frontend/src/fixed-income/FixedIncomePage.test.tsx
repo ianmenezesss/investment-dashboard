@@ -9,16 +9,19 @@ import { FixedIncomePage } from './FixedIncomePage'
 import { PrivateRepository } from '../repositories/PrivateRepository'
 import { fixedIncomeFixture } from '../test-fixtures/fixed-income'
 import { totalApplications } from './format'
+import { parseObservedBRL } from './ManualPositionDialog'
+import type { ObservedPosition } from './types'
 
 let host: HTMLDivElement, root: Root, queryClient: QueryClient
 let fixture: ReturnType<typeof fixedIncomeFixture>
 let listError: number, detailError: number, historyError: number, postError: number, returnError: number
 let fetchMock: ReturnType<typeof vi.fn>
+let observedRows: ObservedPosition[]
 const authError = vi.fn()
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } })
 async function pause() { await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) }) }
 beforeEach(() => {
-  fixture = fixedIncomeFixture(); listError = detailError = historyError = postError = returnError = 0; authError.mockClear()
+  fixture = fixedIncomeFixture(); observedRows=[]; listError = detailError = historyError = postError = returnError = 0; authError.mockClear()
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   fetchMock = vi.fn(async (path: string, init: RequestInit) => {
@@ -28,6 +31,11 @@ beforeEach(() => {
     if (init.method === 'POST') {
       if (postError) return json({ detail: 'Operação rejeitada: confira saldo e datas' }, postError)
       const input = JSON.parse(String(init.body))
+      if(url.pathname.endsWith('/opening-balance')||url.pathname.endsWith('/observations')) {
+        const row:ObservedPosition={...input,id:observedRows.length+1,investment_id:fixture.detail.id,kind:url.pathname.endsWith('/opening-balance')?'OPENING':'OBSERVATION',created_at:'2026-10-15T12:00:00Z'}
+        observedRows.push(row);fixture.detail.tracking_mode='CONSOLIDATED';fixture.detail.latest_observation=row;if(row.kind==='OPENING')fixture.detail.opening_balance=row
+        return json(row,201)
+      }
       if (url.pathname.endsWith('/investments')) { fixture.detail = { ...fixture.detail, ...input, id: 2, principal_balance: '0', lots: [] }; fixture.movements = []; return json(fixture.detail, 201) }
       const kind = url.pathname.endsWith('/applications') ? 'APPLICATION' : 'REDEMPTION'
       const row = { ...fixture.movements[0], ...input, id: fixture.movements.length + 1, investment_id: fixture.detail.id, lot_id: input.lot_id ?? 2, kind, cash_received: input.cash_received ?? null }
@@ -38,6 +46,7 @@ beforeEach(() => {
       return json(row, 201)
     }
     if (url.pathname.endsWith('/returns')) return returnError ? json({ detail: 'Falha de consulta' }, returnError) : json(fixture.returns)
+    if (url.pathname.endsWith('/observations')) return json(observedRows)
     if (url.pathname.endsWith('/movements')) return historyError ? json({ detail: 'Histórico indisponível' }, historyError) : json(fixture.movements.slice(Number(url.searchParams.get('offset')), Number(url.searchParams.get('offset')) + 100))
     if (url.pathname.endsWith('/investments')) return listError ? json({ detail: 'Lista indisponível' }, listError) : json([fixture.detail])
     return detailError ? json({ detail: 'Posição indisponível' }, detailError) : json(fixture.detail)
@@ -69,7 +78,7 @@ test('lista contratos e detalhe real, preserva principal e histórico sem consul
   await render()
   expect(host.textContent).toContain('Banco fictício'); expect(host.textContent).toContain('100% do CDI')
   expect(host.textContent).toContain('Principal aplicado acumulado'); expect(host.textContent).toContain('R$ 1.000,00')
-  expect(host.querySelector('table button')!.textContent).toBe('Ver lotes e histórico')
+  expect(host.querySelector('[aria-label="Abrir CDB de teste"]')!.textContent).toBe('Ver lotes e histórico')
   expect(fetchMock.mock.calls.some(([path]) => path.includes('/returns'))).toBe(false)
   expect(fetchMock.mock.calls.every(([path]) => path.startsWith('/api/fixed-income/'))).toBe(true)
   expect(host.textContent).toContain('Caixa de resgate não é rendimento')
@@ -225,5 +234,81 @@ test('envio pendente bloqueia duplicação de movimento e mantém feedback de ca
   expect(document.querySelector('[role="dialog"]')!.textContent).toContain('Registrando…')
   await submitDialog(); expect(posts()).toHaveLength(1)
   await act(async () => resolve(json({ ...fixture.movements[0], id: 2 }, 201))); await pause()
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+})
+
+async function prepareManual() {
+  fixture.detail.lots=[];fixture.detail.principal_balance='0';fixture.movements=[]
+  await render();await click('Iniciar com saldo atual')
+  for(const[name,value]of Object.entries({as_of:'2026-10-15',source:'Extrato fictício',gross_value:'5.000,00',net_value:'4.950,00',taxes_combined:'50,00',reported_gain:'250,00'}))await field(name,value)
+}
+
+test('saldo inicial exige revisão e preserva principal desconhecido sem aplicações fictícias', async()=>{
+  await prepareManual()
+  expect(host.textContent).not.toContain('R$ 0,00')
+  await submitDialog();expect(posts()).toHaveLength(0)
+  expect(document.querySelector('[role="dialog"]')!.textContent).toContain('Confirme antes de salvar')
+  await click('Confirmar e salvar posição')
+  const input=JSON.parse(posts()[0][1].body)
+  expect(posts()[0][0]).toBe('/api/fixed-income/investments/1/opening-balance')
+  expect(input).toMatchObject({gross_value:'5000.00',net_value:'4950.00',taxes_combined:'50.00',reported_gain:'250.00',confirmed_principal:null,ir_estimate:null,iof_estimate:null})
+  expect(fixture.movements).toHaveLength(0);expect(fixture.detail.lots).toHaveLength(0)
+  expect(host.textContent).toContain('Principal não informado');expect(host.textContent).toContain('Rentabilidade histórica indisponível')
+  expect(host.textContent).toContain('R$ 5.000,00');expect(host.textContent).toContain('R$ 4.950,00')
+  expect(fetchMock.mock.calls.some(([path])=>path.includes('/returns'))).toBe(false)
+})
+
+test('tributos inconsistentes são rejeitados antes de revisão e campos opcionais não viram zero',async()=>{
+  await prepareManual();await field('taxes_combined','40,00');await submitDialog()
+  expect(document.querySelector('[role="dialog"] [role="alert"]')!.textContent).toContain('deve corresponder')
+  expect(posts()).toHaveLength(0)
+  await field('tax_mode','unknown');await field('confirmed_principal','4.700,00');await submitDialog();await click('Confirmar e salvar posição')
+  expect(JSON.parse(posts()[0][1].body)).toMatchObject({taxes_combined:null,ir_estimate:null,iof_estimate:null,confirmed_principal:'4700.00'})
+})
+
+test('IR IOF discriminados, valores preservados ao voltar e snapshot anterior mantido na conciliação',async()=>{
+  await prepareManual();await field('tax_mode','separate');await field('ir_estimate','40,00');await field('iof_estimate','10,00');await submitDialog()
+  await click('Voltar ao formulário')
+  expect(document.querySelector<HTMLInputElement>('[name="gross_value"]')!.value).toBe('5.000,00')
+  await submitDialog();await click('Confirmar e salvar posição')
+  const first=JSON.stringify(observedRows[0])
+  await click('Registrar nova posição')
+  for(const[name,value]of Object.entries({as_of:'2026-10-16',source:'Aplicativo fictício',gross_value:'4.800,00',net_value:'4.750,00',taxes_combined:'50,00',reason:'AFTER_CONSOLIDATED_REDEMPTION'}))await field(name,value)
+  await field('cash_received','300,00');await submitDialog();await click('Confirmar e salvar posição')
+  expect(observedRows).toHaveLength(2);expect(JSON.stringify(observedRows[0])).toBe(first)
+  expect(JSON.parse(posts()[1][1].body)).toMatchObject({reason:'AFTER_CONSOLIDATED_REDEMPTION',cash_received:'300.00',confirmed_principal:null})
+  expect(fixture.movements).toHaveLength(0)
+})
+
+test('máscara monetária é exata, permite perdas independentes e não aceita casas fracionárias extras',()=>{
+  expect(parseObservedBRL('5.000,00')).toBe('5000.00');expect(parseObservedBRL('-250,00')).toBe('-250.00');expect(parseObservedBRL('')).toBeNull()
+  expect(()=>parseObservedBRL('1,001')).toThrow();expect(()=>parseObservedBRL('NaN')).toThrow()
+})
+
+test.each([422,401,403])('erro %i ao salvar posição não simula sucesso nem repete o POST',async(status)=>{
+  await prepareManual();await submitDialog()
+  fetchMock.mockImplementationOnce(()=>Promise.resolve(json({detail:[{loc:['body'],msg:'Tributos inconsistentes',type:'value_error'}]},status)))
+  await click('Confirmar e salvar posição')
+  expect(posts()).toHaveLength(1);expect(observedRows).toHaveLength(0)
+  if(status===422){
+    expect(document.querySelector('[role="dialog"] [role="alert"]')!.textContent).toContain('Tributos inconsistentes')
+    expect(document.querySelector('[role="dialog"]')!.textContent).toContain('Confirme antes de salvar')
+  }else{
+    expect(authError).toHaveBeenCalledWith(expect.objectContaining({status}))
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+  }
+})
+
+test('posição manual bloqueia envio duplicado e fechamento enquanto a confirmação está pendente',async()=>{
+  await prepareManual();await submitDialog()
+  let resolve!:(response:Response)=>void
+  fetchMock.mockImplementationOnce(()=>new Promise<Response>(r=>{resolve=r}))
+  await click('Confirmar e salvar posição')
+  const button=[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(b=>b.textContent==='Salvando posição…')!
+  expect(button.disabled).toBe(true)
+  await act(async()=>{button.click();document.querySelector('[role="dialog"]')!.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))})
+  expect(posts()).toHaveLength(1);expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+  const input=JSON.parse(posts()[0][1].body)
+  await act(async()=>resolve(json({...input,id:1,investment_id:1,kind:'OPENING',created_at:'2026-10-15T12:00:00Z'},201)));await pause()
   expect(document.querySelector('[role="dialog"]')).toBeNull()
 })

@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Literal
 from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from .observations import ObservationOutput
 
 
 def financial_today():
@@ -64,6 +65,8 @@ class InvestmentOutput(Output):
     application_date: date
     maturity_date: date
     created_at: datetime
+    tracking_mode: Literal["LEDGER", "CONSOLIDATED"] = "LEDGER"
+    latest_observation: ObservationOutput | None = None
 
 
 class MovementOutput(Output):
@@ -86,3 +89,4 @@ class LotOutput(Output):
 class InvestmentDetail(InvestmentOutput):
     principal_balance: Decimal
     lots: list[LotOutput]
+    opening_balance: ObservationOutput | None = None

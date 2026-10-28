@@ -24,6 +24,9 @@ from .bcb_rates.provider import SGSProvider
 from .bcb_rates.service import RateService
 from .bcb_rates.router import router as bcb_rates_router
 from .fixed_income.returns_router import router as fixed_income_returns_router
+from .fixed_income.observation_routes import router as observation_router
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 
 
 @asynccontextmanager
@@ -46,6 +49,14 @@ app = FastAPI(title="Investment Dashboard", version="0.1.5", lifespan=lifespan, 
 app.include_router(fixed_income_router)
 app.include_router(bcb_rates_router)
 app.include_router(fixed_income_returns_router)
+app.include_router(observation_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def safe_observation_validation(request, exc):
+    if request.url.path.endswith(("/opening-balance", "/observations")):
+        return JSONResponse(status_code=422, content={"detail": [{"loc": list(error["loc"]), "msg": error["msg"], "type": error["type"]} for error in exc.errors()]})
+    return await request_validation_exception_handler(request, exc)
 app.add_middleware(CORSMiddleware, allow_origins=[settings.cors_origin], allow_methods=["GET", "POST", "DELETE"], allow_headers=["Authorization", "Content-Type"])
 @app.middleware("http")
 async def privacy_headers(request, call_next):

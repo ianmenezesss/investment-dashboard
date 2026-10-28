@@ -120,15 +120,19 @@ def estimate_returns(snapshot: ReturnsSnapshot, observations, *, as_of: date, co
             result.net_income_estimate = result.gross_income_estimate - result.iof_estimate - result.ir_estimate
             result.net_value_estimate = result.gross_value_estimate - result.iof_estimate - result.ir_estimate
         def total(field):
+            if contract.tracking_mode == "CONSOLIDATED" and not results:
+                return None
             values = [getattr(lot, field) for lot in results]
             return sum(values, ZERO) if all(v is not None for v in values) else None
         return InvestmentReturns(investment_id=contract.id, as_of=as_of, ledger_as_of=snapshot.ledger_as_of,
             convention=convention, calendar=calendar, tax_profile=tax_profile,
-            principal_balance=sum((lot.principal_balance for lot in results), ZERO),
-            status="empty" if not results else "estimated" if all(lot.status in ("estimated", "closed") for lot in results) else "incomplete",
+            scope="post_opening_lots_only" if contract.tracking_mode == "CONSOLIDATED" else "ledger_only",
+            principal_balance=None if contract.tracking_mode == "CONSOLIDATED" and not results else sum((lot.principal_balance for lot in results), ZERO),
+            status="incomplete" if contract.tracking_mode == "CONSOLIDATED" and not results else "empty" if not results else "estimated" if all(lot.status in ("estimated", "closed") for lot in results) else "incomplete",
             gross_income_estimate=total("gross_income_estimate"), gross_value_estimate=total("gross_value_estimate"),
             iof_estimate=total("iof_estimate"), ir_estimate=total("ir_estimate"),
             net_income_estimate=total("net_income_estimate"), net_value_estimate=total("net_value_estimate"),
             lots=results, rates_error=rates_error, rates_references=list(references),
             warnings=["estimate_not_settlement", "explicit_contract_convention_required", "proportional_redemption_assumed",
-                      "no_coupons_fees_or_spread", "pf_brazil_tax_estimate_only", "realized_taxes_not_inferred_from_cash"])
+                      "no_coupons_fees_or_spread", "pf_brazil_tax_estimate_only", "realized_taxes_not_inferred_from_cash"] +
+                      (["manual_position_excluded", "historical_returns_unavailable"] if contract.tracking_mode == "CONSOLIDATED" else []))

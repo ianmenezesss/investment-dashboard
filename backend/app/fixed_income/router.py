@@ -6,6 +6,7 @@ from ..access import private_db
 from .models import Investment, Lot, Movement
 from .schemas import InvestmentInput, InvestmentOutput, InvestmentDetail, LotOutput, ApplicationInput, RedemptionInput, MovementOutput
 from .ledger import principal_balances, total_principal
+from .observations import PositionObservation, ObservationOutput, opening, latest
 
 router = APIRouter(prefix="/api/fixed-income", tags=["fixed-income"])
 
@@ -28,6 +29,9 @@ def locked_history(db, investment_id, event_date):
         db.execute(text("SET LOCAL lock_timeout = '5s'"))
         db.execute(text("SELECT pg_advisory_xact_lock(20001, :id)"), {"id": investment_id})
     movements = history(db, investment_id)
+    observed = latest(db, investment_id)
+    if observed and (event_date < observed.as_of or event_date <= opening(db, investment_id).as_of):
+        raise HTTPException(422, "Movimentação deve ser posterior à abertura e não anterior à última posição observada")
     if movements and event_date < movements[-1].date:
         raise HTTPException(422, "Movimentações devem seguir ordem cronológica por investimento")
     return movements
@@ -45,16 +49,23 @@ def create_investment(data: InvestmentInput, db: Session = Depends(private_db)):
 
 @router.get("/investments", response_model=list[InvestmentOutput])
 def list_investments(offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200), db: Session = Depends(private_db)):
-    return list(db.scalars(select(Investment).where(Investment.owner_id == db.info.get("owner_id"))
-        .order_by(Investment.id).offset(offset).limit(limit)))
+    last_id = select(PositionObservation.id).where(PositionObservation.investment_id == Investment.id,
+        PositionObservation.owner_id == db.info.get("owner_id")).order_by(PositionObservation.as_of.desc(), PositionObservation.id.desc()).limit(1).correlate(Investment).scalar_subquery()
+    rows = db.execute(select(Investment, PositionObservation).outerjoin(PositionObservation, PositionObservation.id == last_id)
+        .where(Investment.owner_id == db.info.get("owner_id")).order_by(Investment.id).offset(offset).limit(limit))
+    return [InvestmentOutput.model_validate(investment).model_copy(update={"tracking_mode": "CONSOLIDATED" if observed else "LEDGER",
+        "latest_observation": ObservationOutput.model_validate(observed) if observed else None}) for investment, observed in rows]
 
 
 @router.get("/investments/{investment_id}", response_model=InvestmentDetail)
 def investment_detail(investment_id: int, db: Session = Depends(private_db)):
     investment = owned_investment(db, investment_id)
+    start, observed = opening(db, investment_id), latest(db, investment_id)
     balances = principal_balances(history(db, investment_id))
     lots = db.scalars(select(Lot).where(Lot.investment_id == investment_id, Lot.owner_id == db.info.get("owner_id")).order_by(Lot.application_date, Lot.id))
-    return InvestmentDetail(**InvestmentOutput.model_validate(investment).model_dump(),
+    return InvestmentDetail(**InvestmentOutput.model_validate(investment).model_dump(exclude={"tracking_mode", "latest_observation"}),
+        tracking_mode="CONSOLIDATED" if start else "LEDGER", opening_balance=ObservationOutput.model_validate(start) if start else None,
+        latest_observation=ObservationOutput.model_validate(observed) if observed else None,
         principal_balance=total_principal(balances), lots=[LotOutput(id=lot.id,
             application_date=lot.application_date, principal_balance=balances.get(lot.id, Decimal(0))) for lot in lots])
 
@@ -82,7 +93,7 @@ def apply_principal(investment_id: int, data: ApplicationInput, db: Session = De
     movements = locked_history(db, investment_id, data.date)
     if not investment.application_date <= data.date <= investment.maturity_date:
         raise HTTPException(422, "Aplicação fora das datas do contrato")
-    if not movements and data.date != investment.application_date:
+    if not movements and not opening(db, investment_id) and data.date != investment.application_date:
         raise HTTPException(422, "Primeira aplicação deve coincidir com a data de aplicação do contrato")
     lot = Lot(investment_id=investment_id, owner_id=db.info.get("owner_id"), application_date=data.date)
     db.add(lot)

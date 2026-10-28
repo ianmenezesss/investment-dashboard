@@ -31,8 +31,26 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
     with engine.begin() as connection:
         connection.execute(text("""INSERT INTO operations(ticker,kind,date,quantity,price,fees,created_at,owner_id)
             VALUES ('BBAS3','BUY','2025-01-01',1,20,0,now(),'33333333-3333-4333-8333-333333333333')"""))
+    command.upgrade(Config("alembic.ini"), "003")
+    # A fictional contract/ledger already exists before 004. Compare every original field.
+    with engine.begin() as connection:
+        investment = connection.scalar(text("""INSERT INTO fixed_income_investments
+          (owner_id,issuer,product_name,product_type,remuneration,indexer,contracted_rate,application_date,maturity_date,created_at)
+          VALUES ('33333333-3333-4333-8333-333333333333','Banco Exemplo','CDB Pré-migração Exemplo',
+          'CDB','CDI','CDI',100,'2025-01-01','2027-01-01',now()) RETURNING id"""))
+        lot = connection.scalar(text("""INSERT INTO fixed_income_lots(investment_id,owner_id,application_date,created_at)
+          VALUES (:id,'33333333-3333-4333-8333-333333333333','2025-01-01',now()) RETURNING id"""), {'id':investment})
+        connection.execute(text("""INSERT INTO fixed_income_movements
+          (investment_id,lot_id,owner_id,kind,date,principal_amount,created_at)
+          VALUES (:id,:lot,'33333333-3333-4333-8333-333333333333','APPLICATION','2025-01-01',100,now())"""),{'id':investment,'lot':lot})
+    with engine.connect() as connection:
+        original = {table: list(connection.execute(text(f'SELECT * FROM {table} ORDER BY id'))) for table in
+          ('fixed_income_investments','fixed_income_lots','fixed_income_movements')}
     command.upgrade(Config("alembic.ini"), "head")
     with engine.connect() as connection:
+        for table, rows in original.items():
+            assert list(connection.execute(text(f'SELECT * FROM {table} ORDER BY id'))) == rows
+        assert connection.scalar(text('SELECT count(*) FROM fixed_income_observations')) == 0
         assert connection.execute(text("SELECT ticker,quantity,price FROM operations")).one() == ("BBAS3", Decimal(1), Decimal(20))
 
     def db():
@@ -86,6 +104,8 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
                 assert [row[0] for row in connection.execute(text("SELECT id FROM operations"))] == [ids[a]]
             from fixed_income_postgres import verify_fixed_income_postgres
             verify_fixed_income_postgres(engine, client)
+            from opening_balance_postgres import verify_opening_postgres
+            verify_opening_postgres(engine, client)
     finally:
         app.dependency_overrides.clear()
         # Banco exclusivamente de teste; não apagar tabelas ou reverter ownership.

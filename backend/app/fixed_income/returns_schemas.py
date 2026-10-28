@@ -69,7 +69,8 @@ class InvestmentReturns(BaseModel):
     currency: Literal["BRL"] = "BRL"
     source: Literal["BCB/SGS 12"] = "BCB/SGS 12"
     status: Literal["estimated", "incomplete", "empty"]
-    principal_balance: Decimal
+    scope: Literal["ledger_only", "post_opening_lots_only"] = "ledger_only"
+    principal_balance: Decimal | None
     gross_income_estimate: Decimal | None
     gross_value_estimate: Decimal | None
     iof_estimate: Decimal | None

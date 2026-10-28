@@ -1,5 +1,36 @@
 # Validação do Investment Dashboard
 
+## Fase 2.0.5 — abertura consolidada e conciliação
+
+- **264 testes backend aprovados** (22 novos): snapshot não cria aporte/lote, principal
+  desconhecido null, tributos combinados/discriminados/parciais, ganho independente,
+  datas/valores inválidos, duplicação, histórico existente, novos lotes e conciliação,
+  401/404/owner e erro 422 sem reproduzir input privado. Motor preservado; escopo explícito
+  exclui capital consolidado, com valores indisponíveis null, sem chamada SGS indevida.
+- **1 integração PostgreSQL 17 aprovada** em container próprio descartável/tmpfs: 001–004,
+  regressões de ações e ledger, RLS direta para A/B/sem contexto, runtime sem bypass,
+  privilégios/default Supabase, UPDATE/DELETE/TRUNCATE bloqueados, constraints SQL,
+  cronologia e concorrência de duas aberturas (201/409). Nenhum volume pessoal usado.
+- **125 testes frontend aprovados** (oito novos): abertura BRL, revisão antes de POST,
+  erro monetário, principal desconhecido/confirmado, tributos discriminados/ausentes,
+  voltar ao formulário, nova observação após resgate e ausência de aplicação/estimativa
+  fictícia, 401/403/422 no novo fluxo e bloqueio de envio duplicado/fechamento pendente.
+  Regressões de autenticação, troca de conta, ações e demo offline preservadas.
+- **Builds público e privado aprovados**, TypeScript/Vite; sem credenciais reais.
+  Avisos conhecidos de bundle >500 kB e TestClient/httpx continuam não bloqueantes.
+- Chrome headless com fixture exclusivamente fictícia: desktop 1440×1000 e móvel 390×844,
+  sem overflow horizontal; modal móvel ~366,6 px, rolagem interna e foco visível.
+- Auditoria de publicação aprovada: **151 candidatos, 3 artefatos públicos e histórico Git**,
+  sem segredos conhecidos/assinaturas detectados; regras de ignore verificadas. Revisão
+  manual dos arquivos alterados confirmou exemplos/fixtures fictícios, sem novos logs de
+  valores privados. Nenhum arquivo staged; `git diff --check` passou. Scanner não garante
+  ausência de dados pessoais arbitrários: repetir revisão humana antes de commit futuro.
+- Somente migration nova 004; 001–003 intactas. Nenhum registro real reescrito, nenhum seed
+  privado, mudança de auth, fonte externa ou armazenamento financeiro privado no browser.
+- Sem commit/push/deploy/migration remota. Homologação real da conta secundária e grants
+  remotos **não verificados**. Procedimento, rollback e limites em
+  [Fase 2.0.5](phase-2.0.5-opening-balance.md).
+
 ## Fase 2.0.4 — interface privada de renda fixa
 
 - **117 testes frontend aprovados**, incluindo 21 novos: contratos CDI/prefixado, aplicação,

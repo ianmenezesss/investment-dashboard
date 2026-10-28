@@ -2,9 +2,15 @@ export type CdbInput = {
   issuer: string; product_name: string; product_type: 'CDB'; remuneration: 'FIXED' | 'CDI'
   indexer: 'NONE' | 'CDI'; contracted_rate: string; application_date: string; maturity_date: string
 }
-export type Cdb = CdbInput & { id: number; created_at: string }
+export type ObservedPositionInput = {
+  as_of: string; gross_value: string; net_value: string; ir_estimate: string | null; iof_estimate: string | null
+  taxes_combined: string | null; reported_gain: string | null; confirmed_principal: string | null
+  reason: 'POSITION' | 'AFTER_CONSOLIDATED_REDEMPTION'; cash_received: string | null; source: string; notes: string | null
+}
+export type ObservedPosition = ObservedPositionInput & { id: number; investment_id: number; kind: 'OPENING' | 'OBSERVATION'; created_at: string }
+export type Cdb = CdbInput & { id: number; created_at: string; tracking_mode?: 'LEDGER' | 'CONSOLIDATED'; latest_observation?: ObservedPosition | null }
 export type CdbLot = { id: number; application_date: string; principal_balance: string }
-export type CdbDetail = Cdb & { principal_balance: string; lots: CdbLot[] }
+export type CdbDetail = Cdb & { principal_balance: string; lots: CdbLot[]; opening_balance?: ObservedPosition | null }
 export type ApplicationInput = { date: string; principal_amount: string }
 export type RedemptionInput = ApplicationInput & { lot_id: number; cash_received: string | null }
 export type CdbMovement = ApplicationInput & {
@@ -15,7 +21,7 @@ export type ReturnsInput = {
   as_of: string; convention: 'daily_cdi_pro_rata_decimal_v1'; calendar: 'anbima_2024_2026_v1'; tax_profile: 'br_resident_individual'
 }
 export type ReturnAmounts = {
-  principal_balance: string; gross_income_estimate: string | null; gross_value_estimate: string | null
+  principal_balance: string | null; gross_income_estimate: string | null; gross_value_estimate: string | null
   ir_estimate: string | null; iof_estimate: string | null; net_income_estimate: string | null; net_value_estimate: string | null
 }
 export type CdbLotReturns = ReturnAmounts & {
@@ -26,6 +32,7 @@ export type CdbLotReturns = ReturnAmounts & {
   realized_tax_status: 'not_applicable' | 'insufficient_information'; realized_ir: string | null; realized_iof: string | null; realized_income: string | null
 }
 export type CdbReturns = ReturnAmounts & {
+  scope?: 'ledger_only' | 'post_opening_lots_only'
   investment_id: number; as_of: string; ledger_as_of: string; convention: ReturnsInput['convention'] | null
   calendar: ReturnsInput['calendar'] | null; tax_profile: ReturnsInput['tax_profile'] | null; model_version: '2.0.3'; currency: 'BRL'; source: 'BCB/SGS 12'
   status: 'estimated' | 'incomplete' | 'empty'; rates_error: string | null; warnings: string[]; lots: CdbLotReturns[]

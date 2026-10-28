@@ -7,6 +7,7 @@ from ..access import private_db
 from ..bcb_rates.router import rates_service
 from ..bcb_rates.schemas import Period, RateError
 from .models import Investment, Lot, Movement
+from .observations import PositionObservation
 from .schemas import InvestmentOutput, MovementOutput, financial_today
 from .returns_engine import estimate_returns
 from .returns_schemas import ReturnsSnapshot, LotSnapshot, InvestmentReturns, Convention, Calendar, TaxProfile, RatesReference
@@ -17,9 +18,10 @@ router = APIRouter(prefix="/api/fixed-income/investments", tags=["fixed-income-r
 def returns_snapshot(investment_id: int, db: Session = Depends(private_db)):
     owner = db.info.get("owner_id")
     # A single statement observes contract, lots and events in the same MVCC snapshot.
-    rows = db.execute(select(Investment, Lot, Movement)
+    rows = db.execute(select(Investment, Lot, Movement, PositionObservation)
         .outerjoin(Lot, and_(Lot.investment_id == Investment.id, Lot.owner_id == owner))
         .outerjoin(Movement, and_(Movement.lot_id == Lot.id, Movement.owner_id == owner))
+        .outerjoin(PositionObservation, and_(PositionObservation.investment_id == Investment.id, PositionObservation.kind == 'OPENING', PositionObservation.owner_id == owner))
         .where(Investment.id == investment_id, Investment.owner_id == owner)
         .order_by(Lot.id, Movement.date, Movement.id).limit(10001)).all()
     if not rows:
@@ -27,12 +29,15 @@ def returns_snapshot(investment_id: int, db: Session = Depends(private_db)):
     if len(rows) > 10000:
         raise HTTPException(422, "Histórico excede o limite de 10000 registros desta consulta")
     lots, movements = {}, []
-    for _, lot, movement in rows:
+    for _, lot, movement, _ in rows:
         if lot is not None:
             lots[lot.id] = LotSnapshot(lot.id, lot.application_date)
         if movement is not None:
             movements.append(MovementOutput.model_validate(movement))
-    snapshot = ReturnsSnapshot(InvestmentOutput.model_validate(rows[0][0]), tuple(lots.values()),
+    contract = InvestmentOutput.model_validate(rows[0][0])
+    if rows[0][3] is not None:
+        contract.tracking_mode = "CONSOLIDATED"
+    snapshot = ReturnsSnapshot(contract, tuple(lots.values()),
         tuple(movements), datetime.now(timezone.utc))
     db.rollback()  # release pooled connection before waiting for BCB; objects copied above
     return snapshot
