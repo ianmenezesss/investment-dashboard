@@ -1,8 +1,17 @@
 # Roadmap do Investment Dashboard
 
-Registro de planejamento atualizado na Fase **2.0.1**, em 28/10/2026.
-As funcionalidades abaixo não foram implementadas nesta entrega. Este registro não
-inicia a Fase 2.0.2 nem muda a numeração da implementação atual.
+Registro atualizado na Fase **2.0.2**, em 28/10/2026. As funcionalidades da Fase 3
+continuam planejadas e não foram implementadas nesta entrega.
+
+## Fase 2 — renda fixa
+
+- **2.0.1:** contratos CDB, lotes e movimentações imutáveis de principal, validados em
+  PostgreSQL descartável; sem rendimentos ou impostos.
+- **2.0.2 (implementada para revisão):** consulta histórica privada de CDI diário (SGS 12)
+  e Selic diária (SGS 11), com Decimal, cache e controle de chamadas. Sem migration,
+  cálculo de rendimento ou UI. Ver [contrato e limites](phase-2.0.2-bcb-rates.md).
+- Cálculos de rendimentos/tributação e UI de renda fixa não fazem parte desta fase;
+  escopo e versão de entregas futuras ainda devem ser definidos.
 
 ## Fase 3 — exploração de ativos e histórico
 

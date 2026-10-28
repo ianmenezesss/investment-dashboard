@@ -1,5 +1,22 @@
 # Validação do Investment Dashboard
 
+## Fase 2.0.2 — CDI e Selic via BCB/SGS
+
+- Adaptador HTTPX isolado para SGS 12 (CDI) e 11 (Selic), % ao dia, com Decimal,
+  conversão de datas brasileiras, cache LRU expirável e controle local de chamadas.
+- Consulta privada em `/api/fixed-income/rates/{11|12}`, com autenticação existente,
+  sem banco ou exposição de informações financeiras de usuários. Sem preenchimento
+  de dias ausentes, sem cache vencido em erro, sem cálculo de rendimento ou impostos.
+- 185 testes backend aprovados (46 novos), com HTTP SGS totalmente simulado; cobertura
+  de taxas/datas inválidas, conflitos, listas vazias, rede/status/timeouts, cache e limites.
+- 1 teste PostgreSQL integrado aprovado em container descartável, preservando migrations,
+  RLS, principal e histórico da 2.0.1. Nenhuma chamada à API SGS real nos testes.
+- Frontend, demo, ações, FIIs/ETFs, brapi, autenticação e schema do banco preservados;
+  nenhuma migration/dependência/secreto novo. Nenhuma configuração adicional obrigatória
+  no Render; acesso HTTPS ao SGS precisa ser homologado após publicação autorizada.
+- Aviso conhecido de depreciação TestClient/httpx permanece. Sem deploy/commit/push.
+- Ver [contrato, fonte oficial e limites](phase-2.0.2-bcb-rates.md).
+
 ## Fase 2.0.1 — modelagem contábil de renda fixa
 
 - 139 testes backend aprovados, incluindo 31 casos novos de contratos CDB, aplicações,

@@ -20,23 +20,30 @@ from .market_data.service import QuoteService
 from .valuation import PortfolioValuation, value_portfolio
 from .price_basis import purchase_price_basis
 from .fixed_income.router import router as fixed_income_router
+from .bcb_rates.provider import SGSProvider
+from .bcb_rates.service import RateService
+from .bcb_rates.router import router as bcb_rates_router
 
 
 @asynccontextmanager
 async def lifespan(app):
     # Constructing the client makes no external request. No polling or startup fetch.
-    async with httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as client:
+    async with httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as client, \
+            httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as rates_client:
         token = settings.brapi_token.get_secret_value().strip()
         app.state.quote_service = QuoteService(BrapiProvider(client, token),
             enabled=settings.market_data_enabled, configured=bool(token))
+        app.state.bcb_rates_service = RateService(SGSProvider(rates_client))
         try:
             yield
         finally:
             app.state.quote_service = None
+            app.state.bcb_rates_service = None
 
 
 app = FastAPI(title="Investment Dashboard", version="0.1.5", lifespan=lifespan, docs_url=None if settings.environment == "production" else "/docs", redoc_url=None, openapi_url=None if settings.environment == "production" else "/openapi.json")
 app.include_router(fixed_income_router)
+app.include_router(bcb_rates_router)
 app.add_middleware(CORSMiddleware, allow_origins=[settings.cors_origin], allow_methods=["GET", "POST", "DELETE"], allow_headers=["Authorization", "Content-Type"])
 @app.middleware("http")
 async def privacy_headers(request, call_next):
