@@ -42,7 +42,7 @@ def test_role_setup_failure_reports_exit_stdout_stderr_and_redacts_secrets(monke
         assert args[0][args[0].index("-h") + 1] == "127.0.0.1"
         assert args[0][args[0].index("-d") + 1] == "postgres"
         return subprocess.CompletedProcess(
-            args[0], 3, stdout="NOTICE password=fictional-db-secret", 
+            args[0], 3, stdout="NOTICE password=fictional-db-secret",
             stderr="ERROR: role creation failed\nDETAIL: token=fictional-token"
         )
 
