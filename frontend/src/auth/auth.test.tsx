@@ -15,6 +15,7 @@ import { useAuth } from './useAuth'
 import { LoginPanel } from './LoginPanel'
 import App from '../App'
 import { ApiError, request } from '../api'
+import { marketSnapshot } from '../test-fixtures/market'
 
 const session = { access_token: 'test-access-a', refresh_token: 'test-refresh-a', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: '11111111-1111-4111-8111-111111111111', email: 'investor@example.test' } } as Session
 let host: HTMLDivElement
@@ -331,6 +332,76 @@ test('API rejeita ausência de token antes de fazer rede e preserva status 401',
   await expect(request('dashboard', '')).rejects.toBeInstanceOf(ApiError)
   expect(fetchMock).not.toHaveBeenCalled()
   await expect(request('dashboard', 'test-invalid')).rejects.toMatchObject({ status: 401 })
+})
+
+test('dashboard privado usa valuation uma vez, sem endpoint contábil separado ou polling ao navegar', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  const fetchMock = vi.fn(async (input: string) => new Response(JSON.stringify(input.includes('dashboard/valuation') ? marketSnapshot('partial') : []), { status: 200 }))
+  vi.stubGlobal('fetch', fetchMock)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  expect(host.textContent).toContain('Cobertura parcial')
+  expect(host.textContent).toContain('Capital em ações · custo')
+  expect(host.textContent).toContain('Compras acumuladas')
+  expect(host.textContent).toContain('Resultado realizado')
+  const calls = () => fetchMock.mock.calls.filter(call => call[0].includes('dashboard/valuation'))
+  expect(calls()).toHaveLength(1)
+  for (const to of ['/acoes', '/historico', '/']) {
+    const link = host.querySelector(`a[href="${to}"]`)!
+    await act(async () => link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })))
+  }
+  expect(calls()).toHaveLength(1)
+  expect(fetchMock.mock.calls.some(call => /\/api\/(quotes|dashboard)$/.test(call[0]))).toBe(false)
+  client.clear()
+})
+
+test('erro inicial do endpoint valuation é visível e oferece nova tentativa sem simular logout', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain('500')
+  expect(host.textContent).toContain('Tentar novamente')
+  expect(host.querySelector('form[aria-label="Login da carteira"]')).toBeNull()
+  expect(mock.auth.signOut).not.toHaveBeenCalled()
+  client.clear()
+})
+
+test.each(['create', 'delete'])('operação privada %s invalida valuation mesmo dentro do staleTime', async action => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  let mutated = false
+  const operation = { id: 1, ticker: 'ITUB4', kind: 'BUY', date: '2026-01-01', quantity: '10', price: '20', fees: '0' }
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    if (init?.method === 'POST' || init?.method === 'DELETE') {
+      mutated = true
+      return init.method === 'DELETE' ? new Response(null, { status: 204 }) : new Response(JSON.stringify(operation), { status: 201 })
+    }
+    const empty = action === 'create' ? !mutated : mutated
+    return new Response(JSON.stringify(input.includes('dashboard/valuation') ? marketSnapshot(empty ? 'empty' : 'complete') : empty ? [] : [operation]), { status: 200 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  if (action === 'create') {
+    await act(async () => ([...host.querySelectorAll('button')].find(b => b.textContent?.includes('Nova operação'))!).click())
+    const form = document.querySelector('[role="dialog"] form') as HTMLFormElement
+    for (const [name, value] of Object.entries({ ticker: 'ITUB4', kind: 'BUY', date: '2026-01-01', quantity: '10', price: '20', fees: '0' })) {
+      (form.elements.namedItem(name) as HTMLInputElement).value = value
+    }
+    await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })))
+  } else {
+    await act(async () => (host.querySelector('[aria-label="Excluir operação 1"]') as HTMLButtonElement).click())
+    const confirm = document.querySelector('[role="alertdialog"]')!
+    await act(async () => ([...confirm.querySelectorAll('button')].find(b => b.textContent?.includes('Excluir operação'))!).click())
+  }
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  expect(mutated).toBe(true)
+  expect(fetchMock.mock.calls.filter(call => call[0].includes('dashboard/valuation'))).toHaveLength(2)
+  expect(host.textContent).toContain(action === 'create' ? 'Cobertura completa' : 'Sem posições abertas')
+  client.clear()
 })
 
 test('rejeição 401 do FastAPI encerra a sessão e esconde a carteira', async () => {

@@ -8,6 +8,7 @@ test('repositório privado usa HTTP autenticado e nunca lê ou grava localStorag
   try {
     const repo = new PrivateRepository('test-private-token')
     await repo.list(); await repo.summary()
+    expect(http).toHaveBeenCalledWith('dashboard/valuation', 'test-private-token', { signal: undefined })
     await repo.create({ ticker: 'TEST4', kind: 'BUY', date: '2026-01-01', quantity: '1', price: '10', fees: '0' })
     await repo.delete(1); await repo.export()
     expect(http.mock.calls.every(call => call[1] === 'test-private-token')).toBe(true)

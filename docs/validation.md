@@ -1,5 +1,20 @@
 # Validação do Investment Dashboard
 
+## Fase 1.9.4 — dashboard privado com avaliação de mercado
+
+- 92 testes frontend aprovados em 9 arquivos, com snapshots/HTTP simulados e zero brapi real.
+- Builds público e privado aprovados, incluindo TypeScript, sem chaves reais. Aviso conhecido
+  de bundle acima de 500 kB permanece.
+- Cobertura de complete/partial/stale/unavailable/empty, totais null, precisão/arredondamento,
+  horários, erro/pendência de atualização e invalidação do snapshot após compra/exclusão fictícia.
+- Navegação usa uma consulta valuation inicial, com staleTime de 30 min e sem polling; preserva
+  os testes da sessão 1.8.4 e a demo offline. Não foram adicionadas chamadas externas à demo.
+- Chrome headless: componente isolado em 1440×1050 e 390×844; viewport/documento móvel 390,
+  tabela rolável com conteúdo 1060 em região de 340 px. Fixtures fictícios, sem login real.
+- Sem alteração de backend, auth, RLS, migrations, dependências ou infraestrutura. Não houve
+  deploy/push/tag. Homologação da interface publicada permanece pendente.
+- Ver [registro e roteiro da Fase 1.9.4](phase-1.9.4-market-dashboard.md).
+
 ## Fase 1.9.3 — avaliação de posições abertas
 
 - 96 testes backend aprovados (23 novos), sem brapi real; PostgreSQL opcional excluído.
