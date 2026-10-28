@@ -20,7 +20,20 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
         pytest.fail("Use um banco de testes vazio; nenhuma tabela existente será alterada.")
     from app import database
     monkeypatch.setattr(database, "engine", engine)
+    command.upgrade(Config("alembic.ini"), "002")
+    # Emulate Supabase default grants on NEW objects, so 003 must revoke them.
+    with engine.begin() as connection:
+        for role in ("anon", "authenticated", "service_role"):
+            connection.execute(text(f"CREATE ROLE {role} NOLOGIN"))
+        connection.execute(text("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role"))
+        connection.execute(text("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role"))
+    # Migration 003 must preserve a pre-existing stock operation verbatim.
+    with engine.begin() as connection:
+        connection.execute(text("""INSERT INTO operations(ticker,kind,date,quantity,price,fees,created_at,owner_id)
+            VALUES ('BBAS3','BUY','2025-01-01',1,20,0,now(),'33333333-3333-4333-8333-333333333333')"""))
     command.upgrade(Config("alembic.ini"), "head")
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT ticker,quantity,price FROM operations")).one() == ("BBAS3", Decimal(1), Decimal(20))
 
     def db():
         with Session(engine) as session:
@@ -71,6 +84,8 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
                 assert list(connection.execute(text("SELECT id FROM operations"))) == []
                 connection.execute(text("SELECT set_config('app.user_id', :owner, true), set_config('app.auth_mode', 'supabase', true)"), {"owner": str(a)})
                 assert [row[0] for row in connection.execute(text("SELECT id FROM operations"))] == [ids[a]]
+            from fixed_income_postgres import verify_fixed_income_postgres
+            verify_fixed_income_postgres(engine, client)
     finally:
         app.dependency_overrides.clear()
         # Banco exclusivamente de teste; não apagar tabelas ou reverter ownership.

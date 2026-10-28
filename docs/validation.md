@@ -1,5 +1,34 @@
 # Validação do Investment Dashboard
 
+## Fase 2.0.1 — modelagem contábil de renda fixa
+
+- 139 testes backend aprovados, incluindo 31 casos novos de contratos CDB, aplicações,
+  lotes, resgates parciais/totais, principal versus caixa, precisão, datas e isolamento API.
+- 96 testes frontend e builds público/privado aprovados, sem alterar frontend, demo ou ações.
+- Migration aditiva 003: contratos, lotes e eventos imutáveis, RLS forçada por proprietário,
+  validações/locks PostgreSQL, sem calcular rendimentos ou impostos. DDL renderizado em
+  memória e cadeia 001→002→003 verificada; isso não substitui executar em PostgreSQL real.
+- Validação PostgreSQL real concluída em 28/10/2026: **1 teste de integração aprovado**,
+  incluindo a cadeia 001→002→003, preservação de ação anterior à 003, RLS forçada e
+  isolamento direto entre usuários, vínculos e lote sem aplicação, histórico imutável,
+  cronologia e rejeição de isolamento transacional incompatível.
+- GRANTs SELECT/INSERT e USAGE nas sequências confirmados; UPDATE/DELETE/TRUNCATE negados.
+  Defaults permissivos simulados para anon/authenticated/service_role foram revogados
+  pela 003; nenhum privilégio PUBLIC restou nas tabelas/sequências novas.
+- Dois resgates concorrentes de 70 sobre principal 100: apenas um aceito, saldo 30.
+  Resgate total posterior deixou saldo zero e preservou eventos; novo resgate foi rejeitado.
+  NUMERIC(20,8) preservou exatamente 999999999999.12345678 pela API/PostgreSQL.
+- Executor `backend/tests/run_postgres.py`: container próprio PostgreSQL 17-alpine com
+  tmpfs, porta aleatória, senha temporária e remoção ao terminar. Compose tem somente
+  o banco persistente `db`; não foi iniciado nem utilizado para testes. Nenhum volume pessoal tocado.
+- Regressões backend reexecutadas: **139 aprovadas**. Não foram necessárias correções
+  de aplicação/migration; apenas ampliação dos testes e atualização documental.
+- Permanecem avisos conhecidos de TestClient/httpx e bundle >500 kB; nenhum erro nos checks executados.
+- Migrations executadas somente no banco local descartável de testes; nenhum acesso ao
+  Supabase, alteração de dados reais ou deploy/commit/push/tag. Fase 2.0.1 pronta para
+  homologação controlada, condicionada ao diagnóstico/backup/permissões do ambiente alvo.
+- Ver [modelo, endpoints e procedimento manual Supabase](phase-2.0.1-fixed-income-model.md).
+
 ## Fase 1.9.5 — clareza financeira e homologação
 
 - 108 testes backend e 96 frontend aprovados, sem API real ou banco externo.
