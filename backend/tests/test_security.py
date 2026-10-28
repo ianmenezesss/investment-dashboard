@@ -27,6 +27,32 @@ def test_production_rejects_local_token_and_wildcard_cors():
         Settings(_env_file=None, cors_origin="*")
 
 
+@pytest.mark.parametrize("query", ["", "?sslmode=require", "?sslmode=verify-ca", "?sslmode=disable"])
+def test_production_requires_explicit_verify_full_even_with_ca(monkeypatch, query):
+    monkeypatch.setenv("PGSSLROOTCERT", "/etc/secrets/supabase-ca.crt")
+    with pytest.raises(ValidationError, match="TLS"):
+        Settings(
+            _env_file=None, environment="production", auth_mode="supabase",
+            database_url="postgresql+psycopg://runtime:example@pooler.example:5432/postgres" + query,
+            cors_origin="https://portfolio.example", supabase_url="https://auth.example",
+            allowed_user_ids=[A],
+        )
+
+
+@pytest.mark.parametrize("query", [
+    "?sslmode=verify-full",
+    "?sslmode=verify-full&sslrootcert=/etc/secrets/supabase-ca.crt",
+])
+def test_production_accepts_verified_tls_configuration_without_connecting(query):
+    config = Settings(
+        _env_file=None, environment="production", auth_mode="supabase",
+        database_url="postgresql+psycopg://runtime:example@pooler.example:5432/postgres" + query,
+        cors_origin="https://portfolio.example", supabase_url="https://auth.example",
+        allowed_user_ids=[A],
+    )
+    assert config.environment == "production"
+
+
 @pytest.mark.parametrize("unsafe,rls", [(True, True), (False, False)])
 def test_production_denies_privileged_role_or_missing_rls(monkeypatch, unsafe, rls):
     monkeypatch.setattr(settings, "environment", "production")
