@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import Base
 from app.fixed_income.models import Investment, Lot, Movement, ApplicationRevision
 from app.fixed_income.projection import effective_movements, SQLITE_PROJECTION
-from app.fixed_income.revisions import RevisionInput, append_revision
+from app.fixed_income.revisions import RevisionInput, RevisionBody, append_revision
 from app.fixed_income.ledger import principal_balances
 from test_fixed_income import A, CONTRACT
 
@@ -30,6 +30,16 @@ def test_projection_frozen_sql_matches_migration():
 def test_invalid_revision_payload(payload):
     with pytest.raises(ValidationError):
         RevisionInput(**({"reason": "FictÃ­cio", "request_id": uuid4(), "expected_revision": 0} | payload))
+
+
+@pytest.mark.parametrize("payload", [
+    {"kind":"REPLACE", "expected_revision":0, "reason":"x"},
+    {"kind":"VOID", "expected_revision":0, "reason":"x", "replacement_amount":"1"},
+    {"kind":"VOID", "expected_revision":0, "reason":"  "},
+])
+def test_public_revision_body_rejects_incomplete_or_ambiguous_payload(payload):
+    with pytest.raises(ValidationError):
+        RevisionBody(**payload)
 
 
 def test_projection_preserves_originals_and_replaces_whole_value_then_voids():
@@ -79,7 +89,7 @@ def test_all_financial_readers_use_effective_values_but_audit_keeps_original(cli
     returns = client.get(f"{PATH}/{investment}/returns?as_of=2025-01-03").json()
     assert Decimal(returns["principal_balance"]) == Decimal("25")
     assert client.post(f"{PATH}/{investment}/redemptions", json={"lot_id":original["lot_id"], "date":"2025-01-02", "principal_amount":"26"}).status_code == 422
-    assert client.post(f"{PATH}/{investment}/applications/{original['id']}/revisions", json={}).status_code == 404
+    assert client.post(f"{PATH}/{investment}/applications/{original['id']}/revisions", json={}).status_code == 422
 
 
 def test_effective_dates_drive_lots_and_returns_and_void_does_not_create_cash(client):

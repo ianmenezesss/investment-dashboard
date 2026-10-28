@@ -2,13 +2,12 @@
 
 ## Estado e limites
 
-Base iniciada em `5def47d`, com árvore limpa confirmada. Migration 006 proposta,
-sem aplicação em banco persistente, sem endpoints de escrita de revisões e sem UI de
-correção/anulação. Nenhum grant de INSERT de revisões é concedido automaticamente ao
-runtime. A primitive interna `append_revision` exige PostgreSQL; não faz commit pelo
-chamador. A integração descartável foi aprovada conforme relato do usuário (1 passed,
-1 warning em 2.95s); o agente não a reexecutou. A utilização pública depende de aprovação
-e implementação da próxima entrega de API/UX.
+Base iniciou em `5def47d`. A camada A (migration 006 e projeção) permanece como fundação.
+A camada B adiciona migration 007 e endpoints de API sem interface gráfica. A migração foi
+escrita localmente; não foi aplicada a banco persistente ou remoto. A integração 001–007
+precisa ser executada no runner descartável antes de publicar; Docker não está acessível
+neste ambiente. Consulte `phase-2.0.8.2-B-application-revision-api.md` para contratos e
+grants/runtime role.
 
 ## Arquitetura
 
@@ -69,15 +68,12 @@ APIs de revisão precisarão invalidar caches e expor revisão/versão da proje�
 
 ## Testes e execução Windows
 
-Unidade: projeção sem revisão, REPLACE completo, VOID, preservação, valor e data efetivos
-no detalhe/rendimentos, principal para resgate, payload inválido e ausência de endpoint.
-PostgreSQL coberto pelo runner atual, com resultado informado pelo usuário: cadeia 001–006
-e preservação dos registros existentes,
-paridade SQL, RLS A/B/sem identidade, privilégios, SQL direto, imutabilidade, primeira
-aplicação, abertura, resgates incompatíveis, idempotência e rollback; corridas de duas revisões,
-mesma chave e correção versus resgate. O resultado informado nesta revisão refere-se à
-entrega 2.0.8.2-A. A inspeção confirma a chamada dos quatro verificadores e head 006;
-o agente não repetiu a execução PostgreSQL.
+Unidade cobre projeção, REPLACE/VOID, preservação, leituras financeiras e validação do
+payload público. O verificador PostgreSQL foi estendido para 001–007, grants do papel
+runtime, preview sem persistência, replay/conflito idempotente, cronologia global com datas
+iguais, autorização cruzada, rollback, imutabilidade e concorrência. Essa integração ainda
+não foi executada nesta entrega. O resultado anterior do usuário (1 passed, 1 warning)
+corresponde exclusivamente às migrations 001–006 e não valida 007/API.
 
 Executar uma vez no PowerShell, sem usar .env de produção:
 
@@ -86,19 +82,20 @@ Set-Location 'C:\Users\IAN\ProjetosVSCode\investment-dashboard\backend'
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run_postgres_diagnostic.ps1
 ```
 
-O script registra hashes da 006 e dos verificadores, gera transcript completo em %TEMP%,
+O script registra hashes das migrations 006/007 e dos verificadores, gera transcript completo em %TEMP%,
 exige Docker Engine e imagem postgres:17-alpine já em cache, não faz pull, publica apenas
 em 127.0.0.1 e usa container com nome aleatório, tmpfs e remoção após execução. O runner
 substitui TEST_DATABASE_URL pela URL desse banco efêmero. O script restaura DOCKER_CONFIG.
 
 ## Pendências antes de habilitar escrita
 
-- Preservar o log da integração informada pelo usuário. O sandbox não permitiu repetição
-  independente pelo agente; futuras mudanças na migration/validadores exigem nova integração.
+- Executar a integração descartável 001–007 pelo runner e preservar o log. Docker Engine
+  não estava acessível nesta execução; nenhuma aprovação PostgreSQL é declarada.
 - Revisar custo da função e validação de histórico com carteiras maiores antes de definir
   limites operacionais. A consulta de rendimentos preserva o limite de 10.000 registros.
-- Homologar contratos da futura API e UX, status de auditoria, mensagens de conflito e cache.
-- Conferir grants do papel customizado no ambiente de implantação aprovado. A migration
-  não conhece seu nome; backend depende da 006 e desses grants para leitura após implantação.
+- Confirmar, sem revelar connection strings ou dados, que a conexão do ambiente aprovado
+  efetivamente usa a role SQL `investment_runtime`; a configuração externa não foi lida.
+- Homologar os três endpoints e revisar privilégios após aplicar 007 somente em banco
+  descartável; não aplicar produção antes da integração e aprovação.
 - Preparar rollout coordenado de banco/backend/frontend; não habilitar novos escritores
   enquanto algum componente antigo validar principal pelo ledger bruto.

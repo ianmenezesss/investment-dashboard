@@ -23,6 +23,7 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
     command.upgrade(Config("alembic.ini"), "002")
     # Emulate Supabase default grants on NEW objects, so 003 must revoke them.
     with engine.begin() as connection:
+        connection.execute(text("CREATE ROLE investment_runtime LOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION"))
         for role in ("anon", "authenticated", "service_role"):
             connection.execute(text(f"CREATE ROLE {role} NOLOGIN"))
         connection.execute(text("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role"))

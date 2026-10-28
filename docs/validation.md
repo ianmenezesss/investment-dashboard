@@ -393,3 +393,38 @@ Limites de verificação:
 - A versão instalada de Starlette emite aviso de depreciação do adaptador de testes httpx; os testes HTTP passaram.
 
 Nenhum registro financeiro real foi criado e nenhuma integração externa foi consultada.
+# Implementação local — API de revisão de aplicações 2.0.8.2-B
+
+- Base de trabalho verificada no início em `9e2db510f69c44f1a8a9bc8cf1d260ecd174d6b0`,
+  árvore limpa. Arquivos locais da etapa incluem migration 007, API privada, testes e
+  documentação; nenhum commit/push/deploy foi feito.
+- A configuração documentada aponta para o papel restrito `investment_runtime`, separado
+  do papel DDL. Não foram lidos arquivos de ambiente ou segredos. Migration 007 verifica
+  atributos restritos e memberships; concede SELECT nas tabelas necessárias à projeção e
+  SELECT/INSERT, USAGE de sequence e EXECUTE da função para revisões; sem UPDATE/DELETE/
+  TRUNCATE na tabela de revisões.
+- Na primeira rodada, a integração 001–007 estava pendente porque Docker Engine não estava
+  acessível neste ambiente. Depois, o usuário reportou a execução local bem-sucedida descrita
+  na seção de fechamento abaixo. Runner PowerShell: ver
+  [especificação da API](phase-2.0.8.2-B-application-revision-api.md).
+- O usuário reportou uma execução descartável com divergência em `replacement_amount`:
+  criação retornava a escala do input (`250`) e replay, a escala persistida `NUMERIC(20,8)`
+  (`250.00000000`). Causa confirmada: a instância nova ainda mantinha o expoente original
+  do Decimal do request. A API agora relê a linha persistida após flush e serializa criação
+  e replay pelo mesmo helper; a comparação integral continua e os casos `250`, `250.00` e
+  `250.12345678` foram acrescentados à integração. O runner também captura o traceback do
+  pytest no log consolidado.
+- Backend: **278 passed, 1 skipped, 1 warning**. O skip é a integração opt-in, bloqueada
+  sem PostgreSQL descartável; o warning conhecido é a depreciação TestClient/httpx.
+  `compileall` e `alembic history` também passaram; head local aponta para 007.
+- TypeScript `tsc -b` passou. Vitest e Vite build foram tentados, mas o processo Node foi
+  bloqueado ao listar `../../..` (acesso negado do sandbox); não houve alterações frontend.
+- Docker Engine retornou acesso negado ao pipe local. `git diff --check` passou e a busca
+  por padrões de segredo nos arquivos da etapa não encontrou ocorrências.
+
+## Fechamento local — Fase 2.0.8.2-B
+
+- O usuário executou no Windows a integração PostgreSQL descartável com migrations 001–007: **1 passed, 1 warning em 3,31 s**, log `investment-dashboard-postgres-20261028-191753.log` em `%LOCALAPPDATA%\Temp`. Esta é evidência informada pelo usuário; não foi reexecutada neste ambiente.
+- A revisão B mantém eventos REPLACE/VOID append-only, projeção efetiva, serialização da resposta pelo registro persistido, proteção por proprietário, locks de contrato, idempotência e validação de cronologia pelo PostgreSQL. A integração informada cobre o código B após a correção Decimal indicada no log/contexto do usuário.
+- Backend executado localmente: **278 passed, 1 skipped, 1 warning**; o skip é a integração que requer PostgreSQL descartável. O aviso é a depreciação Starlette/httpx.
+- Nenhuma produção foi acessada; sem migration remota, deploy ou push. O commit B não foi criado: Git não conseguiu criar `.git/index.lock` por `Permission denied`. Os arquivos permanecem locais e sem stage.

@@ -18,7 +18,7 @@ from test_fixed_income import A, B, CONTRACT, PATH
 
 def verify_revisions_postgres(engine, client):
     with engine.begin() as c:
-        assert c.scalar(text("SELECT version_num FROM alembic_version")) == "006"
+        assert c.scalar(text("SELECT version_num FROM alembic_version")) == "007"
         assert c.execute(text("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='fixed_income_application_revisions'::regclass")).one() == (True, True)
         for role in ("anon", "authenticated", "service_role", "public"):
             leaked=c.scalar(text("""SELECT count(*) FROM pg_class c,
@@ -29,6 +29,14 @@ def verify_revisions_postgres(engine, client):
         # Deliberately opt in ONLY this disposable runtime role; production writes remain ungranted.
         c.execute(text("GRANT SELECT,INSERT ON fixed_income_application_revisions TO investment_test_runtime"))
         c.execute(text("GRANT USAGE ON SEQUENCE fixed_income_application_revisions_id_seq TO investment_test_runtime"))
+        c.execute(text("GRANT EXECUTE ON FUNCTION public.fi_effective_movements() TO investment_test_runtime"))
+        assert c.scalar(text("SELECT rolcanlogin=true AND rolsuper=false AND rolbypassrls=false AND rolinherit=false AND rolcreatedb=false AND rolcreaterole=false AND rolreplication=false FROM pg_roles WHERE rolname='investment_runtime'"))
+        for privilege in ("UPDATE", "DELETE", "TRUNCATE"):
+            assert not c.scalar(text("SELECT has_table_privilege('investment_runtime','fixed_income_application_revisions',:p)"), {"p":privilege})
+        assert c.scalar(text("SELECT has_table_privilege('investment_runtime','fixed_income_application_revisions','SELECT')"))
+        assert c.scalar(text("SELECT has_table_privilege('investment_runtime','fixed_income_application_revisions','INSERT')"))
+        assert c.scalar(text("SELECT has_sequence_privilege('investment_runtime','fixed_income_application_revisions_id_seq','USAGE')"))
+        assert not c.scalar(text("SELECT has_sequence_privilege('investment_runtime','fixed_income_application_revisions_id_seq','UPDATE')"))
         c.execute(text("SET LOCAL ROLE investment_test_runtime"))
         for privilege in ("UPDATE", "DELETE", "TRUNCATE"):
             assert not c.scalar(text("SELECT has_table_privilege(current_user,'fixed_income_application_revisions',:p)"), {"p": privilege})
@@ -58,6 +66,62 @@ def verify_revisions_postgres(engine, client):
         response = client.post(f"{PATH}/{investment}/applications", json={"date":"2025-01-01", "principal_amount":amount})
         assert response.status_code == 201, response.text
         return investment, response.json()
+
+    # HTTP contract: validated preview leaves no row, creation is 201, replay 200,
+    # history is owner-scoped, and another owner's resource remains indistinguishable from absent.
+    api_investment, api_application = create("300")
+    idem = str(uuid4())
+    api_payload = {"kind":"REPLACE", "expected_revision":0, "reason":"Ajuste fictício",
+        "replacement_date":"2025-01-01", "replacement_amount":"250"}
+    api_url = f"{PATH}/{api_investment}/applications/{api_application['id']}/revisions"
+    preview = client.post(api_url + "/preview", headers={"Idempotency-Key":idem}, json=api_payload)
+    assert preview.status_code == 200, preview.text
+    with engine.connect() as c:
+        assert c.scalar(text("SELECT count(*) FROM fixed_income_application_revisions WHERE application_id=:id"), {"id":api_application['id']}) == 0
+    first_response = client.post(api_url, headers={"Idempotency-Key":idem}, json=api_payload)
+    replay_response = client.post(api_url, headers={"Idempotency-Key":idem}, json=api_payload)
+    assert first_response.status_code == 201, first_response.text
+    assert replay_response.status_code == 200, replay_response.text
+    first_body = first_response.json()
+    replay_body = replay_response.json()
+    if first_body != replay_body:
+        differing_fields = {
+            field: {"created": first_body.get(field), "replay": replay_body.get(field)}
+            for field in sorted(set(first_body) | set(replay_body))
+            if first_body.get(field) != replay_body.get(field)
+        }
+        pytest.fail(f"Idempotency replay changed response fields: {differing_fields!r}")
+    assert first_body["replacement_amount"] == "250.00000000"
+    changed_payload = dict(api_payload, replacement_amount="251")
+    assert client.post(api_url, headers={"Idempotency-Key":idem}, json=changed_payload).status_code == 409
+    later = client.post(f"{PATH}/{api_investment}/applications", json={"date":"2025-01-01", "principal_amount":"50"})
+    assert later.status_code == 201, later.text
+    equal_date = dict(api_payload, expected_revision=1)
+    equal_date_response = client.post(api_url, headers={"Idempotency-Key":str(uuid4())}, json=equal_date)
+    assert equal_date_response.status_code == 201, equal_date_response.text
+    out_of_order = dict(api_payload, expected_revision=2, replacement_date="2025-01-02")
+    assert client.post(api_url, headers={"Idempotency-Key":str(uuid4())}, json=out_of_order).status_code == 422
+    assert len(client.get(api_url).json()) == 2
+    assert client.get(api_url).status_code == 200
+    app.dependency_overrides[authenticate] = lambda: Principal(B)
+    assert client.get(api_url).status_code == 404
+    assert client.post(api_url, headers={"Idempotency-Key":str(uuid4())}, json=api_payload).status_code == 404
+    app.dependency_overrides[authenticate] = lambda: Principal(A)
+
+    # Decimal input spellings with different exponents must converge to the
+    # database's NUMERIC(20,8) representation for both create and replay.
+    for amount in ("250.00", "250.12345678"):
+        amount_investment, amount_application = create(amount)
+        amount_key = str(uuid4())
+        amount_payload = {"kind":"REPLACE", "expected_revision":0, "reason":"Precisão fictícia",
+            "replacement_date":"2025-01-01", "replacement_amount":amount}
+        amount_url = f"{PATH}/{amount_investment}/applications/{amount_application['id']}/revisions"
+        created = client.post(amount_url, headers={"Idempotency-Key":amount_key}, json=amount_payload)
+        replay = client.post(amount_url, headers={"Idempotency-Key":amount_key}, json=amount_payload)
+        assert created.status_code == 201, created.text
+        assert replay.status_code == 200, replay.text
+        assert created.json() == replay.json()
+        assert created.json()["replacement_amount"] == str(Decimal(amount).quantize(Decimal("0.00000001")))
 
     investment, original = create()
     with engine.connect() as c:
