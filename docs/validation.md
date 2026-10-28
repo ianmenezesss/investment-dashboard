@@ -1,4 +1,26 @@
-# Verificação da Fase 1.6.3
+# Validação do Investment Dashboard
+
+## Fase 1.8.4 — sessão e navegação
+
+Verificado em 27/10/2026, sem deploy, push ou tag:
+
+- Regressão reproduzida antes da correção: 2 testes falharam ao exigir ausência do formulário
+  durante a restauração e preservação do dashboard/cache/modal/rota após SIGNED_IN no refoco.
+- Após a correção: **78 testes frontend aprovados**, em 8 arquivos. Incluem renovação do JWT
+  com consulta pendente, foco repetido, erros transitórios, troca de identidade, logout remoto
+  durante restauração, expiração e prioridade de 401/403 sobre falhas de outras consultas.
+- **Build público e build privado aprovados**, incluindo TypeScript. Variáveis de build somente
+  no processo filho, sem chave real. Aviso não bloqueante de bundle acima de 500 kB permanece.
+- Nenhuma chamada real à API/Supabase: testes usam mocks. A inspeção visual no navegador da Vercel
+  e a homologação de sessão real em produção continuam pendentes antes de qualquer tag.
+- Nenhuma alteração em backend, migrations, RLS, banco ou cálculos financeiros. O documento
+  versionado `docs/phase-1.9.1-market-data-plan.md` permaneceu sem alterações em relação ao HEAD.
+
+Ver [registro da Fase 1.8.4](phase-1.8.4-session-navigation.md) para causa, solução e roteiro manual.
+Não há changelog separado no checkout. Commit sugerido:
+`fix(phase-1.8.4): prevent login flash on tab focus`.
+
+## Histórico: Verificação da Fase 1.6.3
 
 Em 27/10/2026, sem deploy ou push:
 

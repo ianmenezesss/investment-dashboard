@@ -56,7 +56,10 @@ export default function App() {
   const data = demo ? demoState?.summary : connected ? summary.data : undefined
   const ops = demo ? demoState?.operations ?? [] : connected ? operations.data ?? [] : []
   const busy = summary.isFetching || operations.isFetching
-  const apiError = demo ? null : summary.error || operations.error
+  const queryErrors = [summary.error, operations.error]
+  const apiError = demo ? null : queryErrors.find(cause => cause instanceof ApiError && cause.status === 401)
+    || queryErrors.find(cause => cause instanceof ApiError && cause.status === 403)
+    || summary.error || operations.error
   useEffect(() => {
     if (SUPABASE_AUTH && apiError instanceof ApiError && apiError.status === 401) auth.expire()
   }, [apiError, auth.expire])
@@ -108,8 +111,12 @@ export default function App() {
     } finally { setConfirmBusy(false) }
   }
   if (PUBLIC_DEMO && location.pathname === '/login') return <DemoAccessPage/>
-  const authorized = connected && summary.isSuccess && operations.isSuccess && !apiError
+  const accessDenied = apiError instanceof ApiError && (apiError.status === 401 || apiError.status === 403)
+  const authorized = connected && summary.data !== undefined && operations.data !== undefined && !accessDenied
   const logout = () => { clearPrivate(); setConnected(false); setToken(''); if (SUPABASE_AUTH) void auth.logout(); navigate('/login', { replace: true }) }
+  if (!demo && ((SUPABASE_AUTH && auth.status === 'loading') || (connected && !authorized && !accessDenied))) {
+    return <main className="session-gate" aria-label="Verificando acesso à carteira"><ShieldCheck size={28}/><h1>Investment Dashboard</h1><p role={apiError ? 'alert' : 'status'}>{apiError ? (apiError as Error).message : 'Verificando acesso à carteira…'}</p>{apiError && <div><Button onClick={() => { void refresh() }}>Tentar novamente</Button><button onClick={logout}>Sair</button></div>}</main>
+  }
   if (!demo && !authorized) {
     if (location.pathname !== '/login') return <Navigate to="/login" replace/>
     return <LoginPage loading={SUPABASE_AUTH ? auth.status === 'loading' || connected && !apiError : localConnected && !apiError} error={auth.error || error || (apiError as Error | null)?.message || ''} onLogin={auth.login} local={!SUPABASE_AUTH} onLocalLogin={value => { clearPrivate(); setToken(value); setConnected(true) }} onDemo={() => { void toggleDemo() }} connected={connected} onLogout={logout}/>

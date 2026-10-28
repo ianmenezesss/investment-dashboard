@@ -1,6 +1,6 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import type { Session } from '@supabase/supabase-js'
@@ -129,13 +129,164 @@ test('restauração não renderiza carteira nem consulta API enquanto getUser es
   const fetchMock = vi.fn(async (input: string) => new Response(JSON.stringify(input.includes('dashboard') ? { holdings: [], acquisition_cost: '0', total_purchases: '0', realized_profit: '0' } : []), { status: 200 }))
   vi.stubGlobal('fetch', fetchMock)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/acoes']}><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/acoes']}><RouteProbe/><App/></MemoryRouter></QueryClientProvider>))
   expect(host.querySelector('.sidebar')).toBeNull()
+  expect(host.querySelector('form[aria-label="Login da carteira"]')).toBeNull()
+  expect(host.querySelector('[data-route]')!.textContent).toBe('/acoes')
   expect(fetchMock).not.toHaveBeenCalled()
   await act(async () => resolveUser({ data: { user: session.user }, error: null }))
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
   expect(host.querySelector('.sidebar')).not.toBeNull()
+  expect(host.querySelector('[data-route]')!.textContent).toBe('/acoes')
   client.clear()
+})
+
+function RouteProbe() { return <output data-route>{useLocation().pathname}</output> }
+
+function financialResponse(input: string) {
+  return new Response(JSON.stringify(input.includes('dashboard')
+    ? { holdings: [], acquisition_cost: '0', total_purchases: '0', realized_profit: '0' } : []), { status: 200 })
+}
+
+test('renovação no retorno à aba mantém dashboard enquanto a API revalida com o novo JWT', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => financialResponse(input))
+  vi.stubGlobal('fetch', fetchMock)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/historico']}><RouteProbe/><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  const cached = client.getQueryData(['summary', session.user.id])
+  const pending: { input: string; resolve: (value: Response) => void }[] = []
+  fetchMock.mockImplementation(input => new Promise(resolve => pending.push({ input, resolve })))
+  await act(async () => {
+    window.dispatchEvent(new Event('focus'))
+    mock.callback!('TOKEN_REFRESHED', { ...session, access_token: 'test-access-renewed' })
+  })
+  expect(host.querySelector('.sidebar')).not.toBeNull()
+  expect(host.querySelector('form[aria-label="Login da carteira"]')).toBeNull()
+  expect(host.querySelector('[data-route]')!.textContent).toBe('/historico')
+  expect(client.getQueryData(['summary', session.user.id])).toBe(cached)
+  expect(fetchMock.mock.calls.some(call => (call[1]?.headers as Record<string, string>)?.Authorization === 'Bearer test-access-renewed')).toBe(true)
+  await act(async () => pending.forEach(item => item.resolve(financialResponse(item.input))))
+  client.clear()
+})
+
+test('falha transitória de rede no refoco mantém dados e mostra erro sem abrir login', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  const fetchMock = vi.fn(async (input: string) => financialResponse(input))
+  vi.stubGlobal('fetch', fetchMock)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/historico']}><RouteProbe/><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  fetchMock.mockRejectedValue(new TypeError('Falha de rede temporária'))
+  await act(async () => { await client.refetchQueries() })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
+  expect(host.querySelector('.sidebar')).not.toBeNull()
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain('Falha de rede temporária')
+  expect(host.querySelector('form[aria-label="Login da carteira"]')).toBeNull()
+  expect(host.querySelector('[data-route]')!.textContent).toBe('/historico')
+  client.clear()
+})
+
+test('logout remoto durante restauração invalida a resposta antiga e eventos de refresh tardios', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  let resolveUser!: (value: unknown) => void
+  mock.auth.getUser.mockReturnValue(new Promise(resolve => { resolveUser = resolve }))
+  await act(async () => root.render(<Harness/>))
+  await act(async () => mock.callback!('SIGNED_OUT', null))
+  await act(async () => resolveUser({ data: { user: session.user }, error: null }))
+  await act(async () => mock.callback!('TOKEN_REFRESHED', session))
+  expect(host.querySelector('[data-status]')!.textContent).toBe('anonymous')
+  expect(host.querySelector('[data-token]')!.textContent).toBe('')
+  expect(host.textContent).toContain('Sessão encerrada')
+})
+
+test('troca de identidade limpa dados e aguarda getUser sem reutilizar a sessão anterior', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  await act(async () => root.render(<Harness/>))
+  clear.mockClear()
+  const other = { ...session, user: { ...session.user, id: '22222222-2222-4222-8222-222222222222' } }
+  let resolveUser!: (value: unknown) => void
+  mock.auth.getUser.mockReturnValue(new Promise(resolve => { resolveUser = resolve }))
+  await act(async () => mock.callback!('SIGNED_IN', other))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
+  expect(clear).toHaveBeenCalled()
+  expect(host.querySelector('[data-status]')!.textContent).toBe('loading')
+  expect(host.querySelector('[data-token]')!.textContent).toBe('')
+  await act(async () => resolveUser({ data: { user: other.user }, error: null }))
+  expect(host.querySelector('[data-status]')!.textContent).toBe('authenticated')
+})
+
+test('expiração real encerra a sessão e não aceita renovação tardia após o encerramento', async () => {
+  vi.useFakeTimers()
+  try {
+    mock.auth.getSession.mockResolvedValue({ data: { session: { ...session, expires_at: Math.floor(Date.now() / 1000) + 2 } }, error: null })
+    await act(async () => root.render(<Harness/>))
+    expect(host.querySelector('[data-status]')!.textContent).toBe('authenticated')
+    await act(async () => { await vi.advanceTimersByTimeAsync(2001) })
+    expect(host.querySelector('[data-status]')!.textContent).toBe('anonymous')
+    expect(mock.auth.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    await act(async () => mock.callback!('TOKEN_REFRESHED', session))
+    expect(host.querySelector('[data-token]')!.textContent).toBe('')
+  } finally { vi.useRealTimers() }
+})
+
+test('hook deixa o SDK singleton gerenciar a visibilidade e auto-refresh do navegador', async () => {
+  await act(async () => root.render(<Harness/>))
+  await act(async () => root.render(null))
+  expect(mock.auth.startAutoRefresh).not.toHaveBeenCalled()
+  expect(mock.auth.stopAutoRefresh).not.toHaveBeenCalled()
+})
+
+test.each([401, 403])('erro %s da API prevalece sobre erro transitório de outra consulta no refoco', async status => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  const fetchMock = vi.fn(async (input: string) => financialResponse(input))
+  vi.stubGlobal('fetch', fetchMock)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  fetchMock.mockImplementation(async input => {
+    if (input.includes('dashboard')) throw new TypeError('Falha de rede')
+    return new Response('{}', { status })
+  })
+  await act(async () => { await client.refetchQueries() })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
+  expect(host.querySelector('.sidebar')).toBeNull()
+  expect(host.querySelector('form[aria-label="Login da carteira"]')).not.toBeNull()
+  if (status === 401) expect(mock.auth.signOut).toHaveBeenCalled()
+  else expect(host.textContent).toContain('Sua conta não está autorizada')
+  client.clear()
+})
+
+test('retorno à aba com SIGNED_IN repetido preserva tela, cache, modal e rota', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  const fetchMock = vi.fn(async (input: string) => new Response(JSON.stringify(input.includes('dashboard')
+    ? { holdings: [], acquisition_cost: '0', total_purchases: '0', realized_profit: '0' } : []), { status: 200 }))
+  vi.stubGlobal('fetch', fetchMock)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><RouteProbe/><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  const history = host.querySelector('a[href="/historico"]')!
+  await act(async () => history.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })))
+  await act(async () => ([...host.querySelectorAll('button')].find(b => b.textContent?.includes('Nova operação'))!).click())
+  const cached = client.getQueryData(['summary', session.user.id])
+  const visibility = vi.spyOn(document, 'visibilityState', 'get')
+  try {
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        visibility.mockReturnValue('hidden'); document.dispatchEvent(new Event('visibilitychange'))
+        visibility.mockReturnValue('visible'); document.dispatchEvent(new Event('visibilitychange'))
+        window.dispatchEvent(new Event('focus'))
+        // Supabase reconfirms the same session when the tab becomes visible.
+        mock.callback!('SIGNED_IN', { ...session })
+      })
+      expect(host.querySelector('.sidebar')).not.toBeNull()
+      expect(host.querySelector('form[aria-label="Login da carteira"]')).toBeNull()
+      expect(host.querySelector('[data-route]')!.textContent).toBe('/historico')
+      expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+      expect(client.getQueryData(['summary', session.user.id])).toBe(cached)
+    }
+  } finally { visibility.mockRestore(); client.clear() }
 })
 
 test('credenciais recusadas mostram erro seguro sem refletir senha', async () => {
