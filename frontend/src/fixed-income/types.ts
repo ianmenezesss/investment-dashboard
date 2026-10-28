@@ -17,6 +17,19 @@ export type CdbMovement = ApplicationInput & {
   id: number; investment_id: number; lot_id: number; kind: 'APPLICATION' | 'REDEMPTION'
   cash_received: string | null; created_at: string
 }
+export type CdbApplicationRevision = {
+  id: number; application_id: number; revision: number; kind: 'REPLACE' | 'VOID'
+  replacement_date: string | null; replacement_amount: string | null; reason: string; created_at: string
+}
+export type CdbApplicationRevisionInput = {
+  kind: 'REPLACE' | 'VOID'; expected_revision: number; reason: string
+  replacement_date?: string; replacement_amount?: string
+}
+export type CdbApplicationRevisionPreview = {
+  kind: 'REPLACE' | 'VOID'; lot_id: number; principal_before: string; principal_after: string
+  effective_date: string | null; amount: string | null; reason: string
+  will_create_event: boolean; idempotent_replay: boolean
+}
 export type ReturnsInput = {
   as_of: string; convention: 'daily_cdi_pro_rata_decimal_v1'; calendar: 'anbima_2024_2026_v1'; tax_profile: 'br_resident_individual'
 }

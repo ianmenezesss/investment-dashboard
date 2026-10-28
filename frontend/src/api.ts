@@ -26,7 +26,11 @@ export class ApiError extends Error {
 export async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   if (PUBLIC_DEMO) throw new Error('A demonstração pública não acessa a API privada.')
   if (!token) throw new ApiError(401, 'Entre para acessar sua carteira.')
-  const response = await fetch(`${apiBase()}/api/${path}`, { ...init, cache: 'no-store', credentials: 'omit', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } })
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+  new Headers(init?.headers).forEach((value, name) => {
+    if (!['authorization', 'content-type'].includes(name.toLowerCase())) headers[name] = value
+  })
+  const response = await fetch(`${apiBase()}/api/${path}`, { ...init, cache: 'no-store', credentials: 'omit', headers })
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
     if (/\/(opening-balance|observations)(\?|$)/.test(path) && response.status === 422 && Array.isArray(body.detail)) {

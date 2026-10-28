@@ -15,6 +15,9 @@ import './fixed-income.css'
 import { ManualPositionDialog } from './ManualPositionDialog'
 import { ObservedPositionSummary } from './ObservedPosition'
 import type { ObservedPositionInput } from './types'
+import { ApplicationRevisionDialog, type RevisionKind } from './ApplicationRevisionDialog'
+import { ApplicationRevisionHistory } from './ApplicationRevisionHistory'
+import type { CdbMovement } from './types'
 
 export function FixedIncomePage({ repository, identity, newOperationRequest, onAuthError }: {
   repository: PrivateRepository; identity: string; newOperationRequest: number; onAuthError: (error: ApiError) => void
@@ -25,6 +28,7 @@ export function FixedIncomePage({ repository, identity, newOperationRequest, onA
   const [offset, setOffset] = useState(0)
   const [mode, setMode] = useState<DialogMode>(null)
   const [manualMode, setManualMode] = useState<'opening' | 'observation' | null>(null)
+  const [revisionTarget, setRevisionTarget] = useState<{ movement: CdbMovement; kind: RevisionKind } | null>(null)
   const [writeError, setWriteError] = useState('')
   const [success, setSuccess] = useState('')
   const [busy, setBusy] = useState(false)
@@ -49,18 +53,24 @@ export function FixedIncomePage({ repository, identity, newOperationRequest, onA
     queryFn: ({ signal, pageParam }) => repository.cdbMovements(selected!, pageParam, signal), enabled: selected !== null,
     getNextPageParam: (last, _pages, page) => last.length === 100 ? page + 100 : undefined,
     retry: false, staleTime: 60000, refetchOnWindowFocus: false })
+  const originalHistory = useInfiniteQuery({ queryKey: [...prefix, 'original-movements', selected], initialPageParam: 0,
+    queryFn: ({ signal, pageParam }) => repository.cdbOriginalMovements(selected!, pageParam, signal), enabled: selected !== null,
+    getNextPageParam: (last, _pages, page) => last.length === 100 ? page + 100 : undefined,
+    retry: false, staleTime: 60000, refetchOnWindowFocus: false })
   const observations = useInfiniteQuery({ queryKey: [...prefix, 'observations', selected], initialPageParam: 0,
     queryFn: ({signal,pageParam}) => repository.cdbObservations(selected!,pageParam,signal), enabled: !!selected && detail.data?.tracking_mode==='CONSOLIDATED',
     getNextPageParam:(last,_pages,page)=>last.length===100?page+100:undefined,retry:false,staleTime:60000,refetchOnWindowFocus:false })
-  const errors = [list.error, detail.error, history.error, observations.error]
+  const errors = [list.error, detail.error, history.error, originalHistory.error, observations.error]
   const authError = errors.find(error => error instanceof ApiError && error.status === 401) || errors.find(error => error instanceof ApiError && error.status === 403)
   useEffect(() => { if (authError instanceof ApiError) onAuthError(authError) }, [authError, onAuthError])
   const rows = history.data?.pages.flat() ?? []
+  const originalRows = originalHistory.data?.pages.flat() ?? []
   const completeHistory = !!history.data && !history.hasNextPage && !history.isError
   function invalidate() {
     setEpoch(value => value + 1)
     client.removeQueries({ queryKey: [...prefix, 'returns'] })
     void client.invalidateQueries({ queryKey: prefix })
+    void client.invalidateQueries({ queryKey: ['summary', identity] })
   }
   function openManual(kind:'opening'|'observation') {focus.current=document.activeElement as HTMLElement;setWriteError('');setManualMode(kind)}
   async function saveManual(input:ObservedPositionInput) {
@@ -149,7 +159,7 @@ export function FixedIncomePage({ repository, identity, newOperationRequest, onA
     {selected && detail.isPending && <p role="status">Carregando posição e lotes…</p>}
     {selected && detail.isError && <div role="alert" className="error">{(detail.error as Error).message}<Button variant="outline" onClick={() => { void detail.refetch() }}>Tentar carregar posição</Button></div>}
     {selected && detail.data && !detail.isError && <div className="fi-detail" aria-label={`Detalhes de ${detail.data.product_name}`}>
-      <div className="fi-heading"><div><h2>{detail.data.product_name}</h2><p>{detail.data.issuer} · {contractLabel(detail.data)} · Vencimento {dayLabel(detail.data.maturity_date)}</p></div><div className="fi-actions">{!detail.data.lots.length&&!detail.data.opening_balance&&!detail.data.latest_observation&&<Button variant="outline" disabled={busy} onClick={()=>void archiveEmptyContract()}>Arquivar contrato</Button>}<Button onClick={() => open('application')}>Nova aplicação</Button><Button variant="outline" disabled={!detail.data.lots.some(lot => positive(lot.principal_balance))} onClick={() => open('redemption')}>Resgatar principal</Button>{detail.data.tracking_mode==='CONSOLIDATED'&&<Button variant="outline" onClick={()=>openManual('observation')}>Registrar nova posição</Button>}<Button variant="outline" onClick={() => setParams({})}>Fechar detalhes</Button></div></div>
+      <div className="fi-heading"><div><h2 tabIndex={-1}>{detail.data.product_name}</h2><p>{detail.data.issuer} · {contractLabel(detail.data)} · Vencimento {dayLabel(detail.data.maturity_date)}</p></div><div className="fi-actions">{!detail.data.lots.length&&!detail.data.opening_balance&&!detail.data.latest_observation&&<Button variant="outline" disabled={busy} onClick={()=>void archiveEmptyContract()}>Arquivar contrato</Button>}<Button onClick={() => open('application')}>Nova aplicação</Button><Button variant="outline" disabled={!detail.data.lots.some(lot => positive(lot.principal_balance))} onClick={() => open('redemption')}>Resgatar principal</Button>{detail.data.tracking_mode==='CONSOLIDATED'&&<Button variant="outline" onClick={()=>openManual('observation')}>Registrar nova posição</Button>}<Button variant="outline" onClick={() => setParams({})}>Fechar detalhes</Button></div></div>
       {writeError && <div className="error" role="alert">{writeError}</div>}
       {detail.data.latest_observation&&<ObservedPositionSummary position={detail.data.latest_observation}/>}
       {!detail.data.lots.length&&!detail.data.opening_balance&&<article className="panel fi-section fi-empty-position"><h3>Como deseja começar?</h3><p>Nenhuma aplicação registrada. Não há informação suficiente para apresentar patrimônio ou principal. A primeira aplicação deve ter a data inicial do contrato.</p><div className="fi-actions"><Button onClick={()=>open('application')}>Registrar nova aplicação</Button><Button variant="outline" onClick={()=>openManual('opening')}>Iniciar com saldo atual</Button></div><p><span className="fi-value-origin fi-origin-calculated">Aplicação registrada</span> Cria um lote e registra o principal no ledger. <span className="fi-value-origin fi-origin-user">Posição observada</span> Registra o saldo declarado do CDB inteiro, sem inventar aplicações históricas; valor não é somado ao principal dos lotes.</p></article>}
@@ -158,9 +168,18 @@ export function FixedIncomePage({ repository, identity, newOperationRequest, onA
       <article className="panel fi-section"><h3>Histórico de movimentações <FinancialHint label="histórico de movimentações">Registro de aplicações e amortizações por lote. O caixa recebido no resgate pode incluir rendimento ou tributos e não é, por si só, lucro.</FinancialHint></h3><p><span className="fi-value-origin fi-origin-calculated">Movimentações registradas</span> Movimentos originais, sem edição ou exclusão. Valores apresentados em centavos; registros preservam até oito casas.</p>
         {history.isPending && <p role="status">Carregando movimentações…</p>}
         {history.isError && <div className="error" role="alert">{(history.error as Error).message}<Button variant="outline" onClick={() => { void history.refetch() }}>Tentar carregar histórico</Button></div>}
-        {!history.isError && history.data && (!rows.length ? <p>Nenhuma movimentação registrada.</p> : <div className="table-scroll" role="region" aria-label="Histórico de CDB" tabIndex={0}><table><thead><tr>{['Data', 'Movimento', 'Lote', 'Principal', 'Caixa recebido'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row.id}><td>{dayLabel(row.date)}</td><td><span className="operation-tag">{row.kind === 'APPLICATION' ? 'Aplicação' : 'Resgate'}</span></td><td>{row.lot_id}</td><td title={row.principal_amount}>{marketMoney(row.principal_amount)}</td><td>{row.kind === 'APPLICATION' ? 'Não se aplica' : row.cash_received == null ? 'Não informado' : marketMoney(row.cash_received)}</td></tr>)}</tbody></table></div>)}
+        {!history.isError && history.data && (!rows.length ? <p>Nenhuma movimentação registrada.</p> : <div className="table-scroll" role="region" aria-label="Histórico de CDB" tabIndex={0}><table><thead><tr>{['Data', 'Movimento', 'Lote', 'Principal', 'Caixa recebido', 'Revisões e ações'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row.id}><td>{dayLabel(row.date)}</td><td><span className="operation-tag">{row.kind === 'APPLICATION' ? 'Aplicação' : 'Resgate'}</span></td><td>{row.lot_id}</td><td title={row.principal_amount}>{marketMoney(row.principal_amount)}</td><td>{row.kind === 'APPLICATION' ? 'Não se aplica' : row.cash_received == null ? 'Não informado' : marketMoney(row.cash_received)}</td><td>{row.kind === 'APPLICATION' ? <ApplicationRevisionHistory investmentId={selected} movement={row} identity={identity} repository={repository} onRevise={(movement, kind) => { focus.current = document.activeElement as HTMLElement; setRevisionTarget({ movement, kind }) }}/> : '—'}</td></tr>)}</tbody></table></div>)}
         {history.hasNextPage && <Button variant="outline" disabled={history.isFetchingNextPage} onClick={() => { void history.fetchNextPage() }}>{history.isFetchingNextPage ? 'Carregando…' : 'Carregar mais movimentações'}</Button>}
         <p className="fi-notice">Caixa de resgate não é rendimento. Resultado realizado, IR e IOF efetivamente retidos não são apurados pelos dados atuais.</p>
+      </article>
+      <article className="panel fi-section"><h3>Auditoria das aplicações originais</h3><p>Esta lista vem do ledger original. Aplicações anuladas continuam visíveis aqui; a projeção efetiva e os cálculos permanecem separados.</p>
+        {originalHistory.isPending && <p role="status">Carregando aplicações originais…</p>}
+        {originalHistory.isError && <div className="error" role="alert">{(originalHistory.error as Error).message}<Button variant="outline" onClick={()=>{void originalHistory.refetch()}}>Tentar carregar aplicações originais</Button></div>}
+        {!originalHistory.isError && originalHistory.data && <div className="fi-original-applications">{originalRows.filter(row=>row.kind==='APPLICATION').map(row=><section className="fi-original-application" key={row.id}>
+          <h4>Aplicação original #{row.id} · Lote #{row.lot_id}</h4><p>{marketMoney(row.principal_amount)} em {dayLabel(row.date)} · O registro original não é editável.</p>
+          <ApplicationRevisionHistory investmentId={selected} movement={row} identity={identity} repository={repository}/>
+        </section>)}</div>}
+        {originalHistory.hasNextPage && <Button variant="outline" disabled={originalHistory.isFetchingNextPage} onClick={()=>{void originalHistory.fetchNextPage()}}>{originalHistory.isFetchingNextPage?'Carregando…':'Carregar mais aplicações originais'}</Button>}
       </article>
       <FixedIncomeReturns key={`${selected}-${epoch}`} detail={detail.data} repository={repository} identity={identity} onAuthError={onAuthError}/>
       {detail.data.tracking_mode==='CONSOLIDATED'&&<article className="panel fi-section"><h3>Conciliação manual e posições anteriores</h3><p>Após resgatar capital antigo sem lotes, registre uma nova observação do CDB inteiro com motivo “Conciliação após resgate”. Não use o formulário de amortização dos novos lotes.</p><Button variant="outline" onClick={()=>openManual('observation')}>Conciliar posição manualmente</Button>{observations.isPending&&<p role="status">Carregando observações…</p>}{observations.isError&&<div className="error" role="alert">{(observations.error as Error).message}<Button onClick={()=>{void observations.refetch()}}>Tentar carregar posições</Button></div>}
@@ -168,5 +187,8 @@ export function FixedIncomePage({ repository, identity, newOperationRequest, onA
     </div>}
     <FixedIncomeDialog mode={mode} setMode={setMode} cdbs={list.data ?? []} selected={selected} select={id => setParams({ investment: String(id) })} detail={!detail.isError ? detail.data : undefined} busy={busy} error={writeError} onSave={(kind, form) => { void save(kind, form) }} returnFocus={focus.current}/>
     {manualMode&&detail.data&&!detail.isError&&<ManualPositionDialog detail={detail.data} opening={manualMode==='opening'} busy={busy} error={writeError} close={()=>setManualMode(null)} save={data=>{void saveManual(data)}} returnFocus={focus.current}/>}
+    {revisionTarget && selected !== null && <ApplicationRevisionDialog investmentId={selected} movement={revisionTarget.movement} kind={revisionTarget.kind} repository={repository}
+      onClose={()=>setRevisionTarget(null)} returnFocus={focus.current} onAuthError={onAuthError} onConflict={invalidate}
+      onSuccess={()=>{focus.current=document.querySelector('.fi-detail h2');setRevisionTarget(null);setSuccess(revisionTarget.kind==='REPLACE'?'Aplicação corrigida na projeção efetiva. O registro original foi preservado.':'Aplicação anulada contabilmente. Nenhum resgate ou caixa fictício foi criado.');invalidate()}}/>}
   </section>
 }

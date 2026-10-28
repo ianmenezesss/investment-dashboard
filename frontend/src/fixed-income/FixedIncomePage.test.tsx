@@ -10,18 +10,21 @@ import { PrivateRepository } from '../repositories/PrivateRepository'
 import { fixedIncomeFixture } from '../test-fixtures/fixed-income'
 import { totalApplications } from './format'
 import { parseObservedBRL } from './ManualPositionDialog'
-import type { ObservedPosition } from './types'
+import type { ObservedPosition, CdbApplicationRevision, CdbMovement } from './types'
 
 let host: HTMLDivElement, root: Root, queryClient: QueryClient
 let fixture: ReturnType<typeof fixedIncomeFixture>
 let listError: number, detailError: number, historyError: number, postError: number, returnError: number, archiveError: number, archived: boolean
 let fetchMock: ReturnType<typeof vi.fn>
 let observedRows: ObservedPosition[]
+let originalMovements: CdbMovement[], revisionEvents: CdbApplicationRevision[], revisionFailures: number[], revisionPreviewFailures: number[]
+let revisionRequests: { input: Record<string, unknown>; key: string; status: number; response: CdbApplicationRevision }[]
+let loseRevisionResponse: boolean
 const authError = vi.fn()
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } })
 async function pause() { await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) }) }
 beforeEach(() => {
-  fixture = fixedIncomeFixture(); observedRows=[]; listError = detailError = historyError = postError = returnError = archiveError = 0; archived = false; authError.mockClear()
+  fixture = fixedIncomeFixture(); observedRows=[]; originalMovements = fixture.movements.map(row=>({...row})); revisionEvents=[]; revisionFailures=[]; revisionPreviewFailures=[]; revisionRequests=[]; loseRevisionResponse=false; listError = detailError = historyError = postError = returnError = archiveError = 0; archived = false; authError.mockClear()
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   fetchMock = vi.fn(async (path: string, init: RequestInit) => {
@@ -34,6 +37,28 @@ beforeEach(() => {
       return new Response(null, { status: 204 })
     }
     if (init.method === 'POST') {
+      const revisionId = Number(url.pathname.match(/\/applications\/(\d+)\/revisions/)?.[1])
+      if (url.pathname.endsWith('/revisions/preview')) {
+        if (revisionPreviewFailures.length) return json({ detail: 'A cronologia impede esta revisão fictícia.' }, revisionPreviewFailures.shift())
+        const input = JSON.parse(String(init.body))
+        const movement = fixture.movements.find(row=>row.id===revisionId) ?? originalMovements.find(row=>row.id===revisionId)!
+        const lotBalance = fixture.detail.lots.find(lot=>lot.id===movement.lot_id)?.principal_balance ?? '0'
+        const after = input.kind==='REPLACE' ? new Decimal(lotBalance).minus(movement.principal_amount).plus(input.replacement_amount).toFixed() : '0'
+        return json({ kind:input.kind,lot_id:movement.lot_id,principal_before:lotBalance,principal_after:after,effective_date:input.replacement_date??null,amount:input.replacement_amount??null,reason:input.reason,will_create_event:true,idempotent_replay:false })
+      }
+      if (url.pathname.includes('/applications/') && url.pathname.endsWith('/revisions')) {
+        const input = JSON.parse(String(init.body)), key = new Headers(init.headers).get('Idempotency-Key') ?? ''
+        const prior = revisionRequests.find(item=>item.key===key)
+        if (prior) return JSON.stringify(prior.input) === JSON.stringify(input) ? json(prior.response, 200) : json({detail:'Idempotency conflict'},409)
+        if (revisionFailures.length) return json({detail:'Revisão recusada pelo teste'},revisionFailures.shift())
+        const movement = fixture.movements.find(row=>row.id===revisionId)!
+        const event:CdbApplicationRevision={id:revisionEvents.length+1,application_id:revisionId,revision:revisionEvents.filter(item=>item.application_id===revisionId).length+1,kind:input.kind as 'REPLACE'|'VOID',replacement_date:input.replacement_date as string??null,replacement_amount:input.replacement_amount?new Decimal(String(input.replacement_amount)).toFixed(8):null,reason:String(input.reason),created_at:'2026-10-28T12:00:00Z'}
+        revisionEvents.push(event);revisionRequests.push({input,key,status:201,response:event})
+        if (event.kind==='REPLACE') { const priorAmount=new Decimal(movement.principal_amount),nextAmount=new Decimal(event.replacement_amount!); const lot=fixture.detail.lots.find(item=>item.id===movement.lot_id)!; lot.principal_balance=new Decimal(lot.principal_balance).plus(nextAmount).minus(priorAmount).toFixed(); fixture.detail.principal_balance=new Decimal(fixture.detail.principal_balance).plus(nextAmount).minus(priorAmount).toFixed(); movement.principal_amount=event.replacement_amount!;movement.date=event.replacement_date! }
+        else { fixture.movements=fixture.movements.filter(row=>row.id!==revisionId);fixture.detail.lots=fixture.detail.lots.filter(lot=>lot.id!==movement.lot_id);fixture.detail.principal_balance=new Decimal(fixture.detail.principal_balance).minus(movement.principal_amount).toFixed() }
+        if(loseRevisionResponse){loseRevisionResponse=false;throw new TypeError('Network response lost after fictional commit')}
+        return json(event,201)
+      }
       if (postError) return json({ detail: 'Operação rejeitada: confira saldo e datas' }, postError)
       const input = JSON.parse(String(init.body))
       if(url.pathname.endsWith('/opening-balance')||url.pathname.endsWith('/observations')) {
@@ -45,14 +70,17 @@ beforeEach(() => {
       const kind = url.pathname.endsWith('/applications') ? 'APPLICATION' : 'REDEMPTION'
       const row = { ...fixture.movements[0], ...input, id: fixture.movements.length + 1, investment_id: fixture.detail.id, lot_id: input.lot_id ?? 2, kind, cash_received: input.cash_received ?? null }
       fixture.movements.push(row)
+      originalMovements.push({...row})
       if (kind === 'APPLICATION') fixture.detail.lots.push({ id: row.lot_id, application_date: row.date, principal_balance: row.principal_amount })
       else { const lot = fixture.detail.lots.find(item => item.id === row.lot_id)!; lot.principal_balance = new Decimal(lot.principal_balance).minus(row.principal_amount).toFixed() }
       fixture.detail.principal_balance = new Decimal(fixture.detail.principal_balance)[kind === 'APPLICATION' ? 'plus' : 'minus'](row.principal_amount).toFixed()
       return json(row, 201)
     }
     if (url.pathname.endsWith('/returns')) return returnError ? json({ detail: 'Falha de consulta' }, returnError) : json(fixture.returns)
+    if (url.pathname.includes('/applications/') && url.pathname.endsWith('/revisions')) { const id=Number(url.pathname.match(/\/applications\/(\d+)\/revisions/)?.[1]);const offset=Number(url.searchParams.get('offset')??0);return json(revisionEvents.filter(row=>row.application_id===id).slice(offset,offset+100)) }
     if (url.pathname.endsWith('/observations')) return json(observedRows)
     if (url.pathname.endsWith('/effective-movements')) return historyError ? json({ detail: 'Histórico indisponível' }, historyError) : json(fixture.movements.slice(Number(url.searchParams.get('offset')), Number(url.searchParams.get('offset')) + 100))
+    if (url.pathname.endsWith('/movements')) return json(originalMovements.slice(Number(url.searchParams.get('offset')), Number(url.searchParams.get('offset')) + 100))
     if (url.pathname.endsWith('/investments')) return listError ? json({ detail: 'Lista indisponível' }, listError) : json(archived ? [] : [fixture.detail])
     return detailError ? json({ detail: 'Posição indisponível' }, detailError) : json(fixture.detail)
   })
@@ -69,14 +97,16 @@ async function click(text: string) {
   await act(async () => button!.click()); await pause()
 }
 async function field(name: string, value: string) {
-  const input = document.querySelector(`[role="dialog"] [name="${name}"]`) as HTMLInputElement | HTMLSelectElement
+  const input = document.querySelector(`[role="dialog"] [name="${name}"]`) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
   expect(input, name).toBeTruthy()
   await act(async () => {
-    Object.getOwnPropertyDescriptor(input instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+    const prototype = input instanceof HTMLSelectElement ? HTMLSelectElement.prototype : input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+    Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(input, value)
     input.dispatchEvent(new Event(input instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
   })
 }
 async function submitDialog() { await act(async () => document.querySelector('[role="dialog"] form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))); await pause() }
+async function confirmRevisionCheckbox() { const input=document.querySelector<HTMLInputElement>('.fi-confirm input')!;expect(input).toBeTruthy();await act(async()=>input.click());await pause() }
 const posts = () => fetchMock.mock.calls.filter(([, init]) => init.method === 'POST')
 
 test('lista contratos e detalhe real, preserva principal e histórico sem consulta automática de rendimento', async () => {
@@ -148,6 +178,72 @@ test('nova aplicação cria lote e atualiza posição e histórico após respost
   expect(JSON.parse(posts()[0][1].body)).toEqual({ date: '2025-01-03', principal_amount: '200.12345678' })
   expect(host.textContent).toContain('Aplicação registrada em um novo lote')
   expect(host.textContent).toContain('R$ 1.200,12')
+})
+
+test('corrige aplicação só após preview e confirmação; envia a mesma intenção e preserva o lançamento original', async () => {
+  await render(); await click('Corrigir aplicação')
+  await field('replacement_amount','250.00'); await field('replacement_date','2025-01-02'); await field('reason','Valor fictício cadastrado incorretamente')
+  await click('Ver impacto antes de confirmar')
+  expect(posts().filter(([path])=>String(path).endsWith('/preview'))).toHaveLength(1)
+  expect(posts().filter(([path])=>String(path).endsWith('/revisions'))).toHaveLength(0)
+  expect(document.body.textContent).toContain('Impacto no principal registrado')
+  await confirmRevisionCheckbox(); await click('Confirmar correção')
+  const previewCall=posts().find(([path])=>String(path).endsWith('/preview'))!
+  const writeCall=posts().find(([path])=>String(path).endsWith('/revisions'))!
+  expect(JSON.parse(String(previewCall[1].body))).toEqual({kind:'REPLACE',expected_revision:0,reason:'Valor fictício cadastrado incorretamente',replacement_amount:'250.00',replacement_date:'2025-01-02'})
+  expect(new Headers(previewCall[1].headers).get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/i)
+  expect(new Headers(writeCall[1].headers).get('Idempotency-Key')).toBe(new Headers(previewCall[1].headers).get('Idempotency-Key'))
+  expect(originalMovements[0].principal_amount).toBe('1000')
+  expect(fixture.movements[0].principal_amount).toBe('250.00000000')
+  expect(host.textContent).toContain('Aplicação corrigida na projeção efetiva')
+})
+
+test('anulação explica a natureza contábil e exige confirmação sem enviar valores substitutos ou criar resgate', async () => {
+  await render(); await click('Anular aplicação')
+  expect(document.body.textContent).toContain('anulação contábil: não registra caixa e não cria um resgate fictício')
+  await field('reason','Lançamento fictício inexistente'); await click('Ver impacto antes de confirmar')
+  expect(document.body.textContent).toContain('Esta ação é contábil')
+  expect(document.querySelector('[name="replacement_amount"]')).toBeNull()
+  await confirmRevisionCheckbox(); await click('Confirmar anulação')
+  const write=posts().find(([path])=>String(path).endsWith('/revisions'))!
+  expect(JSON.parse(String(write[1].body))).toEqual({kind:'VOID',expected_revision:0,reason:'Lançamento fictício inexistente'})
+  expect(originalMovements).toHaveLength(1)
+  expect(fixture.movements).toHaveLength(0)
+  expect(posts().some(([path])=>String(path).includes('/redemptions'))).toBe(false)
+  expect(host.textContent).toContain('Nenhum resgate ou caixa fictício foi criado')
+  expect(host.textContent).toContain('Aplicação original #1')
+})
+
+test('replay após resposta de rede perdida reutiliza a mesma chave e aceita HTTP 200', async () => {
+  loseRevisionResponse=true
+  await render(); await click('Corrigir aplicação'); await field('replacement_amount','999.99'); await field('reason','Correção fictícia'); await click('Ver impacto antes de confirmar'); await confirmRevisionCheckbox(); await click('Confirmar correção')
+  expect(document.body.textContent).toContain('mesma chave de idempotência será reutilizada')
+  const writeButton=[...document.querySelectorAll('button')].find(button=>button.textContent?.trim()==='Confirmar correção')!
+  expect(writeButton).toBeTruthy()
+  await act(async()=>writeButton.click()); await pause()
+  const writes=posts().filter(([path])=>String(path).endsWith('/revisions'))
+  expect(writes).toHaveLength(2)
+  expect(new Headers(writes[0][1].headers).get('Idempotency-Key')).toBe(new Headers(writes[1][1].headers).get('Idempotency-Key'))
+  expect(host.textContent).toContain('Aplicação corrigida na projeção efetiva')
+})
+
+test.each([[409,'desatualizada'],[422,'inválida'],[404,'não foi encontrado']] as const)('apresenta erro HTTP %i claramente sem repetir gravação', async (status,message) => {
+  if(status===422) revisionPreviewFailures=[status]; else revisionFailures=[status]
+  await render(); await click('Corrigir aplicação'); await field('replacement_amount','500'); await field('reason','Teste fictício')
+  await click('Ver impacto antes de confirmar')
+  if(status!==422){await confirmRevisionCheckbox();await click('Confirmar correção')}
+  expect(document.body.querySelector('[role="alert"]')?.textContent).toContain(message)
+  expect(posts().filter(([path])=>String(path).endsWith('/revisions')&&!String(path).endsWith('/preview'))).toHaveLength(status===422?0:1)
+})
+
+test('histórico de revisões é paginado e mantém a sequência e valores de auditoria', async () => {
+  revisionEvents=Array.from({length:101},(_,index)=>({id:index+1,application_id:1,revision:index+1,kind:index%2?'VOID':'REPLACE',replacement_date:index%2?null:'2025-01-02',replacement_amount:index%2?null:'250.00000000',reason:`Motivo fictício ${index+1}`,created_at:'2026-10-28T12:00:00Z'}))
+  await render(); await click('Ver histórico de revisões')
+  expect(host.textContent).toContain('Motivo fictício 100')
+  expect(host.textContent).not.toContain('Motivo fictício 101')
+  await click('Carregar mais revisões')
+  expect(host.textContent).toContain('#101 · Correção')
+  expect(host.textContent).toContain('R$')
 })
 
 test('resgate parcial separa caixa e principal, e total usa o saldo exato do lote', async () => {
