@@ -5,7 +5,7 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.lock.txt && pip install --no-deps .
-    preDeployCommand: python -m alembic upgrade head
+    # Migrations are manual, with a separate administrative connection.
     startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --no-access-log
     healthCheckPath: /health
     autoDeployTrigger: off
@@ -18,8 +18,8 @@ services:
         value: supabase
       - key: DATABASE_URL
         sync: false
-      - key: MIGRATION_DATABASE_URL
-        sync: false
+      - key: PGSSLROOTCERT
+        value: /etc/secrets/supabase-ca.crt
       - key: CORS_ORIGIN
         sync: false
       - key: SUPABASE_URL
