@@ -84,6 +84,16 @@ test('lista contratos e detalhe real, preserva principal e histórico sem consul
   expect(host.textContent).toContain('Caixa de resgate não é rendimento')
 })
 
+test('dicas financeiras são acessíveis por foco e distinguem cálculo do ledger', async () => {
+  await render()
+  const hint = document.querySelector<HTMLButtonElement>('[aria-label="Entender: principal aplicado acumulado"]')!
+  expect(hint).toBeTruthy()
+  await act(async () => hint.focus()); await pause()
+  expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('posição observada do CDB inteiro não é incluída')
+  expect(host.textContent).toContain('Calculado do ledger')
+  expect(host.textContent).toContain('Movimentações registradas')
+})
+
 test('cadastra CDI pelos campos reais, não cria aplicação implícita e confirma sucesso', async () => {
   await render(false); await click('Cadastrar CDB')
   for (const [name, value] of Object.entries({ issuer: 'Banco exemplo', product_name: 'Novo CDB', contracted_rate: '110.12345678', application_date: '2025-01-02', maturity_date: '2027-01-02' })) await field(name, value)

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ApiError } from '../api'
 import type { PrivateRepository } from '../repositories/PrivateRepository'
 import { Button } from '../components/ui/button'
+import { FinancialHint } from '../components/FinancialHint'
 import { marketMoney } from '../components/market-format'
 import { dayLabel, financialToday, timeLabel } from './format'
 import type { CdbDetail, CdbLotReturns, ReturnsInput } from './types'
@@ -49,11 +50,16 @@ export function FixedIncomeReturns({ detail, repository, identity, onAuthError }
         <p>Data-base: {dayLabel(data.as_of)} · Ledger capturado em {timeLabel(data.ledger_as_of)} · Modelo {data.model_version}</p>
         {data.rates_error && <p>Não foi possível obter todo o histórico CDI. O principal continua conhecido; rendimento não é confirmado.</p>}
       </div>
+      <div className="fi-estimate-label"><span className="fi-value-origin fi-origin-estimate">Estimativa sujeita às premissas confirmadas</span></div>
       <div className="fi-metrics">{([
-        ['Principal na data consultada', data.principal_balance], ['Rendimento bruto estimado', data.gross_income_estimate],
-        ['IOF estimado', data.iof_estimate], ['IR estimado', data.ir_estimate], ['Rendimento líquido estimado', data.net_income_estimate], ['Valor líquido estimado', data.net_value_estimate],
-      ] as const).map(([label, value]) => <article className="metric" key={label}><span>{label}</span><h2>{marketMoney(value)}</h2></article>)}</div>
-      <p>Valor bruto estimado: <strong>{marketMoney(data.gross_value_estimate)}</strong>. Taxas e tributos são estimativas sobre a posição aberta, não valores efetivamente retidos.</p>
+        ['Principal na data consultada', data.principal_balance, 'Principal calculado a partir das aplicações e amortizações registradas até a data consultada. Não inclui o saldo observado do CDB inteiro.'],
+        ['Rendimento bruto estimado', data.gross_income_estimate, 'Estimativa do rendimento antes de IOF e IR, com base no histórico CDI disponível e nas premissas acima.'],
+        ['IOF estimado', data.iof_estimate, 'Estimativa de IOF para o lote e a data consultada. Não é valor efetivamente retido pela instituição.'],
+        ['IR estimado', data.ir_estimate, 'Estimativa de IR para o lote e a data consultada. Não é confirmação de imposto devido ou retido.'],
+        ['Rendimento líquido estimado', data.net_income_estimate, 'Rendimento estimado depois dos tributos estimados; não é valor confirmado de liquidação.'],
+        ['Valor líquido estimado', data.net_value_estimate, 'Principal mais rendimento estimado, descontados IOF e IR estimados, quando calculáveis.'],
+      ] as const).map(([label, value, help]) => <article className="metric" key={label}><span>{label} <FinancialHint label={label}>{help}</FinancialHint></span><h2>{marketMoney(value)}</h2><small className="fi-value-origin fi-origin-estimate">Estimado</small></article>)}</div>
+      <p><span className="fi-value-origin fi-origin-estimate">Estimado</span> Valor bruto estimado <FinancialHint label="valor bruto estimado">Principal do ledger mais rendimento bruto estimado, antes de IOF e IR. Resultado condicionado ao histórico de CDI e às premissas selecionadas.</FinancialHint>: <strong>{marketMoney(data.gross_value_estimate)}</strong>. Taxas e tributos são estimativas sobre os lotes abertos, não valores efetivamente retidos.</p>
       <div className="table-scroll" role="region" aria-label="Estimativa por lote" tabIndex={0}><table><caption className="sr-only">Rentabilidade estimada por lote</caption><thead><tr>{['Lote', 'Situação', 'Rendimento bruto', 'IOF', 'IR', 'Líquido estimado', 'Referência'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
         <tbody>{data.lots.map(lot => <tr key={lot.lot_id}><th scope="row">{lot.lot_id}</th><td>{states[lot.status]}{lot.missing_rate_dates.length > 0 && <details><summary>{lot.missing_rate_dates.length} datas sem CDI</summary>{lot.missing_rate_dates.map(day => <div key={day}>{dayLabel(day)}</div>)}</details>}</td>
           <td>{marketMoney(lot.gross_income_estimate)}</td><td>{marketMoney(lot.iof_estimate)}</td><td>{marketMoney(lot.ir_estimate)}</td><td>{marketMoney(lot.net_value_estimate)}</td>

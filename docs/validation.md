@@ -1,5 +1,44 @@
 # Validação do Investment Dashboard
 
+## Revisão final 2.0.7 — 28/10/2026
+
+- Auditoria estática direcionada da migration 004 já aplicada (sem conexão ao Supabase),
+  policy/Force RLS, constraints, índices, triggers, endpoint/auth/isolamento e separação
+  observação-ledger; nenhuma falha de segurança que justificasse alterar migration ou regra.
+- Frontend recebeu dicas acessíveis para principal, lotes, histórico, posição observada,
+  estimativas e tributos, com origem visual informada/calculada/estimada.
+- **118 testes aprovados no total.** O responsável executou no Windows 75 testes backend
+  focais e 1 teste de integração PostgreSQL descartável; resultado informado pelo usuário,
+  não reexecutado pelo agente. O foco backend cobriu abertura, renda fixa, estimativas e
+  segurança; o runner de integração usa PostgreSQL Docker efêmero.
+- **42 testes frontend focais aprovados** (`FixedIncomePage.test.tsx` e
+  `MarketDashboard.test.tsx`), incluindo tooltip por foco/teclado, abertura sem lote
+  fictício, principal desconhecido, sequência de observações, auth e troca de identidade.
+  `tsc -b` aprovado.
+- **Build privado aprovado** com `vite build --configLoader native`; chunk JS de 1,099 kB e
+  aviso do Vite acima de 500 kB permanecem. TypeScript e build passaram anteriormente e não
+  foram reexecutados nesta revisão de preparação.
+- Revisão do diff para release: as alterações de aplicação são de apresentação/acessibilidade;
+  nenhuma fórmula/cálculo financeiro, autenticação, autorização, endpoint/contrato API,
+  backend ou migration foi alterado. O diff contém somente frontend, documentação e um
+  teste frontend. `git diff --check` passou; Git emitiu apenas avisos de conversão LF/CRLF.
+- Revisão estática dos arquivos alterados/novos não encontrou credenciais, tokens reais,
+  URL privada com segredo, informação pessoal ou registros financeiros reais. Números em
+  testes são fixtures/boundaries sintéticos; preços em `phase-3.0-technical-plan.md` são
+  referências públicas de planos de fornecedores. Nenhum deploy ou consulta remota foi feito.
+- `scripts/audit_publication.py` aprovado após as alterações: 154 arquivos candidatos,
+  3 artefatos de build e histórico Git analisados; nenhum segredo conhecido/assinatura
+  detectado e padrões de ignore confirmados. A auditoria não substitui revisão manual de
+  conteúdo arbitrário; o diff também foi revisado manualmente.
+- Consultas SQL de metadados estritamente somente leitura, checklist de conta secundária e
+  recomendação para preservar o contrato de teste estão em
+  [revisão final 2.0.7](phase-2.0.7-final-review.md).
+- Nenhum registro, segredo, ambiente de produção ou demonstração pública foi acessado ou
+  alterado. Nenhuma migration, commit, push ou deploy executado.
+- Desde essa revisão, o responsável informou Supabase em `004 (head)`, RLS/FORCE RLS e
+  grants mínimos confirmados, com site e fluxos de CDB funcionando. Estado remoto não foi
+  verificado independentemente; homologação com a segunda conta segue pendente.
+
 ## Revisão de prontidão 2.0.6 — 28/10/2026
 
 - Commit `385120723a183f0964652682a99a7e64ab281ab9` presente; `main` limpo, um commit
