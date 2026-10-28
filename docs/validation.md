@@ -1,5 +1,21 @@
 # Validação do Investment Dashboard
 
+## Revisão de prontidão 2.0.6 — 28/10/2026
+
+- Commit `385120723a183f0964652682a99a7e64ab281ab9` presente; `main` limpo, um commit
+  à frente de `origin/main`.
+- Revisão direcionada da migration 004, dependência 003, constraints, índices, FK,
+  RLS/Force RLS, triggers append-only/cronologia/concorrência e endpoints de observação;
+  sem correções de código necessárias.
+- Testes focais não foram reexecutados: `.venv` aponta para Python indisponível e o Python
+  empacotado disponível não tem pytest. Integração PostgreSQL (1) e suites da Fase 2.0.5
+  permanecem aprovadas conforme o registro abaixo, sem nova execução nesta revisão.
+- Nenhum build novo (sem mudança de aplicação); testes anteriores/builds público e privado
+  estão registrados na seção Fase 2.0.5.
+- Nenhuma operação remota. Backup, migration 004, grants, Render/Vercel, allowlist real,
+  homologação da segunda conta e confirmação da demo continuam pendentes.
+- Runbook e checklist: [prontidão de produção 2.0.6](phase-2.0.6-production-readiness.md).
+
 ## Fase 2.0.5 — abertura consolidada e conciliação
 
 - **264 testes backend aprovados** (22 novos): snapshot não cria aporte/lote, principal

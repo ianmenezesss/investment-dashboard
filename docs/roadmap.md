@@ -3,6 +3,11 @@
 Registro atualizado na Fase **2.0.5**, em 28/10/2026. As funcionalidades da Fase 3
 continuam planejadas e não foram implementadas nesta entrega.
 
+Revisão de prontidão 2.0.6 registrada em
+[phase-2.0.6-production-readiness.md](phase-2.0.6-production-readiness.md): sem novas
+funcionalidades; validação local/documental concluída, publicação e homologação remotas
+pendentes de autorização.
+
 ## Fase 2 — renda fixa
 
 - **2.0.1:** contratos CDB, lotes e movimentações imutáveis de principal, validados em
