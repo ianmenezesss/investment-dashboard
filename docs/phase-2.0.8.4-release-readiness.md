@@ -1,10 +1,10 @@
 # Fase 2.0.8.4 — preparação de publicação
 
-Estado auditado: base `44c0191`, produção informada em 2.0.7 / Alembic 004. Migration local 008 e assertions de integração 001–008 estão em preparação; nenhum comando remoto foi executado.
+Estado auditado nesta preparação: base informada `81c35cb`, produção informada em 2.0.7 / Alembic 004. Migration local 008 existe; este ensaio local cria dois servidores Docker efêmeros para validar migrations, backup lógico e restore. Nenhum comando remoto foi executado.
 
 ## Parecer e gates
 
-**NO-GO para publicar agora.** Faltam execução aprovada da integração descartável 001–008, backup recuperável e restore ensaiado, identidade SQL efetiva da API e homologação isolada com duas contas. O resultado 001–007 reportado anteriormente não valida a migration 008 nem as novas assertions.
+**NO-GO para publicar agora.** A integração 001–008 anterior foi reportada pelo usuário, mas ainda falta executar o novo ensaio backup/restore local. Também faltam identidade SQL efetiva da API autorizada e homologação autenticada real. O teste SQL com duas identidades fictícias não comprova login Supabase.
 
 Não usar dados pessoais na homologação. Registrar somente resultados, versão Alembic e identificadores não sensíveis; não registrar URL, senha, token, extrato ou valores reais.
 
@@ -34,7 +34,7 @@ WHERE member = (SELECT oid FROM pg_roles WHERE rolname = 'investment_runtime');
 
 Antes da migration, exigir versão única 004, role presente com LOGIN, NOINHERIT e demais flags administrativas falsas, sem memberships. Na **conexão efetiva do backend**, executar leitura controlada `SELECT current_user, session_user, current_database(), current_schema()` e comparar com a role aprovada e o banco esperado. Não imprimir a URL. A checagem atual `ensure_production_role` impede superuser/BYPASSRLS/ownership de `operations` e exige RLS nessa tabela, mas não confirma, sozinha, que `current_user = investment_runtime` nem os grants novos; por isso esta verificação separada é obrigatória.
 
-Após 007, consultar RLS/FORCE RLS e grants efetivos:
+Após 008, consultar RLS/FORCE RLS e grants efetivos:
 
 ```sql
 SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity,
@@ -63,10 +63,10 @@ Todas as permissões positivas acima devem ser verdadeiras; UPDATE/DELETE/TRUNCA
 
 1. **Congelar escritas financeiras** na janela de publicação e registrar início, versão 004 e contagens agregadas sem dados pessoais. Bloquear jobs concorrentes de migrations. Manter leitura disponível apenas se houver garantia de compatibilidade e consistência; caso contrário, usar manutenção temporária.
 2. **Backup verificável**: capturar snapshot/backup consistente do banco e guardar identificador, hora, escopo, hash/manifesto e prazo de retenção definido pelo operador. Confirmar que a retenção cobre a janela de publicação e observação. Ensaiar restore em PostgreSQL descartável isolado, verificar versão 004, objetos, RLS e contagens agregadas. Nunca restaurar no banco ativo como teste.
-3. **Go/no-go pré-migration**: backup e restore aprovados, destino confirmado, role DDL distinta do runtime, papel efetivo da API identificado, role `investment_runtime` apta à 007, janela sem escritas e cadeia Alembic única. Caso contrário, NO-GO.
-4. **Migrations**: com credencial DDL temporária, executar futuramente da raiz `cd backend; python -m alembic -c alembic.ini current; python -m alembic -c alembic.ini heads; python -m alembic -c alembic.ini upgrade head`. `MIGRATION_DATABASE_URL` pertence apenas ao processo DDL; não deve existir no runtime. Nunca executar estas linhas antes da aprovação de publicação. Após upgrade, conferir versão única 007, RLS, triggers, ACLs, sequências e projeção sem revisão. Falha ou drift: parar; não repetir às cegas.
-5. **Grants mínimos faltantes do arquivo**: aplicar apenas após confirmar papel efetivo e revisão da etapa administrativa acima. Verificar novamente privilégios com a conexão runtime. Sem isso, arquivamento permanece bloqueado.
-6. **Backend Render**: publicar versão 2.0.8 após schema 007 e ACLs aprovadas. Conferir `/health`, autenticação, leitura privada e prévia sem persistência. Não ativar frontend de revisão antes da API. Manter escrita congelada até validar endpoints e RLS.
+3. **Go/no-go pré-migration**: backup e restore aprovados, destino confirmado, role DDL distinta do runtime, papel efetivo da API identificado, role `investment_runtime` apta à 007/008, janela sem escritas e cadeia Alembic única. Caso contrário, NO-GO.
+4. **Migrations**: com credencial DDL temporária, executar futuramente da raiz `cd backend; python -m alembic -c alembic.ini current; python -m alembic -c alembic.ini heads; python -m alembic -c alembic.ini upgrade head`. `MIGRATION_DATABASE_URL` pertence apenas ao processo DDL; não deve existir no runtime. Nunca executar estas linhas antes da aprovação de publicação. Após upgrade, conferir versão única 008, RLS, triggers, ACLs, sequências e projeção sem revisão. Falha ou drift: parar; não repetir às cegas.
+5. **Grants de arquivamento**: migration 008 concede ao `investment_runtime` somente SELECT/INSERT no tombstone e USAGE na sequência, preservando RLS/FORCE RLS e negando UPDATE/DELETE/TRUNCATE. A migration aborta se role ausente ou insegura. Confirmar role efetiva e privilégios por conexão runtime após upgrade.
+6. **Backend Render**: publicar versão 2.0.8 após schema 008 e ACLs aprovadas. Conferir `/health`, autenticação, leitura privada e prévia sem persistência. Não ativar frontend de revisão antes da API. Manter escrita congelada até validar endpoints e RLS.
 7. **Frontend Vercel privado**: publicar build correspondente após backend aprovado; verificar CSP/CORS, login, prévia, revisão e refetch. A demonstração pública é projeto separado e deve continuar offline, sem API financeira privada.
 8. **Smoke e liberação**: executar roteiro fictício abaixo em ambiente de homologação separado; em produção limitar smoke a health, autenticação e leituras não sensíveis autorizadas, sem criar lançamentos de teste. Liberar escritas somente após todos os gates. Registrar versão backend/frontend, hora e resultados sem payloads financeiros.
 
@@ -76,19 +76,35 @@ Nomes de configuração a conferir sem ler valores: Render `ENVIRONMENT`, `AUTH_
 
 Em banco e contas descartáveis, executar: contrato vazio e arquivamento; contrato com aplicação e bloqueio de arquivo; aplicação inicial na data do contrato; resgate parcial e integral; REPLACE de valor/data com prévia; VOID sem resgate, com evento terminal; bloqueio de VOID com resgate dependente; correção retroativa que cruzaria resgate ou observação; aplicações/resgates intercalados e datas iguais; múltiplas revisões e sequência desatualizada; replay com mesma chave/payload e conflito 409 com chave reutilizada em payload distinto; falha de rede após gravação e retry; consulta paginada do histórico; abertura/observações imutáveis; duas contas, com 404/nenhuma linha para recurso alheio. Conferir saldos, principal efetivo, rendimentos e dashboard após cada alteração, sem somar posição observada aos lotes. Confirmar que registros originais não mudam e que VOID não cria caixa ou resgate.
 
-**Aprovação objetiva:** migrations 001–007 e runner descartável aprovados no código candidato; role/ACL/RLS/trigger checks aprovados; nenhuma leitura ou escrita cruzada; resposta idempotente idêntica; nenhum saldo intermediário negativo ou cronologia inválida aceitos; UI exige motivo, prévia e confirmação e atualiza consultas; restore ensaiado; smoke de API/frontend aprovado. Qualquer falha nesses pontos, migration parcial, role não identificada, backup não restaurável ou privilégio amplo implica **NO-GO**. Os testes locais automatizados existentes cobrem parte desses cenários; o roteiro integrado de duas contas precisa de evidência separada antes de publicar.
+**Aprovação objetiva:** migrations 001–008 e runner descartável aprovados no código candidato; backup/restore comparado por conteúdo e contagens; role/ACL/RLS/trigger checks aprovados; nenhuma leitura ou escrita cruzada; resposta idempotente idêntica; nenhum saldo intermediário negativo ou cronologia inválida aceitos; UI exige motivo, prévia e confirmação e atualiza consultas; smoke de API/frontend aprovado. Qualquer falha nesses pontos, migration parcial, role não identificada, backup não restaurável ou privilégio amplo implica **NO-GO**. Os testes SQL usam proprietários fictícios e não substituem login autenticado real.
 
 ## 4. Falha e recuperação
 
 - **Antes de migration:** cancelar publicação e reabrir a versão 2.0.7 após confirmar que não houve DDL nem escrita pendente.
 - **Migration falha:** manter congelamento de escritas, consultar `alembic_version`, catálogo de objetos e logs sem segredos; PostgreSQL normalmente reverte a transação falha. Corrigir causa e ensaiar novamente em clone descartável antes de qualquer repetição. Não usar `stamp` para mascarar drift.
-- **Backend/frontend falha após schema 007:** voltar os artefatos de aplicação para a versão anterior apenas se a compatibilidade com schema 007 tiver sido verificada em ensaio. Manter novas rotas desabilitadas e escritas congeladas até decisão. Preferir correção aditiva para defeitos de schema.
-- **Banco após escritas 2.0.8:** não fazer downgrade 005–007 nem restaurar snapshot 004 sobre operações novas. Preservar eventos append-only. Plano de recuperação exige reconciliação de operações pós-backup e aprovação explícita do proprietário antes de qualquer restauração isolada ou corte de tráfego. Guardar backup conforme retenção definida; validar restore em ambiente separado antes de usá-lo.
+- **Backend/frontend falha após schema 008:** voltar os artefatos de aplicação para a versão anterior apenas se a compatibilidade com schema 008 tiver sido verificada em ensaio. Manter novas rotas desabilitadas e escritas congeladas até decisão. Preferir correção aditiva para defeitos de schema.
+- **Banco após escritas 2.0.8:** não fazer downgrade 005–008 nem restaurar snapshot 004 sobre operações novas. Preservar eventos append-only. Plano de recuperação exige reconciliação de operações pós-backup e aprovação explícita do proprietário antes de qualquer restauração isolada ou corte de tráfego. Guardar backup conforme retenção definida; validar restore em ambiente separado antes de usá-lo.
 
 ## 5. Riscos e decisões pendentes
 
 1. Confirmar a identidade SQL efetiva usada pelo backend implantado e o provisionamento da role `investment_runtime`; a documentação histórica não substitui essa evidência.
-2. Confirmar/aplicar grants mínimos de arquivamento, ausentes na migration 005, com papel correto e processo administrativo explícito.
+2. Confirmar que a role `investment_runtime` existe e que a migration 008 foi aplicada pela role DDL correta; confirmar os grants pela conexão efetiva do backend.
 3. Definir janela de congelamento de escritas, método de backup, retenção e local de restore ensaiado.
-4. Confirmar compatibilidade de rollback da aplicação 2.0.7 contra schema 007 em clone antes de confiar nessa opção.
+4. Confirmar compatibilidade de rollback da aplicação 2.0.7 contra schema 008 em clone antes de confiar nessa opção.
 5. Homologar duas contas e configurações de rede/CSP/TLS em ambiente separado antes da decisão final de publicação.
+
+## 6. Ensaio local automatizado de backup/restore
+
+Script único: `backend/tests/run_postgres_backup_restore.ps1`. Executar no PowerShell a partir da raiz do repositório. Logs, dump e temporários do host ficam em `E:\InvestmentDashboard\temp`; a pasta é criada se necessário e conteúdo existente não é limpo:
+
+```powershell
+& .\backend\tests\run_postgres_backup_restore.ps1
+```
+
+O script exige digitar `DESCARTAVEL`, rejeita contexto Docker que não seja `npipe:`/`unix:`, isola `DOCKER_CONFIG`, rejeita `DOCKER_HOST`/`DOCKER_CONTEXT` herdados, usa somente `postgres:17-alpine` já presente (sem pull), cria uma bridge Docker exclusiva com binding padrão `127.0.0.1` e nomes UUID exclusivos, publica cada porta explicitamente em `127.0.0.1` e usa `tmpfs` sem volumes nomeados. O container PostgreSQL fica em uma bridge que permite saída de rede; portanto o ensaio não promete isolamento total de rede. A aplicação de testes recebe somente URL de banco local, auth local, mercado desabilitado, sem proxies herdados e `NO_PROXY=*`; nenhum endereço de produção é utilizado. O runner desativa bytecode/cache do pytest e aponta `TEMP`, `TMP` e `TMPDIR` para E:. Ele executa `tests/test_postgres.py` no banco fonte vazio, produz `pg_dump` custom em E:, precria somente roles fictícias necessárias e restaura em outro container/banco. Ambos os containers e a rede criada pela execução são removidos; nenhum container ou volume preexistente é removido. O PowerShell está salvo em UTF-8 com BOM, força stdout/stderr Python em UTF-8, captura cada fluxo em arquivo temporário separado em E:, registra o exit code e acrescenta traceback/exceção completos após sanitização; os arquivos intermediários da execução são apagados somente depois da captura.
+
+**Armazenamento interno do Docker:** os arquivos do host (backup, log, Docker config temporário) usam E:. O PostgreSQL fica em `tmpfs` do container e não é persistido em volume. A imagem, metadados e armazenamento do engine continuam sob o Docker Desktop; `DockerRootDir` é registrado, mas em Windows pode apontar para dentro da VM Linux e não revela a localização do disco virtual no host. O sandbox não conseguiu acessar o pipe Docker local, então não foi possível confirmar se o disco virtual do Docker Desktop está em C:. Se a configuração padrão estiver em C:, esse armazenamento do engine ainda consumirá espaço em C:; o runner não move nem altera essa configuração.
+
+O verificador compara versão 008, contagens e SHA-256 de linhas das tabelas de operações/ledger, constraints validadas, RLS/FORCE RLS, triggers append-only, atributos e memberships da role, grants/negações e visibilidade sob `investment_test_runtime` para os dois proprietários fictícios. O log consolidado fica em `E:\InvestmentDashboard\temp` e contém tamanho/hash do backup, sem URL ou credenciais. O dump temporário é removido após o ensaio; seu hash permanece no log. Este exercício valida backup/restore do schema candidato fictício em head 008; não substitui um restore autorizado de backup operacional legado em clone, que não será obtido de produção nesta fase.
+
+**Evidência atual:** o ensaio anterior no Windows, com Docker Engine 29.5.3, falhou porque `docker port` não encontrou binding para `5432/tcp` na rede `--internal`, apesar de `--publish` explícito. O log não contém `docker inspect` desse container, então a causa específica no engine não está provada. A nova bridge e os diagnósticos de `PortBindings`, `Ports` e `NetworkMode` precisam ser executados no Windows. No sandbox, `docker info` retornou acesso negado ao pipe local; somente os testes unitários do comando Docker e verificações estáticas foram executados. Backup/restore permanece **pendente**. Autenticação Supabase real, role conectada no Render, backup operacional autorizado e janela de publicação seguem como gates separados.
