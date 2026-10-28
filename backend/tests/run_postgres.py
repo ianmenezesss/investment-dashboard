@@ -1,4 +1,4 @@
-"""Executa integração em container efêmero próprio; não usa .env nem volume pessoal."""
+"""Executa integração 001–008 em container efêmero; não usa .env nem volume pessoal."""
 import os
 from pathlib import Path
 import secrets

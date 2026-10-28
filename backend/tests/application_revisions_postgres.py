@@ -18,7 +18,7 @@ from test_fixed_income import A, B, CONTRACT, PATH
 
 def verify_revisions_postgres(engine, client):
     with engine.begin() as c:
-        assert c.scalar(text("SELECT version_num FROM alembic_version")) == "007"
+        assert c.scalar(text("SELECT version_num FROM alembic_version")) == "008"
         assert c.execute(text("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='fixed_income_application_revisions'::regclass")).one() == (True, True)
         for role in ("anon", "authenticated", "service_role", "public"):
             leaked=c.scalar(text("""SELECT count(*) FROM pg_class c,

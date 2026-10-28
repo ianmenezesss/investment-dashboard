@@ -49,6 +49,8 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
           ('fixed_income_investments','fixed_income_lots','fixed_income_movements')}
     command.upgrade(Config("alembic.ini"), "head")
     with engine.connect() as connection:
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "008"
+    with engine.connect() as connection:
         for table, rows in original.items():
             assert list(connection.execute(text(f'SELECT * FROM {table} ORDER BY id'))) == rows
         assert connection.scalar(text('SELECT count(*) FROM fixed_income_observations')) == 0

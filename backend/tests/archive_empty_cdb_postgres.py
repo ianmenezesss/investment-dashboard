@@ -13,6 +13,15 @@ def verify_archive_postgres(engine, client):
     with engine.begin() as connection:
         flags = connection.execute(text("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=to_regclass('public.fixed_income_investment_archives')")).one()
         assert flags == (True, True)
+        assert connection.scalar(text("SELECT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls AND NOT rolinherit AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication FROM pg_roles WHERE rolname='investment_runtime'"))
+        assert connection.scalar(text("SELECT NOT EXISTS(SELECT 1 FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname='investment_runtime'))"))
+        for privilege in ('SELECT', 'INSERT'):
+            assert connection.scalar(text("SELECT has_table_privilege('investment_runtime','public.fixed_income_investment_archives',:p)"), {'p': privilege})
+        assert connection.scalar(text("SELECT has_sequence_privilege('investment_runtime','public.fixed_income_investment_archives_id_seq','USAGE')"))
+        for privilege in ('UPDATE', 'DELETE', 'TRUNCATE'):
+            assert not connection.scalar(text("SELECT has_table_privilege('investment_runtime','public.fixed_income_investment_archives',:p)"), {'p': privilege})
+        connection.execute(text("GRANT SELECT, INSERT ON public.fixed_income_investment_archives TO investment_test_runtime"))
+        connection.execute(text("GRANT USAGE ON SEQUENCE public.fixed_income_investment_archives_id_seq TO investment_test_runtime"))
         connection.execute(text("SET LOCAL ROLE investment_test_runtime"))
         assert connection.scalar(text("SELECT has_table_privilege(current_user,'fixed_income_investment_archives','SELECT') AND has_table_privilege(current_user,'fixed_income_investment_archives','INSERT')"))
         for privilege in ('UPDATE', 'DELETE', 'TRUNCATE'):
@@ -71,6 +80,10 @@ def verify_archive_postgres(engine, client):
     applied = client.post(f"{PATH}/{populated_id}/applications", json={'date': '2025-01-01', 'principal_amount': '100'})
     assert applied.status_code == 201, applied.text
     assert client.delete(f"{PATH}/{populated_id}/archive").status_code == 409
+
+    # The ledger's deferred invariant forbids a lot without an application in the
+    # same transaction. The valid application above creates both dependencies;
+    # archiving that contract must reject them without fabricating orphan lots.
 
     from test_opening_balances import POSITION, contract
     observed_id = contract(client)

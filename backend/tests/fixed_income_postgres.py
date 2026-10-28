@@ -33,7 +33,7 @@ def verify_fixed_income_postgres(engine, client):
                 assert leaked == 0
             connection.execute(text(f"GRANT SELECT, INSERT ON public.{table} TO investment_test_runtime"))
             connection.execute(text(f"GRANT USAGE ON SEQUENCE public.{table}_id_seq TO investment_test_runtime"))
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "007"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "008"
 
     @contextmanager
     def restricted(owner=None, isolation=None):
