@@ -1,6 +1,6 @@
 # Roadmap do Investment Dashboard
 
-Registro atualizado na Fase **2.0.2**, em 28/10/2026. As funcionalidades da Fase 3
+Registro atualizado na Fase **2.0.3**, em 28/10/2026. As funcionalidades da Fase 3
 continuam planejadas e não foram implementadas nesta entrega.
 
 ## Fase 2 — renda fixa
@@ -10,8 +10,11 @@ continuam planejadas e não foram implementadas nesta entrega.
 - **2.0.2 (implementada para revisão):** consulta histórica privada de CDI diário (SGS 12)
   e Selic diária (SGS 11), com Decimal, cache e controle de chamadas. Sem migration,
   cálculo de rendimento ou UI. Ver [contrato e limites](phase-2.0.2-bcb-rates.md).
-- Cálculos de rendimentos/tributação e UI de renda fixa não fazem parte desta fase;
-  escopo e versão de entregas futuras ainda devem ser definidos.
+- **2.0.3 (implementada para revisão):** motor determinístico de estimativas CDI por lote,
+  IOF/IR estimados para PF residente, premissas explícitas, principal separado de rendimento
+  e estados de informação insuficiente. Sem migration ou UI. Ver [fórmulas e homologação](phase-2.0.3-fixed-income-returns.md).
+- **2.0.4 (planejada):** integração da interface privada de renda fixa com os endpoints;
+  preservar indicação de estimativa, lacunas, perfil/convenção e demo offline.
 
 ## Fase 3 — exploração de ativos e histórico
 

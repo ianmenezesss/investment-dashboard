@@ -1,5 +1,26 @@
 # Validação do Investment Dashboard
 
+## Fase 2.0.3 — estimativas de rentabilidade CDB/CDI
+
+- Base inspecionada: commit 1baf46743211c6ee3b4026b2d7932d65b12c8b4b (2.0.2).
+- **242 testes backend aprovados**, incluindo 57 novos; SGS exclusivamente simulado.
+  Cenários 100/110/120% CDI, lotes distintos, resgates parciais/totais, IR em 180/181/
+  360/361/720/721 dias, IOF dias 1–30, arredondamento, precisão intermediária e contexto
+  Decimal externo, calendário, lacunas, maturidade e falhas de fornecedor.
+- **1 teste integrado PostgreSQL aprovado**, ampliado com o endpoint de rentabilidade sob
+  RLS/role restrita: conta B não lê contrato A, leitura não cria movimentos, estimativas
+  reconciliam com fixture. Migrations e invariantes das fases anteriores preservadas.
+- Endpoint novo usa snapshot SQL único por proprietário e libera transação antes do SGS.
+  Principal é separado de rendimentos; valores incompletos são null; tributos realizados
+  são informação insuficiente, sem deduzir impostos a partir do caixa recebido.
+- Convenção/calendário/perfil tributário explícitos. Calendário revisado cobre 2024–2026;
+  outros anos e condições contratuais não modeladas não recebem estimativas inventadas.
+- Sem mudanças em modelos, APIs anteriores, migrations, RLS, auth, ações ou frontend/demo.
+  Frontend/builds não reexecutados: nenhuma alteração nesses arquivos. Aviso conhecido
+  TestClient/httpx permanece. Sem commit/push/deploy/migration de produção.
+- **Homologação autenticada real no Render não executada**: nenhuma sessão/JWT fornecida
+  ou utilizada. Procedimento manual e premissas em [Fase 2.0.3](phase-2.0.3-fixed-income-returns.md).
+
 ## Fase 2.0.2 — CDI e Selic via BCB/SGS
 
 - Adaptador HTTPX isolado para SGS 12 (CDI) e 11 (Selic), % ao dia, com Decimal,

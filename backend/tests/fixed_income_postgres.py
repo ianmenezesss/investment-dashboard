@@ -129,3 +129,36 @@ def verify_fixed_income_postgres(engine, client):
     result = client.post(f"{PATH}/{ids[A]}/applications", json={"date": "2025-01-05", "principal_amount": "999999999999.12345678"})
     assert result.status_code == 201, result.text
     assert Decimal(client.get(f"{PATH}/{ids[A]}").json()["principal_balance"]) == Decimal("999999999999.12345678")
+
+    # Phase 2.0.3: the new read-only return snapshot also uses the restricted role/RLS.
+    import asyncio
+    import httpx
+    from app.bcb_rates.provider import SGSProvider
+    from app.bcb_rates.service import RateService
+    from app.bcb_rates.router import rates_service
+    cdi = client.post(PATH, json=CONTRACT | {"remuneration": "CDI", "indexer": "CDI", "contracted_rate": "100", "application_date": "2025-01-02"})
+    assert cdi.status_code == 201
+    investment = cdi.json()["id"]
+    assert client.post(f"{PATH}/{investment}/applications", json={"date": "2025-01-02", "principal_amount": "1000"}).status_code == 201
+    calls = []
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, json=[{"data":"02/01/2025","valor":"1"},{"data":"03/01/2025","valor":"1"}])
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    service = RateService(SGSProvider(http))
+    app.dependency_overrides[rates_service] = lambda: service
+    query = "as_of=2025-01-04&convention=daily_cdi_pro_rata_decimal_v1&calendar=anbima_2024_2026_v1&tax_profile=br_resident_individual"
+    try:
+        app.dependency_overrides[authenticate] = lambda: Principal(B)
+        assert client.get(f"{PATH}/{investment}/returns?{query}").status_code == 404
+        assert not calls
+        app.dependency_overrides[authenticate] = lambda: Principal(A)
+        result = client.get(f"{PATH}/{investment}/returns?{query}")
+        assert result.status_code == 200, result.text
+        assert result.json()["gross_income_estimate"] == "20.10"
+        assert result.json()["net_value_estimate"] == "1001.09" and len(calls) == 1
+        with restricted(A) as connection:
+            assert connection.scalar(text("SELECT count(*) FROM fixed_income_movements WHERE investment_id=:id"), {"id":investment}) == 1
+    finally:
+        app.dependency_overrides.pop(rates_service, None)
+        asyncio.run(http.aclose())

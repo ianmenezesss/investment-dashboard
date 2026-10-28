@@ -23,6 +23,7 @@ from .fixed_income.router import router as fixed_income_router
 from .bcb_rates.provider import SGSProvider
 from .bcb_rates.service import RateService
 from .bcb_rates.router import router as bcb_rates_router
+from .fixed_income.returns_router import router as fixed_income_returns_router
 
 
 @asynccontextmanager
@@ -44,6 +45,7 @@ async def lifespan(app):
 app = FastAPI(title="Investment Dashboard", version="0.1.5", lifespan=lifespan, docs_url=None if settings.environment == "production" else "/docs", redoc_url=None, openapi_url=None if settings.environment == "production" else "/openapi.json")
 app.include_router(fixed_income_router)
 app.include_router(bcb_rates_router)
+app.include_router(fixed_income_returns_router)
 app.add_middleware(CORSMiddleware, allow_origins=[settings.cors_origin], allow_methods=["GET", "POST", "DELETE"], allow_headers=["Authorization", "Content-Type"])
 @app.middleware("http")
 async def privacy_headers(request, call_next):
