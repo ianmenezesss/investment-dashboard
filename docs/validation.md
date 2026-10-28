@@ -1,5 +1,23 @@
 # Validação do Investment Dashboard
 
+## Fase 2.0.4 — interface privada de renda fixa
+
+- **117 testes frontend aprovados**, incluindo 21 novos: contratos CDI/prefixado, aplicação,
+  resgate parcial/total, principal/caixa, oito casas, paginação, estimativas/null, loading,
+  erros/retry, 401/403, troca de identidade, envio duplicado, Escape/foco e botão contextual.
+- App integrado confirma formulário CDB em Renda fixa e formulário de ações em Ações;
+  rota forçada de CDB na demo não faz HTTP privado nem inicializa sessão Supabase.
+- **242 testes backend e 1 integração PostgreSQL aprovados**, sem alterações no backend,
+  sem API SGS/brapi real, usando banco descartável com tmpfs e credencial temporária.
+- **Builds público e privado aprovados**, com TypeScript, sem chaves reais. Aviso conhecido
+  de bundle >500 kB permanece, assim como depreciação TestClient/httpx no backend.
+- Chrome headless com fixtures locais: desktop 1440×1000 e móvel 390×844; documento móvel
+  390 px, tabela 650 px em região 340 px e modal ~366,6 px, sem overflow da página.
+- Cliente HTTP/QueryClient/Auth existentes reutilizados; nenhum storage financeiro privado,
+  nenhuma migration/dependência/configuração remota nova. UI usa somente APIs existentes.
+- Sem deploy/commit/push. Homologação autenticada real dos deploys continua pendente.
+  Ver [contratos, limitações e roteiro](phase-2.0.4-fixed-income-ui.md).
+
 ## Fase 2.0.3 — estimativas de rentabilidade CDB/CDI
 
 - Base inspecionada: commit 1baf46743211c6ee3b4026b2d7932d65b12c8b4b (2.0.2).

@@ -16,6 +16,7 @@ import { LoginPanel } from './LoginPanel'
 import App from '../App'
 import { ApiError, request } from '../api'
 import { marketSnapshot } from '../test-fixtures/market'
+import { fixedIncomeFixture } from '../test-fixtures/fixed-income'
 
 const session = { access_token: 'test-access-a', refresh_token: 'test-refresh-a', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: '11111111-1111-4111-8111-111111111111', email: 'investor@example.test' } } as Session
 let host: HTMLDivElement
@@ -413,5 +414,37 @@ test('rejeição 401 do FastAPI encerra a sessão e esconde a carteira', async (
   expect(host.querySelector('form[aria-label="Login da carteira"]')).not.toBeNull()
   expect(mock.auth.signOut).toHaveBeenCalled()
   expect(client.getQueryData(['summary', session.user.id])).toBeUndefined()
+  client.clear()
+})
+
+test('Nova operação em Renda fixa usa o fluxo CDB e Ações mantém seu formulário', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  const fixture = fixedIncomeFixture()
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => new Response(JSON.stringify(path.includes('dashboard/valuation') ? marketSnapshot() : path.includes('fixed-income/investments?') ? [fixture.detail] : []), { status: 200 })))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/cdbs']}><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 40)) })
+  const fixedLink = host.querySelector('a[href="/cdbs"]')!
+  expect(fixedLink.textContent).not.toContain('Em breve')
+  await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent?.includes('Nova operação'))!.click())
+  expect(document.querySelector('[role="dialog"]')!.textContent).toContain('Nova operação de renda fixa')
+  expect(document.querySelector('[name="ticker"]')).toBeNull()
+  await act(async () => document.querySelector<HTMLButtonElement>('[aria-label="Fechar formulário de renda fixa"]')!.click())
+  await act(async () => host.querySelector('a[href="/acoes"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })))
+  await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent?.includes('Nova operação'))!.click())
+  expect(document.querySelector('[name="ticker"]')).not.toBeNull()
+  expect(document.querySelector('[role="dialog"]')!.textContent).toContain('compra ou venda de ações')
+  client.clear()
+})
+
+test('URL de renda fixa na demo não cria módulo fictício nem faz chamadas privadas ou Supabase', async () => {
+  const fetchMock = vi.fn(() => { throw new Error('Demo must stay offline') })
+  vi.stubGlobal('fetch', fetchMock)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/demo/cdbs']}><App/></MemoryRouter></QueryClientProvider>))
+  expect(host.textContent).toContain('A demonstração permanece offline')
+  expect(host.querySelector('[aria-label="Carteira de renda fixa"]')).toBeNull()
+  expect(fetchMock).not.toHaveBeenCalled()
+  expect(mock.auth.getSession).not.toHaveBeenCalled()
   client.clear()
 })

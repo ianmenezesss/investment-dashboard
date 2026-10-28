@@ -1,0 +1,229 @@
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
+import { beforeEach, afterEach, expect, test, vi } from 'vitest'
+import Decimal from 'decimal.js'
+vi.mock('../runtime', () => ({ PUBLIC_DEMO: false, SUPABASE_AUTH: true, apiBase: () => '' }))
+import { FixedIncomePage } from './FixedIncomePage'
+import { PrivateRepository } from '../repositories/PrivateRepository'
+import { fixedIncomeFixture } from '../test-fixtures/fixed-income'
+import { totalApplications } from './format'
+
+let host: HTMLDivElement, root: Root, queryClient: QueryClient
+let fixture: ReturnType<typeof fixedIncomeFixture>
+let listError: number, detailError: number, historyError: number, postError: number, returnError: number
+let fetchMock: ReturnType<typeof vi.fn>
+const authError = vi.fn()
+const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } })
+async function pause() { await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) }) }
+beforeEach(() => {
+  fixture = fixedIncomeFixture(); listError = detailError = historyError = postError = returnError = 0; authError.mockClear()
+  host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  fetchMock = vi.fn(async (path: string, init: RequestInit) => {
+    expect((init.headers as Record<string, string>).Authorization).toMatch(/^Bearer token-/)
+    expect(init.credentials).toBe('omit'); expect(init.cache).toBe('no-store')
+    const url = new URL(path, 'https://test.invalid')
+    if (init.method === 'POST') {
+      if (postError) return json({ detail: 'Operação rejeitada: confira saldo e datas' }, postError)
+      const input = JSON.parse(String(init.body))
+      if (url.pathname.endsWith('/investments')) { fixture.detail = { ...fixture.detail, ...input, id: 2, principal_balance: '0', lots: [] }; fixture.movements = []; return json(fixture.detail, 201) }
+      const kind = url.pathname.endsWith('/applications') ? 'APPLICATION' : 'REDEMPTION'
+      const row = { ...fixture.movements[0], ...input, id: fixture.movements.length + 1, investment_id: fixture.detail.id, lot_id: input.lot_id ?? 2, kind, cash_received: input.cash_received ?? null }
+      fixture.movements.push(row)
+      if (kind === 'APPLICATION') fixture.detail.lots.push({ id: row.lot_id, application_date: row.date, principal_balance: row.principal_amount })
+      else { const lot = fixture.detail.lots.find(item => item.id === row.lot_id)!; lot.principal_balance = new Decimal(lot.principal_balance).minus(row.principal_amount).toFixed() }
+      fixture.detail.principal_balance = new Decimal(fixture.detail.principal_balance)[kind === 'APPLICATION' ? 'plus' : 'minus'](row.principal_amount).toFixed()
+      return json(row, 201)
+    }
+    if (url.pathname.endsWith('/returns')) return returnError ? json({ detail: 'Falha de consulta' }, returnError) : json(fixture.returns)
+    if (url.pathname.endsWith('/movements')) return historyError ? json({ detail: 'Histórico indisponível' }, historyError) : json(fixture.movements.slice(Number(url.searchParams.get('offset')), Number(url.searchParams.get('offset')) + 100))
+    if (url.pathname.endsWith('/investments')) return listError ? json({ detail: 'Lista indisponível' }, listError) : json([fixture.detail])
+    return detailError ? json({ detail: 'Posição indisponível' }, detailError) : json(fixture.detail)
+  })
+  vi.stubGlobal('fetch', fetchMock)
+})
+afterEach(async () => { await act(async () => root.unmount()); queryClient.clear(); host.remove(); vi.unstubAllGlobals() })
+async function render(selected = true, counter = 0, identity = 'owner-a') {
+  await act(async () => root.render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[selected ? '/cdbs?investment=1' : '/cdbs']}><FixedIncomePage key={identity} repository={new PrivateRepository('token-' + identity)} identity={identity} newOperationRequest={counter} onAuthError={authError}/></MemoryRouter></QueryClientProvider>))
+  await pause()
+}
+async function click(text: string) {
+  const button = [...document.querySelectorAll('button')].find(button => button.textContent?.trim() === text)
+  expect(button, text).toBeTruthy()
+  await act(async () => button!.click()); await pause()
+}
+async function field(name: string, value: string) {
+  const input = document.querySelector(`[role="dialog"] [name="${name}"]`) as HTMLInputElement | HTMLSelectElement
+  expect(input, name).toBeTruthy()
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(input instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+    input.dispatchEvent(new Event(input instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
+  })
+}
+async function submitDialog() { await act(async () => document.querySelector('[role="dialog"] form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))); await pause() }
+const posts = () => fetchMock.mock.calls.filter(([, init]) => init.method === 'POST')
+
+test('lista contratos e detalhe real, preserva principal e histórico sem consulta automática de rendimento', async () => {
+  await render()
+  expect(host.textContent).toContain('Banco fictício'); expect(host.textContent).toContain('100% do CDI')
+  expect(host.textContent).toContain('Principal aplicado acumulado'); expect(host.textContent).toContain('R$ 1.000,00')
+  expect(host.querySelector('table button')!.textContent).toBe('Ver lotes e histórico')
+  expect(fetchMock.mock.calls.some(([path]) => path.includes('/returns'))).toBe(false)
+  expect(fetchMock.mock.calls.every(([path]) => path.startsWith('/api/fixed-income/'))).toBe(true)
+  expect(host.textContent).toContain('Caixa de resgate não é rendimento')
+})
+
+test('cadastra CDI pelos campos reais, não cria aplicação implícita e confirma sucesso', async () => {
+  await render(false); await click('Cadastrar CDB')
+  for (const [name, value] of Object.entries({ issuer: 'Banco exemplo', product_name: 'Novo CDB', contracted_rate: '110.12345678', application_date: '2025-01-02', maturity_date: '2027-01-02' })) await field(name, value)
+  await submitDialog()
+  expect(JSON.parse(posts()[0][1].body)).toEqual({ issuer: 'Banco exemplo', product_name: 'Novo CDB', product_type: 'CDB', remuneration: 'CDI', indexer: 'CDI', contracted_rate: '110.12345678', application_date: '2025-01-02', maturity_date: '2027-01-02' })
+  expect(posts()).toHaveLength(1); expect(host.textContent).toContain('CDB cadastrado')
+  expect(host.textContent).toContain('Nenhuma aplicação registrada')
+})
+
+test('cadastro prefixado usa indexador NONE sem sugerir motor CDI', async () => {
+  await render(false); await click('Cadastrar CDB'); await field('remuneration', 'FIXED')
+  for (const [name, value] of Object.entries({ issuer: 'Banco exemplo', product_name: 'Prefixado', contracted_rate: '12.5', application_date: '2025-01-02', maturity_date: '2027-01-02' })) await field(name, value)
+  await submitDialog()
+  expect(JSON.parse(posts()[0][1].body).indexer).toBe('NONE')
+  expect(host.textContent).toContain('não há cálculo prefixado disponível')
+})
+
+test('nova aplicação cria lote e atualiza posição e histórico após resposta da API', async () => {
+  await render(); await click('Nova aplicação'); await field('date', '2025-01-03'); await field('principal_amount', '200.12345678'); await submitDialog()
+  expect(posts()[0][0]).toBe('/api/fixed-income/investments/1/applications')
+  expect(JSON.parse(posts()[0][1].body)).toEqual({ date: '2025-01-03', principal_amount: '200.12345678' })
+  expect(host.textContent).toContain('Aplicação registrada em um novo lote')
+  expect(host.textContent).toContain('R$ 1.200,12')
+})
+
+test('resgate parcial separa caixa e principal, e total usa o saldo exato do lote', async () => {
+  await render(); await click('Resgatar principal'); await field('date', '2025-01-03'); await field('principal_amount', '400'); await field('cash_received', '420'); await submitDialog()
+  expect(JSON.parse(posts()[0][1].body)).toEqual({ date: '2025-01-03', principal_amount: '400', lot_id: 1, cash_received: '420' })
+  expect(host.textContent).toContain('R$ 600,00'); expect(host.textContent).toContain('R$ 420,00')
+  await click('Resgatar principal'); await click('Resgatar todo o principal do lote'); await submitDialog()
+  expect(JSON.parse(posts()[1][1].body).principal_amount).toBe('600')
+  expect(JSON.parse(posts()[1][1].body).cash_received).toBeNull()
+  expect(host.textContent).toContain('Encerrado · histórico preservado')
+})
+
+test('venda superior ao principal é bloqueada por Decimal sem POST', async () => {
+  await render(); await click('Resgatar principal'); await field('principal_amount', '1000.00000001'); await submitDialog()
+  expect(document.querySelector('[role="dialog"] [role="alert"]')!.textContent).toContain('supera o saldo')
+  expect(posts()).toHaveLength(0)
+})
+
+test('erros do backend não simulam persistência nem reenviam movimento', async () => {
+  await render(); postError = 422; await click('Nova aplicação'); await field('principal_amount', '20'); await submitDialog()
+  expect(document.querySelector('[role="dialog"] [role="alert"]')!.textContent).toContain('Operação rejeitada')
+  expect(posts()).toHaveLength(1); expect(fixture.movements).toHaveLength(1)
+})
+
+test('loading e retry da listagem são explícitos', async () => {
+  let resolve!: (response: Response) => void
+  fetchMock.mockImplementationOnce(() => new Promise<Response>(r => { resolve = r }))
+  await render(false)
+  expect(host.textContent).toContain('Carregando CDBs')
+  await act(async () => resolve(json({ detail: 'Falha temporária' }, 503))); await pause()
+  expect(host.querySelector('[role="alert"]')).not.toBeNull()
+  await click('Tentar listar novamente'); expect(host.textContent).toContain('CDB de teste')
+})
+
+test('carteira vazia oferece cadastro sem saldo fictício', async () => {
+  fetchMock.mockImplementation(async () => json([])); await render(false)
+  expect(host.textContent).toContain('Seu primeiro CDB começa aqui')
+  expect(host.textContent).not.toContain('R$ 0,00')
+})
+
+test('histórico incompleto não vira principal aplicado total', async () => {
+  fixture.movements = Array.from({ length: 101 }, (_, index) => ({ ...fixture.movements[0], id: index + 1 }))
+  await render()
+  const card = [...host.querySelectorAll('.fi-metrics article')].find(card => card.textContent!.includes('Principal aplicado acumulado'))!
+  expect(card.textContent).toContain('Indisponível')
+  await click('Carregar mais movimentações')
+  expect(card.textContent).toContain('R$ 101.000,00')
+})
+
+async function consult() {
+  const form = host.querySelector('.fi-premises')!
+  await act(async () => {
+    const input = form.querySelector<HTMLInputElement>('[name="as_of"]')!
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '2025-01-04')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => { for (const input of form.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) input.click() })
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))); await pause()
+}
+
+test('consulta estimativa com premissas explícitas e apresenta valores do snapshot sem recalcular', async () => {
+  await render(); await consult()
+  const call = fetchMock.mock.calls.find(([path]) => path.includes('/returns'))![0]
+  expect(call).toContain('convention=daily_cdi_pro_rata_decimal_v1'); expect(call).toContain('calendar=anbima_2024_2026_v1'); expect(call).toContain('tax_profile=br_resident_individual')
+  expect(host.textContent).toContain('R$ 20,10'); expect(host.textContent).toContain('R$ 18,69'); expect(host.textContent).toContain('R$ 0,32'); expect(host.textContent).toContain('R$ 1.001,09')
+  expect(host.textContent).toContain('04/01/2025'); expect(host.textContent).toContain('BCB/SGS 12')
+})
+
+test('estimativa incompleta mantém null e explicita rendimentos realizados não apurados', async () => {
+  fixture.returns.status = 'incomplete'
+  for (const field of ['gross_income_estimate', 'gross_value_estimate', 'iof_estimate', 'ir_estimate', 'net_income_estimate', 'net_value_estimate'] as const) { fixture.returns[field] = null; fixture.returns.lots[0][field] = null }
+  fixture.returns.lots[0].status = 'incomplete_history'; fixture.returns.lots[0].missing_rate_dates = ['2025-01-03']; fixture.returns.lots[0].realized_tax_status = 'insufficient_information'
+  await render(); await consult()
+  expect(host.textContent).toContain('Histórico CDI incompleto'); expect(host.textContent).toContain('Resultados realizados, IR e IOF de resgates: informação insuficiente')
+  expect(host.querySelector('[aria-label="Estimativa de rentabilidade"]')!.textContent!.match(/Indisponível/g)!.length).toBeGreaterThanOrEqual(6)
+})
+
+test('falha na estimativa permite retry sem fabricar resultados', async () => {
+  returnError = 503; await render(); await consult()
+  expect(host.textContent).toContain('Falha de consulta'); expect(host.textContent).not.toContain('R$ 1.001,09')
+  returnError = 0; await click('Tentar novamente'); expect(host.textContent).toContain('R$ 1.001,09')
+})
+
+test('401/403 não mostram dados financeiros em cache e notificam o guard existente', async () => {
+  for (const status of [401, 403]) {
+    listError = status; await render(false)
+    expect(authError).toHaveBeenLastCalledWith(expect.objectContaining({ status }))
+    expect(host.querySelector('table')).toBeNull()
+    listError = 0; queryClient.clear()
+  }
+})
+
+test('troca de identidade não compartilha estado financeiro entre contas', async () => {
+  await render(); expect(host.textContent).toContain('Banco fictício')
+  fetchMock.mockImplementation(async (path: string) => path.includes('/investments?') ? json([]) : json({ detail: 'Não encontrado' }, 404)); await render(false, 0, 'owner-b')
+  expect(host.textContent).not.toContain('Banco fictício')
+  expect(host.textContent).toContain('Seu primeiro CDB começa aqui')
+})
+
+test('Nova operação externa abre somente formulário de renda fixa', async () => {
+  await render(); await render(true, 1)
+  expect(document.querySelector('[role="dialog"]')!.textContent).toContain('Nova operação de renda fixa')
+  expect(document.querySelector('input[name="ticker"]')).toBeNull()
+})
+
+test('soma de principal preserva oito casas sem interferir no Decimal da demo', () => {
+  expect(totalApplications([{ ...fixture.movements[0], principal_amount: '999999999999.12345678' }, { ...fixture.movements[0], principal_amount: '0.00000001' }])).toBe('999999999999.12345679')
+})
+
+test('fechar formulário por Escape preserva ledger e devolve foco', async () => {
+  await render()
+  const origin = [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Nova aplicação')!
+  await act(async () => origin.focus()); await click('Nova aplicação')
+  await act(async () => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  await pause() // Radix restores focus after unmounting the focus scope.
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+  expect(document.activeElement).toBe(origin); expect(posts()).toHaveLength(0)
+})
+
+test('envio pendente bloqueia duplicação de movimento e mantém feedback de carregamento', async () => {
+  await render(); await click('Nova aplicação'); await field('principal_amount', '20')
+  let resolve!: (response: Response) => void
+  fetchMock.mockImplementationOnce(() => new Promise<Response>(r => { resolve = r }))
+  await submitDialog()
+  expect(document.querySelector('[role="dialog"]')!.textContent).toContain('Registrando…')
+  await submitDialog(); expect(posts()).toHaveLength(1)
+  await act(async () => resolve(json({ ...fixture.movements[0], id: 2 }, 201))); await pause()
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+})
