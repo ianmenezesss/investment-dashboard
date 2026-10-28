@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from contextlib import asynccontextmanager
 import httpx
 from decimal import Decimal
@@ -17,6 +17,7 @@ from .auth import authenticate
 from .access import private_db
 from .market_data.brapi import BrapiProvider
 from .market_data.service import QuoteService
+from .valuation import PortfolioValuation, value_portfolio
 
 
 @asynccontextmanager
@@ -94,6 +95,20 @@ def quote_service(request: Request):
 @app.get("/api/quotes")
 async def quotes(tickers: list[str] = Depends(held_tickers), service: QuoteService = Depends(quote_service)):
     return {"quotes": await service.get_many(tickers)}
+
+
+def portfolio_snapshot(db: Session = Depends(private_db)):
+    summary = summarize(records(db))
+    captured_at = datetime.now(timezone.utc)
+    db.rollback()  # Release the read transaction before external HTTP; no ledger writes.
+    return summary, captured_at
+
+
+@app.get("/api/dashboard/valuation", response_model=PortfolioValuation)
+async def portfolio_valuation(snapshot=Depends(portfolio_snapshot), service: QuoteService = Depends(quote_service)):
+    summary, captured_at = snapshot
+    quotes = await service.get_many([h["ticker"] for h in summary["holdings"]])
+    return value_portfolio(summary, quotes, ledger_as_of=captured_at)
 
 
 def serialize(op):

@@ -1,5 +1,15 @@
 # Validação do Investment Dashboard
 
+## Fase 1.9.3 — avaliação de posições abertas
+
+- 96 testes backend aprovados (23 novos), sem brapi real; PostgreSQL opcional excluído.
+- 78 testes frontend aprovados, preservando sessão e demo. Nenhum código frontend alterado.
+- GET /api/dashboard/valuation usa snapshot privado, QuoteService existente e Decimal;
+  mantém resultado realizado e retorna totais null quando a cobertura de preços é incompleta.
+- Sem mudanças em auth, RLS, migrations, banco, dependências ou fases 1.9.1/1.9.2/1.8.4.
+- Ver [fórmulas e contrato da Fase 1.9.3](phase-1.9.3-portfolio-valuation.md).
+- Nenhum deploy, push, tag ou consumo da API real. Homologação remota permanece pendente.
+
 ## Fase 1.9.2 — infraestrutura de cotações gratuitas
 
 - 73 testes backend aprovados, com HTTPX MockTransport/SQLite em memória; PostgreSQL opcional
