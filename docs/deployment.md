@@ -35,7 +35,7 @@ Esses comandos não foram executados automaticamente. Ative secret scanning e pu
 - Root Directory: `frontend`.
 - Framework: Vite; instalação: `npm ci`; build: `npm run build`; saída: `dist`.
 - Variáveis: `VITE_PUBLIC_DEMO=true` para clareza operacional. Nenhum token, senha, URL privada ou chave Supabase é necessário.
-- `frontend/vercel.json` inclui rewrite para React Router e headers de segurança. A CSP permite scripts próprios e estilos inline usados pelos gráficos, mas bloqueia conexões de rede.
+- `frontend/vercel.ts` seleciona a configuração por projeto. O modelo `frontend/vercel.public.json` preserva o rewrite React Router e os headers públicos, incluindo CSP sem conexões de rede. Veja [publicação privada](private-frontend-production.md).
 - O código usa demonstração por padrão em produção. Desde a Fase 1.6, um projeto privado separado pode habilitar explicitamente `VITE_APP_MODE=private` e configurar Supabase; `VITE_PUBLIC_DEMO=true` continua forçando demonstração. A CSP privada deve ser revisada pelo modelo separado, sem alterar a configuração pública.
 - Preview deployments também devem usar apenas demonstração. Não cadastrar segredos em variáveis `VITE_*`: são incorporadas ao JavaScript público.
 
@@ -95,7 +95,7 @@ O proxy do provedor deve terminar TLS; não expor HTTP direto publicamente. A AP
 
 ## Condições para ativação futura
 
-Homologar o login por e-mail/senha implementado na Fase 1.6, testar o fluxo real de JWKS e rotação de chaves, validar SSL e rede entre Render/Supabase, verificar inscrições bloqueadas, testar dois usuários e negações, preparar backup/restauração, revisar limites de requisição e confirmar as configurações de logs. O modelo `frontend/vercel.private.example.json` precisa de origens reais explícitas antes de ser adotado em um projeto privado separado.
+Homologar o login por e-mail/senha implementado na Fase 1.6, testar o fluxo real de JWKS e rotação de chaves, validar SSL e rede entre Render/Supabase, verificar inscrições bloqueadas, testar dois usuários e negações, preparar backup/restauração, revisar limites de requisição e confirmar as configurações de logs. O seletor `frontend/vercel.ts` preenche as origens do modelo privado a partir das variáveis do projeto, conforme [publicação privada](private-frontend-production.md).
 
 A Fase 2 deve começar com regressão da persistência local, concluir o fluxo privado de autenticação em homologação e só então evoluir ações/cotações/proventos. Não acrescentar CDBs antes de validar essa fronteira de segurança.
 

@@ -7,6 +7,7 @@ dist/
 !**/.env.production.example
 !**/.env.public.example
 !**/.env.supabase.example
+!frontend/.env.private.example
 venv/
 env/
 .python-version

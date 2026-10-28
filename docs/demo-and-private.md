@@ -13,7 +13,7 @@ Atualização 1.6.3: confirmações de restauração/exclusão usam modal acess�
 | Banco | Nenhum | Registros `owner_id IS NULL` | Registros com UUID do usuário |
 | Exportação | Apenas carteira demonstrativa do navegador | Registros do usuário local | Registros do usuário autenticado |
 
-Desde a Fase 1.6, o frontend privado possui login Supabase. Produção permanece demonstrativa por padrão; somente `VITE_APP_MODE=private` habilita explicitamente a interface privada. `VITE_PUBLIC_DEMO=true` sempre prevalece, sem criar cliente Supabase. O arquivo `vercel.json` continua exclusivo da demonstração, com CSP `connect-src 'none'`. O modelo privado é separado. Veja [configuração de Auth](supabase-auth.md).
+Desde a Fase 1.6, o frontend privado possui login Supabase. Produção permanece demonstrativa por padrão; somente `VITE_APP_MODE=private` habilita explicitamente a interface privada. `VITE_PUBLIC_DEMO=true` sempre prevalece, sem criar cliente Supabase. O seletor `vercel.ts` usa `vercel.public.json` na demonstração, com CSP `connect-src 'none'`, ou gera a CSP privada com origens explícitas. Veja [publicação privada](private-frontend-production.md) e [configuração de Auth](supabase-auth.md).
 
 O modo local via `npm run dev` continua oferecendo token e demonstração com `VITE_AUTH_MODE=local`. O modo `supabase` usa login e sessão em sessionStorage por aba. A mudança de modo cancela requisições, descarta o cache e encerra a sessão Supabase ao entrar na demonstração. As chaves das consultas contêm identidade do usuário, nunca tokens. Nenhuma sessão privada é salva em localStorage ou cookies.
 

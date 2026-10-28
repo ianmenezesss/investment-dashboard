@@ -88,7 +88,7 @@ No `.env` da raiz, use `ENVIRONMENT=development` e `AUTH_MODE=local`; preserve s
 
 O build de produção continua **demonstrativo por padrão**. `VITE_PUBLIC_DEMO=true` força demonstração em qualquer ambiente, sem instanciar cliente Supabase nem chamar API privada.
 
-Para um build privado futuro, é obrigatório configurar `VITE_APP_MODE=private`, `VITE_AUTH_MODE=supabase`, `VITE_PUBLIC_DEMO=false` e as URLs/chave públicas. Ainda não foi executado deploy. O `vercel.json` atual permanece restrito à demonstração e bloqueia rede por CSP. O modelo `vercel.private.example.json` mostra a configuração privada: revise e substitua **somente** as duas origens de `connect-src` pelos domínios reais antes de adotá-lo em um projeto privado separado. Não afrouxe a CSP da demonstração pública.
+Para o build privado, configurar `VITE_APP_MODE=private`, `VITE_AUTH_MODE=supabase`, `VITE_PUBLIC_DEMO=false` e as URLs/chave públicas. O seletor `vercel.ts` mantém o modelo público `vercel.public.json` como padrão e preenche as duas origens HTTPS da CSP privada pelas variáveis do projeto. Não alterar os marcadores do modelo manualmente. Veja a [configuração exata do segundo projeto Vercel](private-frontend-production.md). Não foi executado deploy nesta preparação.
 
 Antes de expor a API, mantenha os requisitos da Fase 1.5: papel restrito, TLS verificável, RLS, CORS HTTPS exato, backup, duração de sessão adequada e revisão de logs. O token local nunca é aceito como mecanismo de produção.
 
