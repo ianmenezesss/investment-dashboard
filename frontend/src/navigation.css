@@ -1,0 +1,29 @@
+.sidebar-collapse-toggle{position:absolute;top:78px;right:14px;display:grid;place-items:center;width:28px;height:28px;border:1px solid #2a353f;border-radius:7px;background:#111b23;color:#9aacae}
+.sidebar-collapse-toggle:hover,.mobile-menu-trigger:hover,.mobile-nav-close:hover{background:#1b302d;color:#8aebc2}
+.sidebar-is-collapsed .sidebar{width:76px;padding-inline:13px}
+.sidebar-is-collapsed main{width:calc(100% - 76px);margin-left:76px}
+.sidebar-collapsed .brand{justify-content:center;gap:0}
+.sidebar-collapsed .brand-word,.sidebar-collapsed .brand-dot,.sidebar-collapsed .nav-caption,.sidebar-collapsed .workspace>div:not(.avatar),.sidebar-collapsed .workspace>svg,.sidebar-collapsed .sidebar-bottom,.sidebar-collapsed .profile-copy,.sidebar-collapsed .profile .status-dot,.sidebar-collapsed .nav-label,.sidebar-collapsed .nav-planned{display:none}
+.sidebar-collapsed .workspace{justify-content:center;margin:55px 0 25px;padding:10px 0}
+.sidebar-collapsed nav a{justify-content:center;padding:12px 8px}
+.sidebar-collapsed .profile{justify-content:center}
+.profile-copy{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mobile-menu-trigger{display:none;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid #2d3a43;border-radius:8px;background:#111b23;color:#a8bbb8}
+.mobile-nav-overlay{position:fixed;inset:0;z-index:50;background:#020608bd;backdrop-filter:blur(3px)}
+.mobile-nav-content{position:fixed;z-index:51;inset:0 auto 0 0;width:min(310px,88vw);max-height:100dvh;overflow-y:auto;padding:18px;background:#10171e;border-right:1px solid #2a353f;box-shadow:16px 0 50px #0008;outline:none}
+.mobile-nav-close{position:absolute;z-index:1;top:17px;right:15px;display:grid;place-items:center;width:34px;height:34px;border:1px solid #2a353f;border-radius:8px;background:#121d25;color:#b5c2c3}
+.mobile-nav-content .sidebar{position:relative;inset:auto;width:100%;min-height:calc(100dvh - 36px);height:auto;padding:5px 1px 12px;border:0;background:transparent}
+.mobile-nav-content .brand{padding-right:38px}
+.mobile-nav-content .workspace{display:flex;margin:34px 0 27px}
+.mobile-nav-content .nav-caption{display:block}
+.mobile-nav-content nav{display:flex;flex-direction:column;overflow:visible;margin-top:0;gap:7px}
+.mobile-nav-content nav a{justify-content:flex-start;white-space:normal;padding:12px;font-size:13px;gap:13px}
+.mobile-nav-content nav svg{width:19px}
+.mobile-nav-content .nav-label{display:inline}
+.mobile-nav-content .nav-planned{display:inline-flex}
+.mobile-nav-content .sidebar-bottom{display:block;margin-top:auto}
+.mobile-nav-content .profile{display:flex}
+.mobile-nav-content .profile-copy{display:block}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:1200px) and (min-width:801px){.sidebar-is-collapsed .sidebar{width:72px;padding-inline:11px}.sidebar-is-collapsed main{width:calc(100% - 72px);margin-left:72px}}
+@media(max-width:800px){.sidebar{display:none}.shell.sidebar-is-collapsed main{width:100%;margin-left:0}.mobile-menu-trigger{display:inline-flex;flex:none}main header{padding-left:50px}.mobile-nav-content .sidebar{display:flex}}
