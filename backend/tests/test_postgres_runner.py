@@ -4,6 +4,9 @@ import subprocess
 
 from run_postgres import (container_run_args, network_create_args, parse_loopback_port,
                           run_restore_role_setup, wait_for_postgres)
+from restore_supabase_backup import (docker_run_args, expected_tables_for_revision,
+                                     parse_archive_index, postgres_restore_args, safe_output,
+                                     validate_archive_schema)
 
 
 def test_disposable_network_and_both_containers_bind_only_loopback():
@@ -72,3 +75,84 @@ def test_restore_readiness_uses_tcp_and_waits_until_pg_is_ready(monkeypatch):
     assert len(calls) == 2
     assert calls[0][calls[0].index("-h") + 1] == "127.0.0.1"
     assert calls[0][calls[0].index("-p") + 1] == "5432"
+
+
+def test_real_dump_restore_uses_disposable_isolated_container_and_read_only_backup():
+    run = docker_run_args("restore-fixture", "db_fixture", "secret-fixture", r"E:\fixture.dump", "run-fixture")
+    assert "--network" in run and run[run.index("--network") + 1] == "none"
+    assert run[run.index("--label") + 1] == "com.investment-dashboard.realbackup=run-fixture"
+    assert run[-1] == "postgres:17-alpine"
+    assert "--tmpfs" in run
+    assert "--mount" in run
+    mount = run[run.index("--mount") + 1]
+    assert "source=E:\\fixture.dump" in mount and "readonly" in mount
+    assert '"' not in mount and "'" not in mount
+    assert "--volume" not in run and "-v" not in run
+    assert not any("0.0.0.0" in arg or "--publish" in arg for arg in run)
+
+    restore = postgres_restore_args("restore-fixture", "db_fixture", "secret-fixture")
+    assert restore[restore.index("-e") + 1] == "PGPASSWORD=secret-fixture"
+    assert restore[restore.index("-h") + 1] == "127.0.0.1"
+    assert "--exit-on-error" in restore
+    assert "--schema=public" in restore
+    assert "--no-owner" in restore and "--no-privileges" in restore
+    assert restore[-1] == "/backup/input.dump"
+
+
+def test_restore_diagnostics_redact_credentials_and_possible_financial_details():
+    diagnostic = safe_output(
+        'ERROR: restore failed\nDETAIL: Key (amount)=12345.67\n'
+        'password=secret token=abc Authorization: Bearer fictional-token '
+        'postgres://user:pass@localhost/db', "other-secret"
+    )
+    assert "ERROR: restore failed" in diagnostic
+    assert "12345.67" not in diagnostic
+    assert "pass@localhost" not in diagnostic
+    assert "password=[REDACTED]" in diagnostic
+    assert "token=[REDACTED]" in diagnostic
+    assert "fictional-token" not in diagnostic
+
+
+def test_archive_index_and_expected_schema_follow_stored_alembic_revision():
+    toc = "\n".join((
+        "; 10; 0 100 TABLE public operations postgres",
+        "; 11; 0 100 TABLE DATA public operations postgres",
+        "; 12; 0 200 TABLE public fixed_income_investments postgres",
+        "; 13; 0 200 TABLE DATA public fixed_income_investments postgres",
+        "; 14; 0 300 TABLE public fixed_income_lots postgres",
+        "; 15; 0 400 TABLE public fixed_income_movements postgres",
+        "; 16; 0 500 TABLE public alembic_version postgres",
+        "; 17; 0 501 TABLE public auth_users postgres",
+    ))
+    tables, table_data = parse_archive_index(toc)
+    assert tables == {"operations", "fixed_income_investments", "fixed_income_lots", "fixed_income_movements", "alembic_version"}
+    assert table_data == {"operations", "fixed_income_investments"}
+    assert expected_tables_for_revision("003") == tables - {"alembic_version"}
+    assert "fixed_income_observations" not in expected_tables_for_revision("003")
+    assert "fixed_income_observations" in expected_tables_for_revision("004")
+    assert validate_archive_schema("003", tables, tables) == tables - {"alembic_version"}
+    with pytest.raises(RuntimeError, match="Alembic 004.*fixed_income_observations"):
+        validate_archive_schema("004", tables, tables)
+    incomplete = tables - {"fixed_income_movements"}
+    with pytest.raises(RuntimeError, match="Restore incompleto.*fixed_income_movements"):
+        validate_archive_schema("003", tables, incomplete)
+
+
+def test_archive_index_parses_exact_real_backup_toc_lines():
+    toc = """376; 1259 17674 TABLE public alembic_version postgres
+380; 1259 17771 TABLE public fixed_income_investments postgres
+382; 1259 17783 TABLE public fixed_income_lots postgres
+384; 1259 17797 TABLE public fixed_income_movements postgres
+378; 1259 17680 TABLE public operations postgres
+4392; 0 17674 TABLE DATA public alembic_version postgres
+4396; 0 17771 TABLE DATA public fixed_income_investments postgres
+4398; 0 17783 TABLE DATA public fixed_income_lots postgres
+4400; 0 17797 TABLE DATA public fixed_income_movements postgres
+4394; 0 17680 TABLE DATA public operations postgres"""
+    tables, table_data = parse_archive_index(toc)
+    expected = {
+        "alembic_version", "fixed_income_investments", "fixed_income_lots",
+        "fixed_income_movements", "operations",
+    }
+    assert tables == expected
+    assert table_data == expected
