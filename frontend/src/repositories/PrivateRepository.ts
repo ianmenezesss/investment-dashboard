@@ -1,4 +1,4 @@
-import { request, type Operation, type PortfolioValuation } from '../api'
+import { request, type CapitalFlows, type FinancialPerformance, type Operation, type PortfolioComposition, type PortfolioValuation } from '../api'
 import type { OperationInput } from '../demo/finance'
 import type { Cdb, CdbInput, CdbDetail, CdbMovement, ApplicationInput, RedemptionInput, ReturnsInput, CdbReturns, CdbApplicationRevision, CdbApplicationRevisionInput, CdbApplicationRevisionPreview } from '../fixed-income/types'
 import type { ObservedPosition, ObservedPositionInput } from '../fixed-income/types'
@@ -10,8 +10,9 @@ export class PrivateRepository {
   constructor(private token: string) {}
   list(signal?: AbortSignal) { return request<Operation[]>('operations', this.token, { signal }) }
   summary(signal?: AbortSignal) { return request<PortfolioValuation>('dashboard/valuation', this.token, { signal }) }
-  capitalFlows(period: string, signal?: AbortSignal) { return request<import('../portfolio/PortfolioInsights').CapitalFlows>(`dashboard/capital-flows?period=${period}`, this.token, { signal }) }
-  composition(signal?: AbortSignal) { return request<import('../portfolio/PortfolioInsights').Composition>('dashboard/composition', this.token, { signal }) }
+  performance(signal?: AbortSignal) { return request<FinancialPerformance>('dashboard/performance', this.token, { signal }) }
+  capitalFlows(period: string, signal?: AbortSignal) { return request<CapitalFlows>(`dashboard/capital-flows?period=${period}`, this.token, { signal }) }
+  composition(signal?: AbortSignal) { return request<PortfolioComposition>('dashboard/composition', this.token, { signal }) }
   movements(signal?: AbortSignal) { return request<UnifiedMovement[]>('dashboard/movements', this.token, { signal }) }
   equityHistory(period: string, signal?: AbortSignal) { return request<import('../api').EquityHistory>(`dashboard/equity-history?period=${period}`, this.token, { signal }) }
   equityPriceHistory(ticker: string, period: import('../api').IndividualEquityPriceHistory['period'], signal?: AbortSignal) {

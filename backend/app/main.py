@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select, text
+from sqlalchemy import exists, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from .database import ensure_production_role, get_db, settings
@@ -29,6 +29,8 @@ from .fixed_income.returns_router import router as fixed_income_returns_router
 from .fixed_income.observation_routes import router as observation_router
 from .fixed_income.history import router as observed_history_router
 from .portfolio import router as portfolio_router
+from .portfolio import aggregate_capital_flows, aggregate_composition, local_today
+from .performance import FinancialPerformance, build_financial_performance
 from .equity_history import router as equity_history_router
 from .individual_equity_history import EquityPriceHistoryService, router as individual_equity_history_router
 from .equity_comparison import router as equity_comparison_router
@@ -156,6 +158,44 @@ async def portfolio_valuation(snapshot=Depends(portfolio_snapshot), service: Quo
     summary, captured_at, basis = snapshot
     quotes = await service.get_many([h["ticker"] for h in summary["holdings"]])
     return value_portfolio(summary, quotes, ledger_as_of=captured_at, price_basis=basis)
+
+
+@app.get("/api/dashboard/performance", response_model=FinancialPerformance, dependencies=[Depends(authenticate)])
+async def dashboard_performance(db: Session = Depends(private_db), service: QuoteService = Depends(quote_service)):
+    """Private current snapshot that composes existing ledger and valuation rules."""
+    from .fixed_income.models import Investment, InvestmentArchive, Lot
+    from .fixed_income.observations import PositionObservation
+    from .fixed_income.projection import effective_movements
+
+    today, owner = local_today(), db.info.get("owner_id")
+    operations = list(db.scalars(select(Operation).where(
+        Operation.owner_id == owner, Operation.date <= today
+    ).order_by(Operation.date, Operation.id)))
+    projected = effective_movements(db)
+    movements = list(db.execute(select(projected).where(
+        projected.c.owner_id == owner, projected.c.date <= today
+    ).order_by(projected.c.date, projected.c.id)).mappings())
+    investments = list(db.scalars(select(Investment).where(
+        Investment.owner_id == owner,
+        ~exists(select(InvestmentArchive.id).where(InvestmentArchive.investment_id == Investment.id)),
+    )))
+    lots = list(db.scalars(select(Lot).where(Lot.owner_id == owner)))
+    observations = list(db.scalars(select(PositionObservation).where(
+        PositionObservation.owner_id == owner, PositionObservation.as_of <= today
+    )))
+
+    summary = summarize(operations)
+    basis = purchase_price_basis(operations)
+    ledger_as_of = datetime.now(timezone.utc)
+    flows = aggregate_capital_flows(operations, movements, start=date.min, end=today)
+    composition = aggregate_composition(operations, movements, investments, lots, observations, as_of=today)
+    tickers = [holding["ticker"] for holding in summary["holdings"]]
+    db.rollback()  # Keep the DB snapshot consistent and release it before quote HTTP.
+
+    quotes = await service.get_many(tickers)
+    valuation = value_portfolio(summary, quotes, ledger_as_of=ledger_as_of, price_basis=basis)
+    return build_financial_performance(as_of=today, ledger_as_of=ledger_as_of,
+        flows=flows, valuation=valuation, composition=composition)
 
 
 def serialize(op):

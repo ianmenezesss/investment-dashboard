@@ -59,6 +59,47 @@ export type PortfolioValuation = Omit<Summary, 'market_value' | 'holdings'> & {
     missing_tickers: string[]; quoted_at_min: string | null; quoted_at_max: string | null
   }
 }
+export type CapitalFlowPoint = { date: string; contributions: string; redemptions: string; sales: string; cumulative_contributions?: string; cumulative_withdrawals?: string; net_accumulated: string }
+export type CapitalFlows = {
+  period_start: string; period_end: string; coverage_start: string | null; coverage_end: string | null
+  coverage: 'available' | 'partial' | 'unavailable'; points: CapitalFlowPoint[]
+  gross_contributions: string; equity_purchases?: string; cdb_applications?: string
+  redemptions: string; cdb_redemptions?: string; sales: string; equity_sale_proceeds?: string
+  cumulative_contributions?: string; cumulative_withdrawals?: string; withdrawals: string; net_accumulated: string
+  market_value: null; return: null
+}
+export type CompositionPosition = { asset: string; value: string; basis: string; as_of?: string }
+export type PortfolioComposition = {
+  as_of: string; equities: CompositionPosition[]; fixed_income: CompositionPosition[]; declared_positions: CompositionPosition[]
+  missing_fixed_income: string[]; market_values: null; coverage: 'available' | 'partial'
+  missing_components: string[]; equity_basis: string; fixed_income_basis: string; declared_values_separate: boolean
+  class_totals: { equities_open_cost: string; fixed_income_open_principal: string; declared_positions: string }
+}
+export type FinancialPerformance = {
+  as_of: string; ledger_as_of: string; currency: 'BRL'
+  flows: {
+    coverage_start: string | null; coverage_end: string | null; coverage: 'available' | 'partial' | 'unavailable'
+    equity_purchases_with_fees: string; cdb_applications_principal: string
+    equity_sales_after_fees: string; cdb_principal_redemptions: string
+    recorded_contributions: string; recorded_withdrawals: string; net_recorded_flow: string
+  }
+  capital: {
+    equities_open_cost: string; fixed_income_open_principal: string; open_positions_accounted: string
+    equity_open_share_percent: string | null; fixed_income_open_share_percent: string | null
+    basis: 'equity_open_acquisition_cost_plus_effective_cdb_principal'
+  }
+  equities: PortfolioValuation & {
+    combined_result_before_tax: string | null
+    combined_result_status: 'complete' | 'stale' | 'partial' | 'unavailable' | 'empty'
+    partial_unrealized_result_estimate: string; result_scope: 'realized_plus_open_unrealized_before_tax'
+  }
+  fixed_income: {
+    effective_open_principal: string; declared_positions: CompositionPosition[]; missing_positions: string[]
+    returns_scope: 'per_contract_only'
+  }
+  composition: PortfolioComposition
+  portfolio: { consolidated_market_value_estimate: null; return_percent: null; status: 'not_comparable' | 'insufficient_historical_data' }
+}
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
 }

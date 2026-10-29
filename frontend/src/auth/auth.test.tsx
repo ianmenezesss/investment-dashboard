@@ -149,6 +149,14 @@ function financialResponse(input: string) {
   const path = new URL(input, 'https://test.invalid').pathname
   const payload = path.endsWith('/dashboard/valuation')
     ? { holdings: [], acquisition_cost: '0', total_purchases: '0', realized_profit: '0', market_value: null }
+    : path.endsWith('/dashboard/performance')
+      ? { as_of: '2025-01-01', ledger_as_of: '2025-01-01T00:00:00Z', currency: 'BRL',
+          flows: { coverage_start: null, coverage_end: null, coverage: 'unavailable', equity_purchases_with_fees: '0', cdb_applications_principal: '0', equity_sales_after_fees: '0', cdb_principal_redemptions: '0', recorded_contributions: '0', recorded_withdrawals: '0', net_recorded_flow: '0' },
+          capital: { equities_open_cost: '0', fixed_income_open_principal: '0', open_positions_accounted: '0', equity_open_share_percent: null, fixed_income_open_share_percent: null, basis: 'equity_open_acquisition_cost_plus_effective_cdb_principal' },
+          equities: { combined_result_before_tax: null, combined_result_status: 'empty', valuation: { missing_tickers: [] } },
+          fixed_income: { effective_open_principal: '0', declared_positions: [], missing_positions: [], returns_scope: 'per_contract_only' },
+          composition: { as_of: '2025-01-01', equities: [], fixed_income: [], declared_positions: [], missing_fixed_income: [], market_values: null, coverage: 'available', missing_components: [], equity_basis: 'open_acquisition_cost', fixed_income_basis: 'effective_open_principal', declared_values_separate: true, class_totals: { equities_open_cost: '0', fixed_income_open_principal: '0', declared_positions: '0' } },
+          portfolio: { consolidated_market_value_estimate: null, return_percent: null, status: 'not_comparable' } }
     : path.endsWith('/dashboard/capital-flows')
       ? { period_start: '2025-01-01', period_end: '2025-01-01', coverage_start: null, coverage_end: null, coverage: 'unavailable', points: [], gross_contributions: '0', redemptions: '0', sales: '0', withdrawals: '0', net_accumulated: '0', market_value: null, return: null }
       : path.endsWith('/dashboard/composition')
