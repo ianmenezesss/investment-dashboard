@@ -1,6 +1,8 @@
 # Changelog
 
-## v4.0.0 — alterações preparadas, ainda não publicadas (29/10/2026)
+## v4.0.0 — publicada (29/10/2026)
+
+Publicação e verificações operacionais confirmadas pelo proprietário. Os endpoints privados de operações, valuation, performance e históricos respondem; sem provedor aprovado, os endpoints históricos respondem com estado de indisponibilidade conforme projetado. Esta entrada não registra SHA implantado nem revisão remota do banco, que não foram conferidos diretamente nesta atualização.
 
 ### Adicionado
 
@@ -24,7 +26,7 @@
 - Estimativas de CDB continuam por contrato na interface existente; posições declaradas
   seguem separadas do principal dos lotes.
 - Histórico individual/comparativo de preços permanece sem fonte aprovada e desabilitado.
-- Sem migration. Esta entrada não significa que a release v4.0.0 foi publicada.
+- Sem migration para esta entrega. A publicação da v4.0.0 foi confirmada pelo proprietário; a verificação atual não reabre nem altera o deploy.
 
 ## v3.0.4 — notas preparadas em 29/10/2026
 

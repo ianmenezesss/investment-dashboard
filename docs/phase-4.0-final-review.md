@@ -1,7 +1,7 @@
 # Revisão técnica final — Investment Dashboard v4.0.0
 
 **Revisado em:** 29/10/2026
-**Estado:** release candidate local tecnicamente validado, com conferências operacionais ainda necessárias. Não houve push, tag, release, deploy ou validação dos painéis de produção.
+**Estado original da revisão:** release candidate local tecnicamente validado, antes das confirmações de publicação descritas no aditivo ao final deste documento.
 
 ## Escopo entregue
 
@@ -84,3 +84,9 @@ Um commit documental final desta revisão é criado após a validação e inclui
 ## Rollback de aplicação
 
 Se uma publicação futura apresentar falha, interromper o tráfego/retornar o frontend privado e backend ao artefato ou commit anteriormente estável usando os controles manuais de cada plataforma. Como não há migration nova, não executar downgrade nem restaurar o banco por causa desta versão. Verificar login, endpoint de valuation e operação de leitura após rollback. Manter export/backup conforme a política do ambiente.
+
+## Aditivo — publicação e verificações operacionais reportadas
+
+O proprietário confirmou que a v4.0.0 foi publicada e que, em produção, `/api/operations`, `/api/dashboard/valuation`, `/api/dashboard/performance`, `/api/dashboard/equity-history`, histórico individual e comparação respondem HTTP 200. Também confirmou que o histórico agregado apresenta indisponibilidade por configuração e os históricos individual/comparativo permanecem indisponíveis enquanto não houver provedor aprovado. O erro 503 do histórico agregado foi corrigido e confirmado em produção.
+
+Este aditivo registra evidência fornecida pelo proprietário em 29/10/2026; não afirma acesso independente aos painéis de hospedagem, ao SHA implantado ou à revisão do PostgreSQL. As limitações de fonte histórica e da Fase 4.4 continuam abertas.
