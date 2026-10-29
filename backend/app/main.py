@@ -59,7 +59,7 @@ async def safe_observation_validation(request, exc):
     if request.url.path.endswith(("/opening-balance", "/observations")):
         return JSONResponse(status_code=422, content={"detail": [{"loc": list(error["loc"]), "msg": error["msg"], "type": error["type"]} for error in exc.errors()]})
     return await request_validation_exception_handler(request, exc)
-app.add_middleware(CORSMiddleware, allow_origins=[settings.cors_origin], allow_methods=["GET", "POST", "DELETE"], allow_headers=["Authorization", "Content-Type"])
+app.add_middleware(CORSMiddleware, allow_origins=[settings.cors_origin], allow_methods=["GET", "POST", "DELETE"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])
 @app.middleware("http")
 async def privacy_headers(request, call_next):
     response = await call_next(request)
