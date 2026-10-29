@@ -3,6 +3,8 @@ import type { OperationInput } from '../demo/finance'
 import type { Cdb, CdbInput, CdbDetail, CdbMovement, ApplicationInput, RedemptionInput, ReturnsInput, CdbReturns, CdbApplicationRevision, CdbApplicationRevisionInput, CdbApplicationRevisionPreview } from '../fixed-income/types'
 import type { ObservedPosition, ObservedPositionInput } from '../fixed-income/types'
 
+export type UnifiedMovement = { id: string; date: string; investment_class: 'AÇÕES' | 'CDB'; asset: string; operation: 'BUY' | 'SELL' | 'APPLICATION' | 'REDEMPTION'; quantity: string | null; unit_price: string | null; financial_value: string; fees: string | null; cash_received: string | null }
+
 // Nunca recebe Storage ou dados da demonstração.
 export class PrivateRepository {
   constructor(private token: string) {}
@@ -10,6 +12,7 @@ export class PrivateRepository {
   summary(signal?: AbortSignal) { return request<PortfolioValuation>('dashboard/valuation', this.token, { signal }) }
   capitalFlows(period: string, signal?: AbortSignal) { return request<import('../portfolio/PortfolioInsights').CapitalFlows>(`dashboard/capital-flows?period=${period}`, this.token, { signal }) }
   composition(signal?: AbortSignal) { return request<import('../portfolio/PortfolioInsights').Composition>('dashboard/composition', this.token, { signal }) }
+  movements(signal?: AbortSignal) { return request<UnifiedMovement[]>('dashboard/movements', this.token, { signal }) }
   equityHistory(period: string, signal?: AbortSignal) { return request<import('../api').EquityHistory>(`dashboard/equity-history?period=${period}`, this.token, { signal }) }
   create(input: OperationInput) { return request<Operation>('operations', this.token, { method: 'POST', body: JSON.stringify(input) }) }
   delete(id: number) { return request<void>(`operations/${id}`, this.token, { method: 'DELETE' }) }

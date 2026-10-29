@@ -53,6 +53,12 @@ test('shows loading, error and empty states', async () => {
   expect(await host.querySelector('[role="alert"]')?.textContent).toContain('Não foi possível carregar')
 })
 
+test('reports a malformed response as an error instead of dereferencing a missing points array', async () => {
+  await render(async () => ({ coverage: 'unavailable', warning: 'bad mock payload' } as unknown as ObservedSeries))
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('Não foi possível carregar as posições')
+  expect(host.textContent).not.toContain('Nenhuma posição observada neste período')
+})
+
 test('changes the requested dates when a temporal filter is selected', async () => {
   const load = vi.fn(async (_id: number, _start: string, _end: string, _signal: AbortSignal) => points)
   await render(load)

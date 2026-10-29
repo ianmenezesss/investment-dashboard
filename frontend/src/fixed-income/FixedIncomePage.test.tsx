@@ -31,6 +31,7 @@ beforeEach(() => {
     expect((init.headers as Record<string, string>).Authorization).toMatch(/^Bearer token-/)
     expect(init.credentials).toBe('omit'); expect(init.cache).toBe('no-store')
     const url = new URL(path, 'https://test.invalid')
+    if (url.pathname.endsWith('/observed-history')) return json({ investment_id: fixture.detail.id, coverage: 'unavailable', points: [], warning: 'Somente observações registradas.' })
     if (init.method === 'DELETE' && url.pathname.endsWith('/archive')) {
       if (archiveError) return json({ detail: 'Contrato não pode ser arquivado' }, archiveError)
       archived = true

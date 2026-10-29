@@ -9,7 +9,11 @@ export function ObservedHistory({ id, identity, load }: { id: number; identity: 
   const end = new Date().toLocaleDateString('en-CA')
   const cutoff = new Date(end + 'T12:00:00'); cutoff.setMonth(cutoff.getMonth() - (period || 120))
   const start = cutoff.toLocaleDateString('en-CA')
-  const query = useQuery({ queryKey: ['fixed-income', identity, 'observed-history', id, start, end], queryFn: ({ signal }) => load(id, start, end, signal), retry: false })
+  const query = useQuery({ queryKey: ['fixed-income', identity, 'observed-history', id, start, end], queryFn: async ({ signal }) => {
+    const response = await load(id, start, end, signal)
+    if (!response || !Array.isArray(response.points)) throw new Error('Resposta inválida do histórico de posições observadas.')
+    return response
+  }, retry: false })
   return <article className="panel fi-section" aria-label="Evolução das posições observadas"><h3>Evolução das posições observadas</h3><p>Valores declarados do CDB inteiro. Aportes e rendimentos não são deduzidos da variação entre pontos. Sem interpolação ou soma com lotes.</p><div className="periods">{[[1,'1M'],[3,'3M'],[6,'6M'],[12,'1A'],[0,'Até 10 anos']].map(([value,label]) => <button key={value} aria-pressed={period === value} onClick={() => setPeriod(Number(value))}>{label}</button>)}</div>
     {query.isPending && <p role="status">Carregando posições observadas…</p>}
     {query.isError && <p role="alert">Não foi possível carregar as posições. <button onClick={() => void query.refetch()}>Tentar novamente</button></p>}

@@ -172,3 +172,32 @@ def portfolio_composition(db: Session = Depends(private_db)):
     observations = list(db.scalars(select(PositionObservation).where(PositionObservation.owner_id == owner,
         PositionObservation.as_of <= today)))
     return aggregate_composition(operations, movements, investments, lots, observations, as_of=today)
+
+
+@router.get("/movements", dependencies=[Depends(authenticate)])
+def unified_movements(db: Session = Depends(private_db)):
+    """Chronological view of recorded equity trades and effective CDB ledger rows."""
+    owner = db.info.get("owner_id")
+    operations = list(db.scalars(select(Operation).where(Operation.owner_id == owner).order_by(Operation.date, Operation.id)))
+    projected = effective_movements(db)
+    rows = db.execute(
+        select(projected, Investment.product_name)
+        .join(Investment, (Investment.id == projected.c.investment_id) & (Investment.owner_id == owner))
+        .where(projected.c.owner_id == owner)
+        .order_by(projected.c.date, projected.c.id)
+    ).all()
+    with localcontext() as ctx:
+        ctx.prec = 64
+        result = [{
+            "id": f"equity:{op.id}", "date": op.date.isoformat(), "investment_class": "AÇÕES",
+            "asset": op.ticker, "operation": op.kind, "quantity": str(op.quantity),
+            "unit_price": str(op.price), "financial_value": str(op.quantity * op.price),
+            "fees": str(op.fees), "cash_received": None,
+        } for op in operations]
+    result.extend({
+        "id": f"cdb:{row.id}", "date": row.date.isoformat(), "investment_class": "CDB",
+        "asset": row.product_name, "operation": row.kind, "quantity": None,
+        "unit_price": None, "financial_value": str(row.principal_amount),
+        "fees": None, "cash_received": str(row.cash_received) if row.cash_received is not None else None,
+    } for row in rows)
+    return sorted(result, key=lambda item: (item["date"], item["id"]))

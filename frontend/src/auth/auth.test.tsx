@@ -51,7 +51,7 @@ async function submit() {
 }
 
 test('login por senha, envio do access token ao FastAPI e logout', async () => {
-  const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => new Response(JSON.stringify(input.includes('dashboard') ? { holdings: [], acquisition_cost: '0', total_purchases: '0', realized_profit: '0' } : []), { status: 200 }))
+  const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => financialResponse(input))
   vi.stubGlobal('fetch', fetchMock)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
@@ -128,7 +128,7 @@ test('restauração não renderiza carteira nem consulta API enquanto getUser es
   mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
   let resolveUser!: (value: unknown) => void
   mock.auth.getUser.mockReturnValue(new Promise(resolve => { resolveUser = resolve }))
-  const fetchMock = vi.fn(async (input: string) => new Response(JSON.stringify(input.includes('dashboard') ? { holdings: [], acquisition_cost: '0', total_purchases: '0', realized_profit: '0' } : []), { status: 200 }))
+  const fetchMock = vi.fn(async (input: string) => financialResponse(input))
   vi.stubGlobal('fetch', fetchMock)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/acoes']}><RouteProbe/><App/></MemoryRouter></QueryClientProvider>))
@@ -146,8 +146,17 @@ test('restauração não renderiza carteira nem consulta API enquanto getUser es
 function RouteProbe() { return <output data-route>{useLocation().pathname}</output> }
 
 function financialResponse(input: string) {
-  return new Response(JSON.stringify(input.includes('dashboard')
-    ? { holdings: [], acquisition_cost: '0', total_purchases: '0', realized_profit: '0' } : []), { status: 200 })
+  const path = new URL(input, 'https://test.invalid').pathname
+  const payload = path.endsWith('/dashboard/valuation')
+    ? { holdings: [], acquisition_cost: '0', total_purchases: '0', realized_profit: '0', market_value: null }
+    : path.endsWith('/dashboard/capital-flows')
+      ? { period_start: '2025-01-01', period_end: '2025-01-01', coverage_start: null, coverage_end: null, coverage: 'unavailable', points: [], gross_contributions: '0', redemptions: '0', sales: '0', withdrawals: '0', net_accumulated: '0', market_value: null, return: null }
+      : path.endsWith('/dashboard/composition')
+        ? { as_of: '2025-01-01', equities: [], fixed_income: [], declared_positions: [], missing_fixed_income: [], market_values: null, coverage: 'available', missing_components: [], equity_basis: 'open_acquisition_cost', fixed_income_basis: 'effective_open_principal', declared_values_separate: true, class_totals: { equities_open_cost: '0', fixed_income_open_principal: '0', declared_positions: '0' } }
+        : path.endsWith('/dashboard/equity-history')
+          ? { period_start: '2025-01-01', period_end: '2025-01-01', coverage_start: null, coverage_end: null, coverage: 'empty', source: 'brapi', price_basis: 'raw_close', convention: '', points: [], missing_tickers: [], provider_errors: {} }
+          : path.endsWith('/dashboard/movements') ? [] : []
+  return new Response(JSON.stringify(payload), { status: 200 })
 }
 
 test('renovação no retorno à aba mantém dashboard enquanto a API revalida com o novo JWT', async () => {
@@ -262,8 +271,7 @@ test.each([401, 403])('erro %s da API prevalece sobre erro transitório de outra
 
 test('retorno à aba com SIGNED_IN repetido preserva tela, cache, modal e rota', async () => {
   mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
-  const fetchMock = vi.fn(async (input: string) => new Response(JSON.stringify(input.includes('dashboard')
-    ? { holdings: [], acquisition_cost: '0', total_purchases: '0', realized_profit: '0' } : []), { status: 200 }))
+  const fetchMock = vi.fn(async (input: string) => financialResponse(input))
   vi.stubGlobal('fetch', fetchMock)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><RouteProbe/><App/></MemoryRouter></QueryClientProvider>))
@@ -337,7 +345,9 @@ test('API rejeita ausência de token antes de fazer rede e preserva status 401',
 
 test('dashboard privado usa valuation uma vez, sem endpoint contábil separado ou polling ao navegar', async () => {
   mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
-  const fetchMock = vi.fn(async (input: string) => new Response(JSON.stringify(input.includes('dashboard/valuation') ? marketSnapshot('partial') : []), { status: 200 }))
+  const fetchMock = vi.fn(async (input: string) => new Response(JSON.stringify(
+    input.includes('dashboard/valuation') ? marketSnapshot('partial') : JSON.parse(await financialResponse(input).text()),
+  ), { status: 200 }))
   vi.stubGlobal('fetch', fetchMock)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
@@ -380,7 +390,11 @@ test.each(['create', 'delete'])('operação privada %s invalida valuation mesmo 
       return init.method === 'DELETE' ? new Response(null, { status: 204 }) : new Response(JSON.stringify(operation), { status: 201 })
     }
     const empty = action === 'create' ? !mutated : mutated
-    return new Response(JSON.stringify(input.includes('dashboard/valuation') ? marketSnapshot(empty ? 'empty' : 'complete') : empty ? [] : [operation]), { status: 200 })
+    const path = new URL(input, 'https://test.invalid').pathname
+    const payload = path.endsWith('/dashboard/valuation') ? marketSnapshot(empty ? 'empty' : 'complete')
+      : path.endsWith('/operations') ? empty ? [] : [operation]
+        : JSON.parse(await financialResponse(input).text())
+    return new Response(JSON.stringify(payload), { status: 200 })
   })
   vi.stubGlobal('fetch', fetchMock)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -420,7 +434,7 @@ test('rejeição 401 do FastAPI encerra a sessão e esconde a carteira', async (
 test('Nova operação em Renda fixa usa o fluxo CDB e Ações mantém seu formulário', async () => {
   mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
   const fixture = fixedIncomeFixture()
-  vi.stubGlobal('fetch', vi.fn(async (path: string) => new Response(JSON.stringify(path.includes('dashboard/valuation') ? marketSnapshot() : path.includes('fixed-income/investments?') ? [fixture.detail] : []), { status: 200 })))
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => new Response(JSON.stringify(path.includes('dashboard/valuation') ? marketSnapshot() : path.includes('fixed-income/investments?') ? [fixture.detail] : JSON.parse(await financialResponse(path).text())), { status: 200 })))
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/cdbs']}><App/></MemoryRouter></QueryClientProvider>))
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 40)) })
