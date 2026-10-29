@@ -44,7 +44,7 @@ export function EquityHistory({ repository, identity }: { repository: PrivateRep
 
   return <article className="panel equity-history" aria-label="Histórico do valor de mercado das ações">
     <div className="panel-heading">
-      <div><h3>Evolução histórica das ações</h3><p>Fechamento por pregão e quantidades reconstruídas pelas operações registradas</p></div>
+      <div><h3>Evolução histórica das ações · estimativa externa</h3><p>Fechamento por pregão e quantidades reconstruídas pelas operações registradas</p></div>
       <div className="periods">{periods.map(value => <button key={value} aria-pressed={period === value} className={period === value ? 'selected' : ''} onClick={() => setPeriod(value)}>{value}</button>)}</div>
     </div>
     {history.isLoading ? <p role="status" className="empty compact">Carregando histórico de ações…</p>
@@ -70,7 +70,7 @@ export function EquityHistory({ repository, identity }: { repository: PrivateRep
           <span>Fluxo líquido acumulado em ações<strong>{latest ? formatEquityMoney(latest.net_invested) : 'Indisponível'}</strong></span>
           <span>Mercado menos fluxo líquido no pregão de {deltaPoint ? dayLabel(deltaPoint.date) : 'referência'}<strong>{delta == null ? 'Indisponível' : formatEquityMoney(delta)}</strong></span>
         </div>
-        <p className="equity-history-note">Diferença não é rentabilidade nem lucro realizado. Exclui caixa, proventos, tributos e operações não registradas. Fechamento bruto da brapi; não é cotação em tempo real.</p>
+        <p className="equity-history-note">Preços históricos estimados por fonte externa; confira os valores na corretora. Diferença não é rentabilidade nem lucro realizado. Exclui caixa, proventos, tributos e operações não registradas. Fechamento bruto da brapi; não é cotação em tempo real.</p>
         <div className="chart-footer">Fonte: brapi · preço sem ajuste · pregões retornados pela fonte, sem preencher lacunas <span>{data.coverage_start && data.coverage_end ? `Pregões disponíveis: ${dayLabel(data.coverage_start)} a ${dayLabel(data.coverage_end)} · janela solicitada ${dayLabel(data.period_start)} a ${dayLabel(data.period_end)}` : 'Cobertura indisponível'}</span></div>
       </>}
   </article>

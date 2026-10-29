@@ -1,9 +1,31 @@
 # Fase 3.0 — plano técnico para gráficos e evolução patrimonial
 
-**Estado: 3.0.1/3.0.2 e 3.0.4 em produção conforme informado pelo responsável; 3.0.3
-implementada localmente para revisão.** A implementação 3.0.3 consulta somente a fonte
-histórica brapi documentada abaixo, usa autenticação existente e não criou migration.
-Detalhes, limites e validação estão em [Fase 3.0.3](phase-3.0.3-equity-history.md).
+**Estado revisado em 29/10/2026:** 3.0.1 e 3.0.2 constam como publicadas conforme relato
+do responsável. A implementação histórica de preços 3.0.3 está preservada no código, mas
+segue pendente de fonte adequada, cobertura/campos e termos confirmados. A 3.0.4 está
+concluída e validada localmente para revisão; não foi publicada nesta rodada. Não houve
+migration nem alteração de dados de produção. A revisão funcional e os critérios de publicação
+da 3.0.4 estão em [revisão final da Fase 3.0.4](phase-3.0.4-final-review.md).
+
+## Fonte de verdade e indicadores entregues
+
+- O histórico de operações do usuário é a fonte principal da verdade para compras, vendas,
+  aplicações e resgates registrados. Preços de mercado não corrigem esse ledger.
+- `GET /api/dashboard/movements` oferece o histórico cronológico privado de ações e CDB;
+  CDBs usam `effective_movements()` para respeitar REPLACE/VOID.
+- `GET /api/dashboard/capital-flows?period=1M|3M|6M|1A|Tudo` expõe compras de ações com
+  taxas, aplicações de principal, vendas líquidas após taxas, resgates de principal e valores
+  acumulados. O saldo desse fluxo não é lucro, patrimônio nem retorno da carteira.
+- `GET /api/dashboard/composition` expõe custo de aquisição aberto em ações e principal
+  efetivo aberto em CDB. Observações declaradas sem reconciliação não são somadas às posições
+  do ledger.
+- `GET /api/dashboard/equity-history` continua sendo uma série estimada a partir de fonte
+  externa, separada do histórico de operações; sua adequação para publicação permanece
+  pendente conforme [Fase 3.0.3](phase-3.0.3-equity-history.md).
+- O resultado realizado de ações permanece conforme `backend/app/finance.py`: venda líquida
+  de taxas menos custo médio atribuível à quantidade vendida, com taxas de compra na base.
+  Não inclui tributos. Resgate de CDB não é rendimento; `cash_received` pode estar ausente e
+  não é usado como rendimento realizado.
 
 ## Inventário da base existente
 
@@ -15,9 +37,9 @@ Detalhes, limites e validação estão em [Fase 3.0.3](phase-3.0.3-equity-histor
   `summarize()` reconstrói posições e custo médio com `Decimal`.
 - `GET /api/dashboard/valuation` devolve snapshot atual com cotação pontual do `QuoteService`
   (`brapi`), status, cobertura e timestamps. Não é uma série de preços históricos.
-- `frontend/src/App.tsx` já usa Recharts e mostra alocação por custo e um gráfico chamado
-  “Fluxo acumulado de operações”. Esse gráfico acumula quantidade × preço de compras menos
-  vendas no cliente usando `Number`, não inclui taxas e não mede patrimônio ou rentabilidade.
+- `frontend/src/App.tsx` mantém os indicadores existentes de ações e compõe `PortfolioInsights`
+  e `EquityHistory` na Visão geral e em Ações. `PortfolioInsights` representa fluxos de
+  capital registrados e bases abertas, enquanto `EquityHistory` é uma estimativa de mercado.
 
 ### Renda Fixa
 
@@ -44,7 +66,7 @@ Detalhes, limites e validação estão em [Fase 3.0.3](phase-3.0.3-equity-histor
   `FixedIncomePage`, `FixedIncomeReturns`, formatadores BRL e `FinancialHint` são pontos de
   reuso candidatos. Não há justificativa identificada para adicionar biblioteca de gráficos.
 
-## Proposta detalhada — Fase 3.0.1: indicadores e cobertura
+## Proposta inicial — Fase 3.0.1: indicadores e cobertura
 
 **Objetivo:** fixar o significado de cada indicador e comprovar quais séries podem ser
 compostas com dados disponíveis, antes de criar gráfico, endpoint, coleta ou persistência.
@@ -127,10 +149,11 @@ Confiabilidade deve ser comparada com um conjunto fictício de tickers cobrindo 
 ETFs/FIIs se estiverem no escopo: completude de pregões, ajustes, revisões, ticker renames,
 timestamps, códigos de falha, uptime/SLA e processo de retificação. O registro acima é uma
 fotografia pública de preço/termos; limites e ofertas mudam e não são garantia contratual.
-O levantamento de 28/10/2026 não escolhia fonte. Para a implementação privada 3.0.3 em
-29/10/2026, foi selecionada a brapi, condicionada a credencial/plano que forneça `rawClose`
-e eventos de ações. Isso não libera exibição a convidados, redistribuição, nem contratação
-automática; conferir a conta/plano do backend antes de publicar. Consulte
+O levantamento de 28/10/2026 não escolhia fonte. A implementação local da 3.0.3 usa brapi
+condicionalmente a uma credencial/plano que forneça `rawClose` e eventos de ações; isso não
+significa que uma fonte adequada esteja confirmada ou selecionada para publicação. Não libera
+exibição a convidados, redistribuição nem contratação automática. O projeto não tem orçamento
+para API paga; avaliar fontes gratuitas permitidas em trabalho futuro. Consulte
 [Fase 3.0.3](phase-3.0.3-equity-history.md) para termos, integração e limites atuais.
 
 Links oficiais consultados: [histórico e ajustes brapi](https://brapi.dev/docs/acoes/historico),
@@ -180,20 +203,22 @@ aprovação e migration independente.
 
 | Etapa proposta | Resultado e validação mínima |
 | --- | --- |
-| **3.0.1 — definições e cobertura** | Aprovar dicionário acima, matriz por ativo e carteira, status de cobertura, política de filtros e documentação comparativa de fonte. Exemplos/fixtures somente fictícios. Sem gráfico, endpoint, coleta, migration ou escolha de provedor. |
-| **3.0.2 — fluxos de capital** | Agregar aplicações, amortizações e operações por mês/ano, separadas de resultado realizado/estimado. Testes `Decimal` para limites de período, ordem cronológica, datas sem evento e account scoping; não produzir patrimônio histórico. |
-| **3.0.3 — preço histórico de ações** | Implementada localmente para revisão com brapi, `rawClose` e fatores de eventos societários. O endpoint privado reconstrói quantidades no fechamento diário e mantém totais nulos quando faltam dados. Exige plano que forneça `rawClose`; ver testes e limitações no documento da subfase. |
-| **3.0.4 — posição por classe e ativo** | Expor composição atual em ações e Renda Fixa com snapshot, cobertura e base explícitos. Criar regra aprovada para posição observada e lotes posteriores; se a sobreposição não puder ser conhecida, não somar ao total. Testar RLS A/B e agregação sem dupla contagem. |
-| **3.0.5 — evolução e interface** | Reaproveitar Recharts e tokens do tema escuro para gráficos responsivos, filtros por períodos suportados, tooltips, fontes, estados vazios/parciais e lacunas. Testes de acessibilidade, mobile, identidade/demo offline e valores `null`; build privado e público se ambos forem alterados. |
+| **3.0.1 — definições e cobertura** | Concluída conforme estado de publicação informado pelo responsável. |
+| **3.0.2 — fluxos de capital** | Concluída conforme estado de publicação informado pelo responsável; métricas de fluxo continuam separadas de patrimônio e rentabilidade. |
+| **3.0.3 — preço histórico de ações** | Implementação preservada; fonte/termos/cobertura apropriados para a execução ainda não validados. Não declarar concluída. Detalhes no documento da subfase. |
+| **3.0.4 — histórico, capital e composição** | Concluída e validada localmente: histórico unificado, fluxos acumulados e composição por bases abertas; sem migration. Não publicada nesta rodada. Ver revisão final. |
+| **3.0.5 — evolução e interface** | A proposta anterior de filtros, gráficos, tooltips, responsividade e estados foi incorporada à interface 3.0.3/3.0.4. Nenhum escopo adicional foi aprovado. |
 
 Cada etapa pode ser interrompida sem falsificar histórico. Não implementar Fase 3.0 até o
 responsável aprovar escopo, definições e próxima entrega.
 
 ## Riscos e decisões para aprovação
 
-- **Preços históricos:** fonte escolhida para carteira pessoal privada: brapi, condicionada a
-  plano/cobertura que exponha `rawClose` e eventos societários. A fonte atual ainda não
-  confirma isso para a credencial do deploy; não tratar o valor de hoje como histórico.
+- **Preços históricos:** existe integração de código com brapi, mas o acesso adequado a
+  `rawClose`, eventos societários, cobertura e termos de uso no ambiente de execução segue
+  sem validação suficiente. Não contratar API paga nesta fase. Avaliar futuramente fontes
+  gratuitas permitidas, mesmo com atraso/cobertura parcial; se indisponível, manter a série
+  como indisponível e não inventar dados.
 - **Retorno:** definir se/como incluir proventos, taxas, impostos, depósitos/resgates e
   eventos corporativos. Fluxo de caixa não é retorno; valorização não é lucro realizado.
 - **Renda Fixa observada:** posição inteira pode incluir aplicações posteriores. Definir
@@ -212,7 +237,9 @@ responsável aprovar escopo, definições e próxima entrega.
 
 ## Não escopo desta autorização
 
-Esta proposta não cria endpoint, migration, tarefa de coleta de preços, gráfico, simulador,
-meta, convite ou cadastro público. Fases 4, 5 e 6, lançamento pessoal 1.0 e expansão por
-convite 2.0 continuam apenas no roadmap. Convites pertencem exclusivamente à nova versão 2.0,
-não à Fase 6.0. A demo pública segue offline e com conteúdo fictício separado.
+O escopo acima descreveu o plano inicial e não autorizou automaticamente endpoints,
+migrations, coleta de preços, simulador, meta, convite ou cadastro público. Os itens que
+vieram a ser implementados e seu estado atual estão no início deste documento. Fases 4, 5
+e 6, lançamento pessoal 1.0 e expansão por convite 2.0 continuam apenas no roadmap. Convites
+pertencem exclusivamente à nova versão 2.0, não à Fase 6.0. A demo pública segue offline e
+com conteúdo fictício separado.

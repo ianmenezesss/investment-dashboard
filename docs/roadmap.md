@@ -1,6 +1,6 @@
 # Roadmap do Investment Dashboard
 
-Atualizado em **29/10/2026** para registrar o estado local da Fase 3.0.3.
+Atualizado em **29/10/2026** para registrar a revisão local da Fase 3.0.4.
 O plano não autoriza implementação automática de funcionalidades futuras.
 
 Revisão de prontidão 2.0.6 registrada em
@@ -66,17 +66,20 @@ validação próprios; nenhuma está disponível como operação funcional nesta
 ## Fase 3.0 — gráficos e evolução patrimonial
 
 Objetivo: visualizações privadas com indicadores explicáveis e dados disponíveis de fato.
-Conforme informado pelo responsável, 3.0.1, 3.0.2 e 3.0.4 estão publicadas; 3.0.3 está
-implementada localmente para revisão e não foi publicada. O plano técnico, endpoints,
-limites e decisões em aberto estão em [Fase 3.0 — plano técnico](phase-3.0-technical-plan.md).
+3.0.1 e 3.0.2 constam como publicadas segundo relato do responsável. A implementação
+histórica de preços da 3.0.3 foi preservada, mas segue pendente de uma fonte adequada,
+gratuita ou com uso permitido, com cobertura e campos suficientes. A 3.0.4 está concluída
+e validada localmente para revisão; não se declara publicada nesta rodada. O plano técnico,
+endpoints, limites e decisões em aberto estão em [Fase 3.0 — plano técnico](phase-3.0-technical-plan.md)
+e a validação final da 3.0.4 em [revisão final 3.0.4](phase-3.0.4-final-review.md).
 
 | Subfase planejada | Escopo |
 | --- | --- |
 | 3.0.1 | Publicada conforme informado pelo responsável: indicadores, contratos e cobertura por ativo/carteira. |
 | 3.0.2 | Publicada conforme informado pelo responsável: fluxos de aplicações/compras e resgates/vendas separados de patrimônio e rentabilidade. |
-| 3.0.3 | Implementada localmente para revisão: fonte brapi, fechamento bruto e eventos societários, quantidades reconstruídas pelo ledger e gráfico privado com cobertura explícita. Exige plano com `rawClose`; detalhes e limitações em [Fase 3.0.3](phase-3.0.3-equity-history.md). |
-| 3.0.4 | Publicada conforme informado pelo responsável: composição por classe/ativo com cobertura e sem somar observações/lotes quando há sobreposição incerta. |
-| 3.0.5 | Gráficos responsivos, filtros temporais, tooltips, estados vazios/parciais e lacunas, com cobertura e data de referência visíveis. |
+| 3.0.3 | Código local preservado: reconstrói quantidades pelo ledger e usa fechamento bruto/eventos societários da integração existente. A adequação da fonte, acesso a `rawClose`, cobertura e termos permanece pendente; não está concluída nem liberada para publicação. Ver [Fase 3.0.3](phase-3.0.3-equity-history.md). |
+| 3.0.4 | Concluída e validada localmente: histórico unificado de ações/CDB, capital movimentado e composição por bases abertas. Sem migration; publicação ainda não realizada. Ver [revisão final](phase-3.0.4-final-review.md). |
+| 3.0.5 | A proposta anterior de filtros, tooltips, estados de cobertura e layout foi incorporada às interfaces 3.0.3/3.0.4. Não há escopo adicional aprovado para esta subfase. |
 
 ### Preço e patrimônio são métricas diferentes
 
@@ -91,10 +94,16 @@ limites e decisões em aberto estão em [Fase 3.0 — plano técnico](phase-3.0-
 
 ### Dependências e limites
 
-A disponibilidade histórica dependerá de **fontes gratuitas e dados realmente existentes**,
-incluindo cobertura, limites, atraso, licença de uso e ajustes de preços. Antes da
-implementação, avaliar a viabilidade por fonte e período, sem assumir histórico completo
-ou dados em tempo real. Não há compromisso com contratação de serviços pagos.
+A disponibilidade histórica dependerá de **fontes gratuitas e permitidas e dados realmente
+existentes**, incluindo cobertura, limites, atraso, licença de uso e ajustes de preços. Antes
+de adotar uma fonte futura, avaliar a viabilidade por ativo e período, sem assumir histórico
+completo ou dados em tempo real. O orçamento do projeto não contempla API paga e esta decisão
+não autoriza contratação.
+
+O ledger de operações é a fonte principal da verdade para compras, vendas, aplicações e
+resgates registrados. Cotações externas são estimativas e devem ser identificadas na
+interface, com orientação para conferência na corretora. Não fabricar cotações nem aceitar
+cálculos sabidamente incompatíveis com a base do preço e os eventos corporativos.
 
 Períodos sem dados suficientes devem aparecer como indisponíveis/lacunas ou ter a seleção
 limitada, sem preencher preços ou rendimentos fictícios. Resumos mensais/anuais devem

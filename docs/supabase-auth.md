@@ -80,6 +80,11 @@ Abra http://localhost:5173 e entre com e-mail e senha do usuário que você já 
 
 Os testes automatizados cobrem expiração, token inválido, indisponibilidade de JWKS, ausência de autenticação, isolamento entre usuários e PostgreSQL local de teste. Não é necessário manipular JWTs reais ou compartilhar senhas para executar esses testes.
 
+Para validar manualmente a navegação privada e os dados sem criar operações na conta real,
+siga o checklist da [revisão final da Fase 3.0.4](phase-3.0.4-final-review.md). Use somente
+dados fictícios ou um banco local descartável nos testes de compra, venda, aplicação, resgate,
+REPLACE e VOID.
+
 ## Voltar ao token local de desenvolvimento
 
 No `.env` da raiz, use `ENVIRONMENT=development` e `AUTH_MODE=local`; preserve seu `API_TOKEN` existente. No frontend, use `VITE_AUTH_MODE=local` e `VITE_PUBLIC_DEMO=false`, e reinicie ambos os servidores. Nesse modo só aparecem os registros locais sem proprietário. Não existe fallback automático para token se a validação Supabase falhar. Em produção, o backend recusa `AUTH_MODE=local` e o frontend sempre usa Supabase no modo privado.

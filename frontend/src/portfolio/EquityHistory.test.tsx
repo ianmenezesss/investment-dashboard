@@ -32,6 +32,8 @@ test('renders market value, net flow, dated difference, source, tooltip values a
   const repository = { equityHistory: vi.fn(async (_period: string, _signal?: AbortSignal) => response) }
   await render(repository)
   expect(host.textContent).toContain('Evolução histórica das ações')
+  expect(host.textContent).toContain('estimativa externa')
+  expect(host.textContent).toContain('confira os valores na corretora')
   expect(host.textContent).toContain('R$ 120,00')
   expect(host.textContent).toContain('R$ 10,25')
   expect(host.textContent).toContain('PETR4')

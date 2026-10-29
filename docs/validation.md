@@ -1,5 +1,23 @@
 # Validação do Investment Dashboard
 
+## Fase 3.0.4 — revisão final local
+
+- Histórico unificado, fluxos acumulados e composição foram integrados às áreas privadas
+  existentes. Revisão sem alterações de schema/dados; sem migration.
+- Backend focalizado para ações, custo/resultado, autenticação, CDB/revisões, histórico de
+  preços, fluxos, movimentos e valuation: **230 aprovados, 1 aviso de depreciação** do
+  `TestClient`/httpx (`backend/.venv/Scripts/python.exe -m pytest` com os módulos listados
+  em [phase-3.0.4-final-review.md](phase-3.0.4-final-review.md)).
+- Frontend: **149 aprovados** na suíte completa; **55 aprovados** nos cinco grupos focais de
+  dashboard, histórico de preços, fluxos/composição, histórico unificado e autenticação.
+  JSDOM registra avisos existentes de tamanho zero para `ResponsiveContainer`.
+- `npm run build`: aprovado; Vite mantém aviso de chunk principal acima de 500 kB.
+- `git diff --check`: aprovado, com avisos do Git sobre conversão LF/CRLF em arquivos
+  editados. Nenhum commit, push ou deploy foi executado.
+- Validação visual, credenciais Supabase da conta real e fonte de preços no ambiente de
+  publicação continuam manuais. A 3.0.3 permanece pendente; veja o checklist e a recomendação
+  em [revisão final da Fase 3.0.4](phase-3.0.4-final-review.md).
+
 ## Fase 2.0.8.2-A — base de revisões de aplicações
 
 - Partida confirmada no commit local 5def47d e árvore limpa. Nenhum commit novo foi criado.

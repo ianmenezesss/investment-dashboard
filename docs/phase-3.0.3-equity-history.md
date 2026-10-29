@@ -1,7 +1,15 @@
 # Fase 3.0.3 — histórico de ações
 
-**Estado: implementação local para revisão; não publicada.** Não houve push, deploy,
-migration nem consulta à carteira de produção nesta entrega.
+**Estado: integração histórica pendente; implementação existente preservada localmente e
+não publicada.** A Fase 3.0.3 não está resolvida porque ainda não foi validada uma fonte que
+atenda cobertura, campos necessários (`rawClose` e eventos societários), termos de uso e
+configuração disponível para o ambiente. Não houve contratação, push, deploy, migration ou
+consulta à carteira de produção nesta revisão.
+
+O histórico de operações do usuário continua sendo a fonte principal da verdade. Os preços
+externos desta subfase são estimativas, não registros de mercado auditados, e devem ser
+identificados como tal e conferidos na corretora. Não preencher lacunas nem substituir preço
+bruto ausente por série ajustada.
 
 ## Fonte e condições de uso
 
@@ -11,19 +19,22 @@ proventos/eventos em ações. Foi feita uma consulta pública sintética de ITUB
 o endpoint respondeu com pregões, mas sem `rawClose` (a amostra sem autenticação não prova
 que qualquer plano de produção tenha acesso ao campo).
 
-O cálculo exige `includeRaw=true` e usa exclusivamente `rawClose`, sem fallback para
+O cálculo implementado exige `includeRaw=true` e usa exclusivamente `rawClose`, sem fallback para
 `close` ou `adjustedClose`. A documentação reserva `raw*` ao plano Pro; o fechamento
 ajustado inclui desdobramentos e proventos e não é compatível diretamente com quantidade
 histórica para mark-to-market. O endpoint de dividendos informa fatores de eventos em
 ações, usados na data ex (`exDate`) antes das operações do dia. A consulta ao provider
-retorna indisponibilidade explícita se esses campos não vierem.
+retorna indisponibilidade explícita se esses campos não vierem. Isso descreve o contrato do
+código, mas não comprova que o plano/configuração disponível ao proprietário forneça os
+campos necessários de forma consistente.
 
-Na consulta de 29/10/2026, o preço anunciado do Pro era R$ 116,66/mês equivalente,
+Na consulta histórica de 29/10/2026, o preço anunciado do Pro era R$ 116,66/mês equivalente,
 cobrado R$ 1.399,90 por ano. O Startup era R$ 99,99/mês equivalente, R$ 1.199,90 por ano,
 mas não fornece `rawClose`; portanto não atende ao valuation implementado. Preço e ofertas
 podem mudar e devem ser conferidos antes de qualquer contratação.
 
-Os termos da brapi permitem integrações em sistemas internos, mas proíbem redistribuir ou
+O registro de preços/termos acima é uma fotografia de pesquisa, não seleção nem autorização
+para contratar. O orçamento do projeto não contempla API paga. Os termos da brapi permitem integrações em sistemas internos, mas proíbem redistribuir ou
 sublicenciar os dados e criar proxy/wrapper para oferecer acesso público. Esta integração
 fica atrás da autenticação/owner scope do dashboard pessoal; não deve ser aberta a terceiros
 sem esclarecimento de licença. A brapi não é distribuidora licenciada da B3, não garante
@@ -78,7 +89,7 @@ e [termos da API Yahoo](https://legal.yahoo.com/us/en/yahoo/terms/product-atos/a
 ## Interface
 
 O painel privado aparece na Visão geral e em Ações, abaixo de “Fluxos e composição da
-carteira”. Os períodos são 1M, 3M, 6M, 1A e Tudo. A linha verde é valor de mercado das
+carteira”. Os períodos são 1M, 3M, 6M, 1A e Tudo. A linha verde é valor de mercado estimado das
 ações; a azul é fluxo líquido acumulado em ações (compras e taxas menos vendas líquidas de
 taxas). O aviso explicita fonte, base do preço e exclusões. Um plano sem `rawClose` mostra
 um aviso e não troca para um preço ajustado.
@@ -100,5 +111,8 @@ controlados, cache, autenticação e isolamento A/B. Testes Vitest cobrem render
 tooltip, filtro, loading/erro/vazio, cobertura e formatação do eixo.
 
 Os valores têm finalidade informativa, não representam preço oficial em tempo real, retorno
-total ou patrimônio completo. Revalidar acesso real a `rawClose` na chave de produção antes
-de qualquer publicação; esta tarefa não inspecionou nem alterou segredos ou produção.
+total ou patrimônio completo. Conferir preços estimados na corretora. Revalidar fonte, licença,
+cobertura e acesso real a `rawClose` antes de publicar a 3.0.3; esta revisão não inspecionou
+nem alterou segredos ou produção. Fontes gratuitas futuras podem ser avaliadas se o uso for
+permitido, mesmo com limites de atualização/cobertura; não raspar sites, fabricar cotações ou
+aceitar base de preço sabidamente incompatível.

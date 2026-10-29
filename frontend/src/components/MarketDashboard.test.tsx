@@ -24,6 +24,7 @@ test('completo mostra o mesmo snapshot, estimativa, variação, cotação e hor�
   expect(cards[1].textContent).toContain('R$ 40,00')
   expect(cards[2].textContent).toContain('20,00%')
   expect(host.textContent).toContain('não são em tempo real')
+  expect(host.textContent).toContain('confira as cotações na corretora')
   expect(host.querySelector('tbody')!.textContent).toContain('R$ 24,00')
   expect(host.querySelector('tbody')!.textContent).toContain('R$ 20,00')
   expect(host.textContent).toContain('Fonte: brapi')
