@@ -1,5 +1,15 @@
 # Arquitetura e plano
 
+Atualização v4.0.0 / Fase 4.3A (29/10/2026): `GET /api/dashboard/performance` é um
+snapshot privado somente de leitura que combina o ledger de ações, fluxos e projeção
+efetiva CDB, composição e avaliação por cotações pontuais. Ele preserva `owner_id`,
+`REPLACE`/`VOID`, `Decimal` e `Cache-Control: no-store`; resultado consolidado da carteira
+e rentabilidade temporal ficam indisponíveis sem dados comparáveis. `PortfolioInsights`
+apresenta as bases e estados sem chamar fluxo de patrimônio. A Fase 4.4 segue bloqueada
+por ausência de eventos/fluxos externos e fonte histórica validada. Componentes de páginas
+e gráficos são importados sob demanda; no build local de validação, o chunk inicial foi
+reduzido de 806,13 kB para 443,68 kB.
+
 Atualização 1.6.3: `components/ui/ConfirmDialog.tsx` reutiliza Radix Dialog existente (papel alertdialog, foco inicial em Cancelar, Escape e retorno de foco). `dashboard-ux.css` concentra os refinamentos visuais. O DemoRepository aceita schema 1 sem sobrescrita, persiste schema 2 na próxima alteração e mantém `seedVersion` independente; restauração explícita carrega o conjunto 2 com 26 registros. Regras financeiras e autenticação permanecem as mesmas.
 
 Atualização 1.6.2: demonstração interativa com `DemoRepository` local e `PrivateRepository` HTTP separados. Somente a primeira usa localStorage; nenhum token ou dado privado é persistido ali. O cálculo Decimal.js foi alinhado ao contexto Decimal Python e possui casos de contrato em `shared/finance-cases.json`, executados pelos dois runtimes. Consulte [demonstração interativa](interactive-demo.md).

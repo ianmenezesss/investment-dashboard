@@ -7,13 +7,26 @@ test('repositório privado usa HTTP autenticado e nunca lê ou grava localStorag
   const read = vi.spyOn(Storage.prototype, 'getItem'), write = vi.spyOn(Storage.prototype, 'setItem')
   try {
     const repo = new PrivateRepository('test-private-token')
-    await repo.list(); await repo.summary()
+    await repo.list(); await repo.summary(); await repo.performance()
     expect(http).toHaveBeenCalledWith('dashboard/valuation', 'test-private-token', { signal: undefined })
+    expect(http).toHaveBeenCalledWith('dashboard/performance', 'test-private-token', { signal: undefined })
     await repo.create({ ticker: 'TEST4', kind: 'BUY', date: '2026-01-01', quantity: '1', price: '10', fees: '0' })
     await repo.delete(1); await repo.export()
     expect(http.mock.calls.every(call => call[1] === 'test-private-token')).toBe(true)
     expect(read).not.toHaveBeenCalled(); expect(write).not.toHaveBeenCalled()
   } finally { vi.restoreAllMocks() }
+})
+
+test('histórico individual usa o endpoint autenticado e codifica o ticker no caminho', async () => {
+  const repo = new PrivateRepository('private-history-token')
+  await repo.equityPriceHistory('ITUB4', 'MAX')
+  expect(http).toHaveBeenCalledWith('dashboard/equities/ITUB4/price-history?period=MAX', 'private-history-token', { signal: undefined })
+})
+
+test('comparação privada envia tickers e período como parâmetros repetidos autenticados', async () => {
+  const repo = new PrivateRepository('comparison-token')
+  await repo.equityComparison(['ITUB4', 'BBAS3'], '6M')
+  expect(http).toHaveBeenCalledWith('dashboard/equities/compare?tickers=ITUB4&tickers=BBAS3&period=6M', 'comparison-token', { signal: undefined })
 })
 
 test('API privada expõe preview, revisão e histórico com a chave idempotente no header', async () => {

@@ -29,3 +29,6 @@ services:
       # Historical equity prices remain opt-in until the source and its terms are validated.
       - key: EQUITY_HISTORY_ENABLED
         value: false
+      # Individual price charts have no approved provider yet.
+      - key: INDIVIDUAL_EQUITY_HISTORY_ENABLED
+        value: false

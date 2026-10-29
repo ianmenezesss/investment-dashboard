@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     migration_database_url: SecretStr = SecretStr("")
     market_data_enabled: bool = False
     equity_history_enabled: bool = False
+    individual_equity_history_enabled: bool = False
     brapi_token: SecretStr = SecretStr("")
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore", hide_input_in_errors=True)
 

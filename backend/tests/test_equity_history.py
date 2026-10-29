@@ -48,6 +48,8 @@ def test_history_flag_does_not_disable_current_quotes(monkeypatch):
         async with lifespan(app):
             assert app.state.quote_service.enabled is True
             assert app.state.equity_history_service.enabled is False
+            assert app.state.individual_equity_price_history_service.enabled is False
+            assert app.state.quote_service.provider.client is not app.state.equity_history_service.provider.client
 
     asyncio.run(run())
 

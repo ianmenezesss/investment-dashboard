@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select, text
+from sqlalchemy import exists, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from .database import ensure_production_role, get_db, settings
@@ -29,7 +29,11 @@ from .fixed_income.returns_router import router as fixed_income_returns_router
 from .fixed_income.observation_routes import router as observation_router
 from .fixed_income.history import router as observed_history_router
 from .portfolio import router as portfolio_router
+from .portfolio import aggregate_capital_flows, aggregate_composition, local_today
+from .performance import FinancialPerformance, build_financial_performance
 from .equity_history import router as equity_history_router
+from .individual_equity_history import EquityPriceHistoryService, router as individual_equity_history_router
+from .equity_comparison import router as equity_comparison_router
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 
@@ -37,20 +41,25 @@ from fastapi.exception_handlers import request_validation_exception_handler
 @asynccontextmanager
 async def lifespan(app):
     # Constructing the client makes no external request. No polling or startup fetch.
-    async with httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as client, \
+    async with httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as market_client, \
+            httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as history_client, \
             httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as rates_client:
         token = settings.brapi_token.get_secret_value().strip()
-        app.state.quote_service = QuoteService(BrapiProvider(client, token),
+        app.state.quote_service = QuoteService(BrapiProvider(market_client, token),
             enabled=settings.market_data_enabled, configured=bool(token))
         app.state.equity_history_service = EquityHistoryService(
-            BrapiEquityHistoryProvider(client, token),
+            BrapiEquityHistoryProvider(history_client, token),
             enabled=settings.market_data_enabled and settings.equity_history_enabled, configured=bool(token))
+        # Nenhum provedor individual é configurado sem validação de dados/licença.
+        app.state.individual_equity_price_history_service = EquityPriceHistoryService(
+            provider=None, enabled=settings.individual_equity_history_enabled)
         app.state.bcb_rates_service = RateService(SGSProvider(rates_client))
         try:
             yield
         finally:
             app.state.quote_service = None
             app.state.equity_history_service = None
+            app.state.individual_equity_price_history_service = None
             app.state.bcb_rates_service = None
 
 
@@ -63,6 +72,8 @@ app.include_router(observation_router)
 app.include_router(observed_history_router)
 app.include_router(portfolio_router)
 app.include_router(equity_history_router)
+app.include_router(individual_equity_history_router)
+app.include_router(equity_comparison_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -147,6 +158,44 @@ async def portfolio_valuation(snapshot=Depends(portfolio_snapshot), service: Quo
     summary, captured_at, basis = snapshot
     quotes = await service.get_many([h["ticker"] for h in summary["holdings"]])
     return value_portfolio(summary, quotes, ledger_as_of=captured_at, price_basis=basis)
+
+
+@app.get("/api/dashboard/performance", response_model=FinancialPerformance, dependencies=[Depends(authenticate)])
+async def dashboard_performance(db: Session = Depends(private_db), service: QuoteService = Depends(quote_service)):
+    """Private current snapshot that composes existing ledger and valuation rules."""
+    from .fixed_income.models import Investment, InvestmentArchive, Lot
+    from .fixed_income.observations import PositionObservation
+    from .fixed_income.projection import effective_movements
+
+    today, owner = local_today(), db.info.get("owner_id")
+    operations = list(db.scalars(select(Operation).where(
+        Operation.owner_id == owner, Operation.date <= today
+    ).order_by(Operation.date, Operation.id)))
+    projected = effective_movements(db)
+    movements = list(db.execute(select(projected).where(
+        projected.c.owner_id == owner, projected.c.date <= today
+    ).order_by(projected.c.date, projected.c.id)).mappings())
+    investments = list(db.scalars(select(Investment).where(
+        Investment.owner_id == owner,
+        ~exists(select(InvestmentArchive.id).where(InvestmentArchive.investment_id == Investment.id)),
+    )))
+    lots = list(db.scalars(select(Lot).where(Lot.owner_id == owner)))
+    observations = list(db.scalars(select(PositionObservation).where(
+        PositionObservation.owner_id == owner, PositionObservation.as_of <= today
+    )))
+
+    summary = summarize(operations)
+    basis = purchase_price_basis(operations)
+    ledger_as_of = datetime.now(timezone.utc)
+    flows = aggregate_capital_flows(operations, movements, start=date.min, end=today)
+    composition = aggregate_composition(operations, movements, investments, lots, observations, as_of=today)
+    tickers = [holding["ticker"] for holding in summary["holdings"]]
+    db.rollback()  # Keep the DB snapshot consistent and release it before quote HTTP.
+
+    quotes = await service.get_many(tickers)
+    valuation = value_portfolio(summary, quotes, ledger_as_of=ledger_as_of, price_basis=basis)
+    return build_financial_performance(as_of=today, ledger_as_of=ledger_as_of,
+        flows=flows, valuation=valuation, composition=composition)
 
 
 def serialize(op):

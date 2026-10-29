@@ -1,0 +1,9 @@
+.portfolio-performance-result{grid-column:1/-1;min-width:0}
+.portfolio-performance-result .panel-heading{align-items:center}
+.portfolio-performance-result .panel-heading>svg{color:#68e5b4;flex:0 0 auto}
+.portfolio-combined-result{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:10px 22px 14px;color:#aebdc5;font-size:12px}
+.portfolio-combined-result strong{font-size:24px;font-weight:600;letter-spacing:-.03em}
+.portfolio-combined-result .positive{color:#68e5b4}
+.portfolio-combined-result .negative{color:#f28b82}
+.portfolio-performance-result .portfolio-coverage{margin-block:6px 14px}
+@media(max-width:600px){.portfolio-combined-result{align-items:flex-start;flex-direction:column;gap:4px;padding-inline:16px}.portfolio-combined-result strong{font-size:21px}.portfolio-performance-result .panel-heading{align-items:flex-start}}

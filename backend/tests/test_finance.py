@@ -1,5 +1,5 @@
 from datetime import date
-from decimal import Decimal as D
+from decimal import Decimal as D, localcontext
 from types import SimpleNamespace
 import pytest
 from app.finance import summarize
@@ -26,4 +26,28 @@ def test_empty_and_full_liquidation():
     assert summarize([])["acquisition_cost"] == 0
     result = summarize([operation("BUY", "3", "0.1"), operation("SELL", "3", "0.2", day=2)])
     assert result["realized_profit"] == D("0.3")
+    assert result["holdings"] == []
+
+
+def test_numeric_20_8_purchase_product_keeps_all_decimal_digits():
+    maximum = D("999999999999.99999999")
+    with localcontext() as context:
+        context.prec = 64
+        expected = maximum * maximum
+
+    result = summarize([operation("BUY", str(maximum), str(maximum))])
+
+    assert result["total_purchases"] == expected
+    assert result["acquisition_cost"] == expected
+    assert result["holdings"][0]["cost"] == expected
+
+
+def test_full_liquidation_removes_exact_cost_after_repeating_average():
+    result = summarize([
+        operation("BUY", "3", "0.1", "0.01"),
+        operation("SELL", "3", "0.2", day=2),
+    ])
+
+    assert result["acquisition_cost"] == D("0")
+    assert result["realized_profit"] == D("0.29")
     assert result["holdings"] == []

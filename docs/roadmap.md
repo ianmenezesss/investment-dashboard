@@ -1,175 +1,148 @@
-# Roadmap do Investment Dashboard
+# Roadmap mestre — Investment Dashboard
 
-Atualizado em **29/10/2026** para registrar a auditoria de release da v3.0.4.
-O plano não autoriza implementação automática de funcionalidades futuras.
+Atualizado em 29/10/2026. Este documento é a fonte principal de verdade do planejamento. Ele registra o estado observado no repositório e decisões expressas pelo proprietário; não autoriza implementação, compra, ativação de provedor, migration, commit, push, merge, release ou deploy.
 
-O commit `f021ad8` está confirmado em `main` local e remoto. A publicação Vercel foi
-reportada pelo responsável, mas seu SHA não foi inspecionado no painel. O health público
-do Render respondeu `200`; isso valida conexão e controles básicos do papel runtime, mas
-não informa a revisão Alembic. Confirme no Render que `alembic_version` está em `008` antes
-de considerar a compatibilidade de produção totalmente verificada.
+## Estados usados
 
-Revisão de prontidão 2.0.6 registrada em
-[phase-2.0.6-production-readiness.md](phase-2.0.6-production-readiness.md): sem novas
-funcionalidades; validação local/documental concluída, publicação e homologação remotas
-pendentes de autorização.
+- **Concluído:** código e critérios da fase foram entregues. A disponibilidade externa ainda pode ter uma dependência declarada.
+- **Em desenvolvimento:** implementação autorizada e em curso.
+- **Planejado:** proposta registrada, ainda sem autorização de implementação.
+- **Bloqueado:** depende de dados, licença, infraestrutura ou decisão ainda ausente.
+- **Opcional:** pode ser omitido sem impedir a finalidade do produto pessoal.
+- **Descontinuado:** decisão explícita de não seguir com uma ideia. Nenhuma proposta histórica é descontinuada por este documento.
 
-Revisão final 2.0.7 de segurança e clareza da Renda Fixa registrada em
-[phase-2.0.7-final-review.md](phase-2.0.7-final-review.md). Não inicia a Fase 3.0 nem
-altera o schema. Os 118 testes aprovados foram registrados em `validation.md`; os testes
-backend e a integração descartável foram executados pelo responsável no Windows. Homologação
-secundária e verificação remota independente seguem pendentes. O responsável informou que
-a 004 está em `head` no Supabase, com RLS e grants mínimos conferidos; esse estado não foi
-acessado/verificado pelo agente.
-Até a versão final serão usados exclusivamente dados fictícios, inclusive no desenvolvimento.
+“Concluído tecnicamente” não significa “ativado em produção”. O CHANGELOG registra somente software efetivamente entregue; este roadmap pode registrar propostas e bloqueios.
 
-## Fase 2 — renda fixa
+## Decisões de produto registradas
 
-- **2.0.1:** contratos CDB, lotes e movimentações imutáveis de principal, validados em
-  PostgreSQL descartável; sem rendimentos ou impostos.
-- **2.0.2 (implementada para revisão):** consulta histórica privada de CDI diário (SGS 12)
-  e Selic diária (SGS 11), com Decimal, cache e controle de chamadas. Sem migration,
-  cálculo de rendimento ou UI. Ver [contrato e limites](phase-2.0.2-bcb-rates.md).
-- **2.0.3 (implementada para revisão):** motor determinístico de estimativas CDI por lote,
-  IOF/IR estimados para PF residente, premissas explícitas, principal separado de rendimento
-  e estados de informação insuficiente. Sem migration ou UI. Ver [fórmulas e homologação](phase-2.0.3-fixed-income-returns.md).
-- **2.0.4 (implementada para revisão):** interface privada CDB com listagem/cadastro,
-  lotes, aplicações, resgates e histórico; estimativa explícita com premissas confirmadas,
-  dados indisponíveis preservados e demo offline. Ver [fluxos e contratos](phase-2.0.4-fixed-income-ui.md).
+1. O produto deve funcionar **sem despesa obrigatória**, tanto para o proprietário como para a futura expansão restrita. Priorizar software aberto, planos gratuitos enquanto disponíveis, registros manuais e CSV. Serviço que exija pagamento nunca será requisito funcional.
+2. Planos gratuitos têm limites e podem mudar, suspender ou encerrar. Configurações devem ser reavaliadas antes de releases. Falha ou limite deve degradar para indisponibilidade explícita ou fluxo manual, sem ativar cobrança automática.
+3. Não há intenção atual de cobrança, assinatura, planos comerciais ou monetização.
+4. Não integrar APIs pagas, Open Finance pago, scraping ou fornecedor sem validação de cobertura, licença, privacidade e custo. Ideias condicionais permanecem documentadas como alternativas futuras.
+5. A expansão chamada provisoriamente **Investment Dashboard 2.0** será somente por convite ou aprovação explícita; não haverá cadastro público irrestrito.
+6. Um administrador não recebe acesso automático às carteiras de convidados. Recrutadores devem usar a demonstração offline ou uma conta isolada com dados próprios, nunca a carteira real do proprietário.
+7. Demo pública, carteira privada do proprietário e carteiras de convidados são fronteiras separadas.
+8. Nenhum dado financeiro ou preço ausente será inventado. Estimativas, observações, fluxo e rentabilidade devem ter rótulos próprios.
 
-- **2.0.5 (implementada para revisão):** saldo inicial consolidado como snapshot imutável,
-  novas observações/conciliação manual sem presumir principal ou tributos, novos lotes
-  separados e cards/formulários BRL. Migration 004; aplicação em produção reportada pelo
-  responsável como concluída e head, ainda sem verificação remota independente.
-  Ver [semântica, contratos e implantação](phase-2.0.5-opening-balance.md).
-- **2.0.6 (prontidão):** revisão local e roteiro manual de publicação, sem funcionalidade.
-- **2.0.7 (revisão final):** dicas acessíveis e distinção visual entre valores informados,
-  calculados e estimados. Nenhum dado real é necessário para desenvolvimento/homologação.
-  Testes backend focais e integração PostgreSQL descartável passaram segundo relato do
-  responsável; conta secundária e verificação remota independente seguem pendentes.
-  Ver [revisão final](phase-2.0.7-final-review.md).
-- **2.0.8.1 (implementação local para revisão):** arquivamento por tombstone append-only
-  apenas de contratos CDB sem lotes, movimentações ou observações. Contratos e histórico
-  original permanecem preservados; listagem ativa os omite. Migration 005 foi exercitada
-  somente pelo teste PostgreSQL descartável; não foi aplicada em ambiente persistente ou de
-  produção. Ver [plano de arquivamento](phase-2.0.8.1-empty-cdb-archive.md).
+## Estado das versões
 
-- **2.0.8.2-A (base local revisada):** revisões append-only REPLACE/VOID,
-  migration 006 e projeção efetiva compartilhada pelos leitores e validadores financeiros.
-  Integração descartável aprovada conforme resultado informado pelo usuário; sem endpoints
-  de escrita de revisão. Ver [arquitetura e inventário](phase-2.0.8.2-revision-foundation.md).
+| Área | Estado | Registro |
+|---|---|---|
+| v3.0.4 | **Concluído tecnicamente; publicação reportada** | A release está documentada e o commit f021ad8 foi registrado. A documentação anterior ressalta que SHA implantado e revisão remota do banco requerem confirmação nos respectivos painéis. |
+| Histórico de preços 3.0.3 | **Bloqueado** | Código preservado; EQUITY_HISTORY_ENABLED permanece desligada por padrão. Falta fonte gratuita, permitida e adequada. |
+| v4.1 — Histórico individual de ações | **Concluído tecnicamente; dados bloqueados** | Endpoint e UI usam contrato independente. INDIVIDUAL_EQUITY_HISTORY_ENABLED é false por padrão e não há provedor aprovado. |
+| v4.2 — Comparação de ativos | **Concluído tecnicamente; dados bloqueados** | Endpoint e UI foram implementados com normalização e sem interpolação; dependem da mesma fonte histórica da 4.1. |
+| v4.3A — Resumo financeiro atual | **Concluído tecnicamente** | Endpoint privado de resumo, composição/fluxos existentes, resultado de ações com cobertura e precisão Decimal corrigida. Sem migration; ainda não publicado. |
+| v4.4 — Rentabilidade temporal completa | **Bloqueado / condicional** | Depende de fluxo externo classificado, eventos pertinentes e avaliações históricas comparáveis. |
+| v5.0.0 | **Planejado** | Simulador e metas são placeholders da Fase 5; os demais módulos abaixo são propostas, não compromissos já implementados. |
+| Investment Dashboard 2.0 | **Planejado, após estabilidade pessoal** | Expansão por convite, com isolamento rigoroso e operação sustentável sem despesa obrigatória. |
 
-## Pós-lançamento — planejado, não implementado
+Referências de implementação e evidência: [revisão da 3.0.4](phase-3.0.4-final-review.md), [fase 4.1](phase-4.1-individual-equity-history.md) e [fase 4.2](phase-4.2-asset-comparison.md).
 
-- Importação de extratos CSV com validação e revisão antes de persistir.
-- Integrações bancárias, respeitando consentimento, privacidade e fontes viáveis.
-- Conciliação automatizada, sem sobrescrever ledger ou presumir impostos/principal.
-- Reconstrução opcional de históricos a partir de documentos efetivamente disponíveis.
+## Histórico do planejamento e funcionalidades preservadas
 
-Snapshot não substitui histórico de aquisição. Essas funcionalidades exigirão escopo e
-validação próprios; nenhuma está disponível como operação funcional nesta fase.
+A arquitetura original agrupava em fases numeradas: fundação de ações; contas/corretoras, edição e proventos; renda fixa; medição com snapshots, caixa externo, benchmarks e TWR/XIRR; planejamento com simulador, metas e relatórios; e uso remoto seguro. A execução evoluiu em versões 1.x, 2.x, 3.x e 4.x diferentes da numeração inicial. Os documentos históricos não são reescritos para sugerir que a numeração atual existia desde o começo.
 
-## Fase 3.0 — gráficos e evolução patrimonial
+- **Entregue em fases anteriores:** ledger de ações com custo médio; demo offline; Supabase Auth privado, autorização por proprietário e RLS; renda fixa CDB com principal, revisões REPLACE/VOID, observações manuais e estimativa CDI sob premissas; cotações pontuais; histórico unificado de operações; fluxos e composição por bases declaradas.
+- **Ainda não entregue ou incompleto:** contas/corretoras, edição transacional geral de operações, dividendos/JCP, eventos societários no livro financeiro, depósitos e saques externos, saldo de caixa, suporte IPCA no motor de rendimento, cotações manuais com fonte e timestamp como base de valuation, importação revisável, relatórios completos, metas e simulador.
+- **Pós-lançamento anteriormente proposto e preservado:** importação CSV, integração bancária, conciliação automatizada e reconstrução somente a partir de documentos existentes. Integração bancária permanece opcional e não pode exigir serviço pago.
+- **Fase de medição original:** snapshots patrimoniais, fluxos externos separados de negociações e benchmarks oficiais. Continua dependente dos itens da 5.1 e da 4.4.
+- **Fase de uso remoto original:** parte da base técnica já existe, mas não substitui o planejamento de onboarding, operação, recuperação, privacidade e controles para convidados.
 
-Objetivo: visualizações privadas com indicadores explicáveis e dados disponíveis de fato.
-3.0.1 e 3.0.2 constam como publicadas segundo relato do responsável. A implementação
-histórica de preços da 3.0.3 foi preservada, mas segue pendente de uma fonte adequada,
-gratuita ou com uso permitido, com cobertura e campos suficientes. A 3.0.4 está concluída,
-validada localmente e no commit `f021ad8`; a publicação é reportada pelo responsável, sem
-confirmação independente do SHA implantado. O plano técnico,
-endpoints, limites e decisões em aberto estão em [Fase 3.0 — plano técnico](phase-3.0-technical-plan.md)
-e a validação final da 3.0.4 em [revisão final 3.0.4](phase-3.0.4-final-review.md).
+Veja [arquitetura original](architecture.md), [demo e fronteira privada](demo-and-private.md), [configuração de Auth](supabase-auth.md), [auditoria de segurança](security-audit.md) e [plano histórico de preços](phase-3.0-technical-plan.md).
 
-| Subfase planejada | Escopo |
-| --- | --- |
-| 3.0.1 | Publicada conforme informado pelo responsável: indicadores, contratos e cobertura por ativo/carteira. |
-| 3.0.2 | Publicada conforme informado pelo responsável: fluxos de aplicações/compras e resgates/vendas separados de patrimônio e rentabilidade. |
-| 3.0.3 | Código local preservado: reconstrói quantidades pelo ledger e usa fechamento bruto/eventos societários da integração existente. A adequação da fonte, acesso a `rawClose`, cobertura e termos permanece pendente; não está concluída nem liberada para publicação. Ver [Fase 3.0.3](phase-3.0.3-equity-history.md). |
-| 3.0.4 | Concluída e validada: histórico unificado de ações/CDB, capital movimentado e composição por bases abertas. Sem migration. Publicação reportada; SHA Vercel e revisão Alembic de produção pendentes de confirmação independente. Ver [revisão final](phase-3.0.4-final-review.md) e [notas](../CHANGELOG.md). |
-| 3.0.5 | A proposta anterior de filtros, tooltips, estados de cobertura e layout foi incorporada às interfaces 3.0.3/3.0.4. Não há escopo adicional aprovado para esta subfase. |
+## v4.0.0 — análise financeira
 
-## Proposta v4.0.0 — não aprovada
+### 4.1 — Histórico individual de ações
 
-Esta proposta organiza opções para o próximo ciclo; não autoriza implementação, gasto,
-integração externa ou alteração de schema.
+**Estado:** concluído tecnicamente, sem fonte. Endpoint privado, períodos, contrato tipado, estados de disponibilidade e UI em /acoes. Fonte desligada por flag; não reutilizar cotação pontual como série.
 
-1. **4.0.0 — confiabilidade operacional:** documentar versão/deployment SHA, verificar
-   backups e restauração, e manter testes de autenticação, RLS e permissões de runtime.
-2. **4.1 — importação revisável:** avaliar importação de CSV de corretora com prévia,
-   validação, detecção de duplicatas e confirmação explícita antes de acrescentar ao ledger.
-3. **4.2 — eventos de carteira:** definir suporte a proventos e eventos societários apenas
-   com registros observáveis, regras documentadas e testes; sem presumir valores ausentes.
-4. **4.3 — evolução patrimonial histórica:** considerar snapshots somente se houver fonte de
-   preços gratuita e permitida com cobertura suficiente. Até lá, manter lacunas indisponíveis.
+### 4.2 — Comparação de ativos
 
-Critérios para qualquer escopo: preservar operações originais e REPLACE/VOID, isolamento por
-proprietário, decimais exatos, demo pública offline e validação local antes de qualquer
-publicação. Nenhuma API paga ou scraping está proposto.
+**Estado:** concluído tecnicamente, sem fonte. Seleção de 2–4 ativos, base 100 na data válida comum, moeda/fonte/base compatíveis, sem preenchimento de lacunas. O índice é variação de preço, não retorno total.
 
-### Preço e patrimônio são métricas diferentes
+### 4.3A — Resumo financeiro atual
 
-- **Histórico de preço** acompanha a cotação de um ativo ao longo do tempo; não representa
-  o dinheiro ou o resultado de uma carteira individual.
-- **Evolução do patrimônio** depende das quantidades efetivamente mantidas em cada data,
-  das movimentações e dos preços correspondentes. Aportes e resgates alteram o patrimônio
-  sem necessariamente representar rentabilidade. Caixa, proventos, custos, tributos e
-  eventos corporativos precisarão de tratamento explícito conforme o escopo disponível.
-- Um gráfico de preços não será apresentado como evolução patrimonial. A cotação atual
-  não será aplicada retroativamente para inventar patrimônio histórico.
+**Estado:** concluído tecnicamente, localmente validado e ainda não publicado. O endpoint privado `GET /api/dashboard/performance` compõe custo/resultado de ações, fluxos registrados, principal CDB efetivo, composição e cobertura das cotações atuais. `PortfolioInsights` mostra os dados pelas bases e estados documentados no [plano 4.3](phase-4.3-financial-performance-plan.md).
 
-### Dependências e limites
+- Usa `Decimal`, o ledger de ações existente e `effective_movements()` para revisões REPLACE/VOID; posição declarada sem lotes fica separada.
+- Resultado realizado é após taxas registradas e antes de impostos. Resultado não realizado/combinado requer cobertura de cotação completa; cotações stale são avisadas.
+- Vendas e resgates não são chamados de lucro/rendimento. Fluxo líquido não é aporte externo, patrimônio ou rentabilidade. Estimativas CDB continuam individuais por contrato.
+- Sem persistência nova ou migration.
+- Validação local: backend 363 aprovados/1 ignorado; PostgreSQL descartável 1 aprovado; frontend 162 aprovados; build concluído.
 
-A disponibilidade histórica dependerá de **fontes gratuitas e permitidas e dados realmente
-existentes**, incluindo cobertura, limites, atraso, licença de uso e ajustes de preços. Antes
-de adotar uma fonte futura, avaliar a viabilidade por ativo e período, sem assumir histórico
-completo ou dados em tempo real. O orçamento do projeto não contempla API paga e esta decisão
-não autoriza contratação.
+### 4.4 — Rentabilidade temporal completa
 
-O ledger de operações é a fonte principal da verdade para compras, vendas, aplicações e
-resgates registrados. Cotações externas são estimativas e devem ser identificadas na
-interface, com orientação para conferência na corretora. Não fabricar cotações nem aceitar
-cálculos sabidamente incompatíveis com a base do preço e os eventos corporativos.
+**Estado:** bloqueado e condicional. Ver [plano 4.4](phase-4.4-historical-performance-plan.md).
 
-Períodos sem dados suficientes devem aparecer como indisponíveis/lacunas ou ter a seleção
-limitada, sem preencher preços ou rendimentos fictícios. Resumos mensais/anuais devem
-definir bases e datas antes de calcular percentuais; fluxo de caixa não é retorno.
+Depende de registro suficiente de fluxos externos, proventos e eventos incluídos no escopo; avaliação de posições em datas adequadas; e fonte de preço gratuita com licença compatível e cobertura demonstrada. Nenhum preço atual pode preencher uma data passada. A implementação pode ficar desligada ou indisponível; uma fonte paga não será requisito.
 
-Demo pública continuará offline, com séries explicitamente fictícias e separadas das
-carteiras privadas. Credenciais de fornecedores continuarão exclusivas do backend.
+### Release v4.0.0
 
-## Fase 4.0 — gestão, análise e consolidação da carteira
+**Proposta:** release candidate tecnicamente preparado após a 4.3A passar critérios funcionais, financeiros, de segurança e release. A falta de fonte histórica não bloqueia o escopo pessoal se 4.1/4.2 mostrarem indisponibilidade de forma honesta, não fizerem chamadas indevidas e as cotações atuais continuarem independentes. A 4.4 não é requisito de lançamento enquanto bloqueada. Implantação, banco hospedado, login hospedado e validação manual ainda precisam de conferência operacional; este registro não declara validação em produção.
 
-Planejar integração entre Ações e Renda Fixa em uma visão geral, histórico consistente,
-filtros e exportação, revisando responsividade e desempenho. Totais só serão apresentados
-quando cobertura, data-base e sobreposição dos ativos estiverem resolvidas. Exportação não
-deve ampliar dados ou permissões; isolamento por proprietário e demo offline continuam.
+Critérios e processo: [critérios de release pessoal](personal-dashboard-release-criteria.md). Nenhuma publicação é autorizada por este roadmap.
 
-## Fase 5.0 — simulador e metas
+## v5.0.0 — planejamento, dados e relatórios
 
-Respeitar os placeholders atuais da navegação. “Planeje o que vem pela frente” poderá
-simular aportes periódicos, taxas hipotéticas e reinvestimento em cenários comparativos.
-“Seu próximo marco financeiro” poderá registrar patrimônio-alvo, prazo, progresso e
-projeção de conclusão. Premissas escolhidas devem ficar visíveis; projeções são cenários,
-nunca promessa ou garantia de retorno. Não pertence à Fase 2 ou 3.
+A Fase 5.0 do app já mostra placeholders de **Simulador** e **Metas**, explicitamente planejados para a versão 5. A sequência abaixo é uma proposta, não autorização de implementação. Os módulos originalmente previstos são preservados, mesmo que condicionais ou opcionais. Ver [plano mestre v5](phase-5-master-plan.md).
 
-## Fase 6.0 — melhorias opcionais do produto pessoal e da demonstração pública
+| Fase proposta | Conteúdo | Prioridade / dependências |
+|---|---|---|
+| 5.1 — Eventos e fluxo de caixa | Definir registros de depósitos/saques externos, proventos e eventos societários sustentados por evidência. | Base necessária para retorno total; regras e migration podem ser necessárias. |
+| 5.2 — Importação CSV revisável | Prévia, validação, detecção de duplicatas, mapeamento e confirmação explícita. | Proposta original preservada; começar por um formato de corretora autorizado e anonimizado. |
+| 5.3 — Relatórios e exportação | Relatório de operações/posições e exportações consistentes com o filtro e o proprietário. | Exportação JSON atual não equivale a relatórios completos. |
+| 5.4 — Simulador | Aportes hipotéticos, taxas, prazo e reinvestimento como cenários editáveis. | Escopo original e placeholder; não requer histórico real se as hipóteses forem explícitas. |
+| 5.5 — Metas | Patrimônio-alvo, prazo, progresso e projeção com base claramente identificada. | Escopo original e placeholder; depende da definição da base do progresso. |
+| 5.6 — Histórico de carteira e benchmarks | TWR/MWR e comparação com benchmarks somente após entradas e avaliações suficientes. | Condicional, possivelmente com persistência nova; fornecedor continua sujeito à regra gratuita. |
 
-Escopo exclusivamente opcional: polimento do produto pessoal e melhorias da demonstração
-pública offline. Não inclui solicitação de acesso, convites, cadastro, multiusuário,
-administração de contas ou autorização para ler dados privados. Os dados da demonstração
-continuam fictícios e isolados.
+**Opcionais preservados:** conexões bancárias/Open Finance, integração automática com corretores, suporte a outros formatos de importação, conciliação e fontes comerciais. São propostas condicionais; devem ter substituto manual/CSV gratuito e não podem ser requisitos do produto.
 
-## Versão 1.0 Final — lançamento do Investment Dashboard pessoal
+## Conclusão do dashboard pessoal e transição
 
-Lançamento do produto para uso pessoal do proprietário, após homologação funcional e
-financeira, privacidade, backup/restauração ensaiada, documentação, aprovação do responsável
-e publicação controlada. A versão 1.0 não oferece onboarding para outros usuários.
+A conclusão do dashboard pessoal é um marco de qualidade do produto, não sinônimo da release v4 ou v5. Critérios mínimos estão em [critérios do dashboard pessoal](personal-dashboard-release-criteria.md). Sem provedor histórico aprovado, pode-se concluir e estabilizar o conjunto de funcionalidades que possui dados suficientes, mantendo explicitamente a 3.0.3/4.1/4.2 indisponíveis.
 
-## Nova versão 2.0 — expansão multiusuário por convite
+A expansão para convidados só deve começar após backup/restauração ensaiados, isolamento verificado e release pessoal estável. Os critérios estão em [Investment Dashboard 2.0](multiuser-expansion-plan.md).
 
-Escopo posterior à 1.0: solicitação de acesso, aprovação manual do administrador, convite
-individual com expiração, seguido da criação de uma carteira privada isolada.
-RLS e autorização devem proteger cada conta. O administrador não recebe acesso automático
-aos investimentos de outros usuários; convite e gestão de acesso não concedem leitura das
-carteiras. Implementação depende de decisão e aprovação próprias; nenhum sistema de convite
-é implementado ou autorizado por este roadmap.
+## Dependências principais
+
+| Para habilitar | É necessário primeiro |
+|---|---|
+| Retorno total da carteira | Fluxos externos separados de operações; proventos/eventos no escopo; valor da carteira em datas de referência. |
+| TWR | Avaliações imediatamente antes/depois dos fluxos externos relevantes, séries coerentes e subperíodos calculáveis. |
+| MWR/XIRR | Fluxos datados completos, sinalizados corretamente e valor terminal confiável. |
+| Gráfico de patrimônio histórico | Posições reconstruíveis e preços/valores observados por data para cada classe incluída. |
+| Comparação/histórico de ações real | Fonte diária gratuita, licença, cobertura B3 e base de preços validadas. |
+| Simulador | Premissas editáveis, fórmulas testadas e apresentação como cenário, não previsão. |
+| Metas | Definição de “patrimônio atual” e método de progresso; sem isso, explicar indisponibilidade. |
+| Importação segura | Formato mapeado, prévia, idempotência/dedupe e preservação de eventos originais. |
+| Multiusuário | Conta e convite, autorização, isolamento, suporte, privacidade, limites, backup e observabilidade. |
+
+## Estimativas e prioridades
+
+Premissa: uma pessoa desenvolvedora, dias de trabalho focado, dependências locais disponíveis e escopo limitado. Não são datas ou compromissos. Esperas por fonte, licença, políticas de hospedagem ou decisão do proprietário não estão incluídas.
+
+| Marco | Prioridade | Esforço indicativo | Incerteza/bloqueio |
+|---|---:|---:|---|
+| 4.3A | Alta para v4 | 5–8 dias | Corrigir precisão somente se testes mostrarem perda material. |
+| Verificação e release v4 | Alta | 2–4 dias | Confirmações manuais dos ambientes e rollback. |
+| 5.1 | Alta para retorno confiável | 8–15 dias | Semântica financeira e migration. |
+| Primeiro formato 5.2 | Média/alta | 7–14 dias | Varia por layout e qualidade do arquivo. |
+| 5.3 | Média | 5–10 dias | Formatos e filtros. |
+| 5.4 e 5.5 | Média | 8–15 dias somadas | Persistir simulações/metas exigiria schema; apenas cenário temporário talvez não. |
+| 5.6 | Condicional | 10–20+ dias de desenvolvimento | Fonte permitida e série histórica; aprovação externa sem prazo. |
+| Estabilização pessoal | Alta antes de expansão | 5–10 dias distribuídos | Ensaio de recuperação e operação. |
+| Preparação e MVP 2.0 | Baixa até aprovação própria | 20–40+ dias | Custos, privacidade, onboarding e suporte não definidos. |
+
+## Processo de documentação e release
+
+- Estados oficiais: Concluído, Em desenvolvimento, Planejado, Bloqueado, Opcional e Descontinuado.
+- Roadmap é a fonte de status; documento de fase define contrato e aceite; CHANGELOG registra somente mudanças já entregues.
+- Antes de release: testes backend/frontend, PostgreSQL descartável para RLS/migrations relevantes, build, links/documentação, revisão de diff e confirmação de backup/restore.
+- Commits devem ser pequenos e por fase; mudanças de código e documentação do plano podem ser separadas.
+- Release, migration de produção, merge, push e deploy permanecem ações manuais autorizadas.
+- Um plano de rollback deve preservar schema e dados, com procedimento de aplicação e reversão verificado antes da janela de release.
+
+## Registro de atualização
+
+Esta consolidação registra a conclusão técnica local da 4.3A; documentos históricos das fases 1–3 permanecem preservados. 4.4 e as fases v5 seguem planejadas/bloqueadas conforme suas dependências, não como funcionalidade implementada nem autorização automática.

@@ -1,5 +1,31 @@
 # Changelog
 
+## v4.0.0 — alterações preparadas, ainda não publicadas (29/10/2026)
+
+### Adicionado
+
+- Resumo privado atual em `GET /api/dashboard/performance`, integrando fluxos registrados,
+  capital em posições abertas, composição e resultado de ações somente com dados disponíveis.
+- Painel `PortfolioInsights` com resultado realizado + resultado não realizado coberto,
+  avisos de cobertura e cotações stale, sem alegar retorno percentual total.
+- Divisão dinâmica dos módulos de gráficos/páginas: o chunk inicial caiu de 806,13 kB para
+  443,68 kB no build local medido.
+
+### Corrigido
+
+- Precisão local do cálculo de custo médio para operações no limite de `NUMERIC(20,8)`;
+  casos de teste reproduziram a perda de dígito no produto quantidade × preço e um resíduo
+  mínimo de custo após venda total com média decimal repetitiva.
+### Limites
+
+- Resultado realizado considera somente taxas registradas e é antes de impostos. Cotações
+  atuais são estimativas; a indicação stale pede conferência na corretora.
+- Fluxo líquido registrado não equivale a depósito externo, patrimônio ou rentabilidade.
+- Estimativas de CDB continuam por contrato na interface existente; posições declaradas
+  seguem separadas do principal dos lotes.
+- Histórico individual/comparativo de preços permanece sem fonte aprovada e desabilitado.
+- Sem migration. Esta entrada não significa que a release v4.0.0 foi publicada.
+
 ## v3.0.4 — notas preparadas em 29/10/2026
 
 > Notas para a release oficial. Nenhuma tag, GitHub Release, deploy ou migration foi criada

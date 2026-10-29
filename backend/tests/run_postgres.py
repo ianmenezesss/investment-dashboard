@@ -143,7 +143,8 @@ def main():
         if not endpoint.startswith(("npipe:", "unix:")):
             raise RuntimeError("Endpoint Docker não local; ensaio cancelado")
         run("info", "--format", "{{.ServerVersion}}")
-        # Never pull or contact a registry: integration runs only with a cached image.
+        # This runner never pulls: CI preloads postgres:17-alpine before this step.
+        # Keep the inspection so a missing image fails before any container setup.
         run("image", "inspect", "--format", "{{.Id}}", "postgres:17-alpine")
         # Docker Desktop 29 did not expose a host binding on the previous --internal
         # network. A dedicated bridge permits host loopback access; the runner still
