@@ -38,6 +38,7 @@ export function EquityHistory({ repository, identity }: { repository: PrivateRep
   const providerMessage = providerReasons.includes('missing_token') ? 'Configure o acesso à fonte de cotações no backend para consultar preços históricos.'
     : providerReasons.includes('disabled') ? 'O serviço de cotações está desabilitado na configuração do backend.'
       : providerReasons.includes('raw_price_unavailable') ? 'A fonte não forneceu fechamentos originais. O histórico de valor exige acesso a rawClose no plano habilitado.'
+        : providerReasons.some(reason => ['raw_history_not_available', 'provider_auth_error'].includes(reason)) ? 'O acesso configurado não permite consultar os fechamentos originais. O histórico de preços permanece indisponível sem acesso a rawClose.'
         : providerReasons.some(reason => ['provider_timeout', 'provider_unavailable', 'provider_http_error', 'rate_limited'].includes(reason))
           ? 'A fonte de cotações está indisponível ou limitou a consulta. Tente novamente mais tarde.'
           : 'Não há preços históricos originais disponíveis para os ativos e período selecionados.'
@@ -50,7 +51,7 @@ export function EquityHistory({ repository, identity }: { repository: PrivateRep
     {history.isLoading ? <p role="status" className="empty compact">Carregando histórico de ações…</p>
       : history.isError ? <p role="alert" className="empty compact">Não foi possível carregar o histórico de ações. Tente novamente mais tarde.</p>
       : !data?.points.length ? <div className="empty compact"><h4>{data?.coverage === 'empty' ? 'Sem operações de ações registradas' : 'Histórico de preços indisponível'}</h4>
-        <p>{providerMessage}</p>
+        <p>{data?.coverage === 'empty' ? 'Registre uma compra ou venda para iniciar o histórico de quantidades. Nenhuma cotação é consultada sem operações.' : providerMessage}</p>
       </div>
       : <>
         {providerReasons.length > 0 && <p className="portfolio-coverage" role="status">{providerMessage}</p>}

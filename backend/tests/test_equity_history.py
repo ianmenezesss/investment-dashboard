@@ -6,11 +6,12 @@ from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
 from app.auth import Principal, authenticate
-from app.database import get_db
+from app.database import get_db, settings
 from app.equity_history import aggregate_equity_history, equity_history_service
-from app.main import app
+from app.main import app, lifespan
 from app.market_data.equity_history import (
     BrapiEquityHistoryProvider, EVENT_ENDPOINT, PRICE_ENDPOINT, DailyPrice, EquityHistoryService,
     ShareEvent, TickerHistory,
@@ -24,6 +25,31 @@ TOKEN = "test-history-token"
 
 def op(id, ticker, kind, day, quantity, price, fees="0"):
     return Row(id=id, ticker=ticker, kind=kind, date=date.fromisoformat(day), quantity=D(quantity), price=D(price), fees=D(fees))
+
+
+def test_history_feature_flag_disabled_does_not_call_provider():
+    class Provider:
+        async def fetch(self, *args, **kwargs):
+            raise AssertionError("provider must not be called while history is disabled")
+
+    async def run():
+        service = EquityHistoryService(Provider(), enabled=False, configured=True)
+        result = await service.get(["ITUB4"], price_start=date(2025, 1, 1), event_start=date(2025, 1, 1), end=date(2025, 1, 2))
+        assert result["ITUB4"].error == "disabled"
+
+    asyncio.run(run())
+
+
+def test_history_flag_does_not_disable_current_quotes(monkeypatch):
+    async def run():
+        monkeypatch.setattr(settings, "market_data_enabled", True)
+        monkeypatch.setattr(settings, "equity_history_enabled", False)
+        monkeypatch.setattr(settings, "brapi_token", SecretStr(TOKEN))
+        async with lifespan(app):
+            assert app.state.quote_service.enabled is True
+            assert app.state.equity_history_service.enabled is False
+
+    asyncio.run(run())
 
 
 def test_rebuilds_quantities_at_daily_close_and_uses_decimal_raw_price():

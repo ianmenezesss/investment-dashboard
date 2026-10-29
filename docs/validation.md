@@ -4,8 +4,11 @@
 
 - Histórico unificado, fluxos acumulados e composição foram integrados às áreas privadas
   existentes. Revisão sem alterações de schema/dados; sem migration.
+- A preparação isolou o histórico externo de ações por `EQUITY_HISTORY_ENABLED=false` por
+  padrão, preservando o uso independente de cotações pontuais. O teste confirmou que o provedor
+  histórico não é chamado quando a flag está desligada.
 - Backend focalizado para ações, custo/resultado, autenticação, CDB/revisões, histórico de
-  preços, fluxos, movimentos e valuation: **230 aprovados, 1 aviso de depreciação** do
+  preços, fluxos, movimentos e valuation: **232 aprovados, 1 aviso de depreciação** do
   `TestClient`/httpx (`backend/.venv/Scripts/python.exe -m pytest` com os módulos listados
   em [phase-3.0.4-final-review.md](phase-3.0.4-final-review.md)).
 - Frontend: **149 aprovados** na suíte completa; **55 aprovados** nos cinco grupos focais de
@@ -14,6 +17,9 @@
 - `npm run build`: aprovado; Vite mantém aviso de chunk principal acima de 500 kB.
 - `git diff --check`: aprovado, com avisos do Git sobre conversão LF/CRLF em arquivos
   editados. Nenhum commit, push ou deploy foi executado.
+- `alembic heads`: o checkout local aponta para **008 (head)**. A revisão e os privilégios do
+  banco remoto não foram consultados. A tentativa de abrir o servidor Vite local no browser
+  embutido terminou em `ERR_CONNECTION_TIMED_OUT`; a validação visual permanece manual.
 - Validação visual, credenciais Supabase da conta real e fonte de preços no ambiente de
   publicação continuam manuais. A 3.0.3 permanece pendente; veja o checklist e a recomendação
   em [revisão final da Fase 3.0.4](phase-3.0.4-final-review.md).

@@ -51,6 +51,15 @@ substitui o ledger. A interface identifica valuations/fechamentos externos como 
 e orienta conferência dos valores na corretora. O histórico de preços da 3.0.3 foi preservado
 sem scraping e sem nova integração nesta rodada.
 
+Para evitar que a pendência histórica bloqueie a 3.0.4, o backend agora possui a variável
+opt-in `EQUITY_HISTORY_ENABLED`, desligada por padrão e no modelo Render. O histórico de
+preços só faz chamadas ao provedor quando `MARKET_DATA_ENABLED=true`,
+`EQUITY_HISTORY_ENABLED=true` e o token está configurado. Assim, cotações pontuais podem
+continuar habilitadas com `MARKET_DATA_ENABLED=true` e `EQUITY_HISTORY_ENABLED=false`; a
+implementação histórica permanece disponível, mas a interface mostra indisponibilidade
+explícita e nenhuma chamada de histórico é feita. Não há variável obrigatória nova para
+publicar a 3.0.4.
+
 A 3.0.3 não deve ser considerada resolvida enquanto não houver uma fonte com uso permitido,
 cobertura e campos compatíveis com o cálculo (incluindo preço bruto e eventos corporativos).
 Futuramente podem ser avaliadas fontes gratuitas permitidas, mesmo que tenham atualização
@@ -62,7 +71,10 @@ preço. Não há verba aprovada para API paga.
 
 Endpoints continuam privados com autenticação existente, `private_db` e isolamento por
 `owner_id`. A demonstração pública continua offline e não recebe carteira privada. Não houve
-mudança de schema, necessidade de migration ou leitura/escrita de banco de produção.
+mudança de schema, necessidade de migration ou leitura/escrita de banco de produção. A
+configuração remota do banco não foi consultada nesta rodada; antes da publicação, confirme
+que o banco está na revisão Alembic atual do repositório (008) e que o papel de runtime tem
+os privilégios provisionados pelas migrações existentes.
 
 ## Validação automatizada
 
@@ -106,9 +118,11 @@ Use dados fictícios ou uma base local descartável; não crie operações de te
 
 ## Recomendação de publicação
 
-A 3.0.4 está pronta para revisão e commit local. Recomenda-se **não publicar o conjunto da
-Fase 3.0 ainda** enquanto a 3.0.3 continuar habilitada sem fonte histórica adequada confirmada
-para o ambiente de execução e os direitos de exibição. Antes de uma publicação controlada,
-confirmar configuração da API privada, licença/cobertura da fonte externa ou desabilitar a
-dependência histórica por configuração revisada. Esta recomendação não executou alterações
-remotas.
+A funcionalidade 3.0.4 é independente da fonte histórica e pode integrar uma publicação
+controlada com `EQUITY_HISTORY_ENABLED=false`. A implementação 3.0.3 permanece preservada e
+indisponível até validação de fonte, cobertura e termos; isso não desliga cotações pontuais
+que usem a configuração geral existente. **Decisão desta revisão: NO-GO para executar a
+publicação agora**, pois não foram inspecionadas a configuração real do Render/Vercel/Supabase,
+a revisão do banco remoto nem o fluxo visual no navegador. A decisão técnica do código é
+**GO condicionado** à conferência manual abaixo e à confirmação do schema/roles de produção.
+Nenhuma ação remota foi executada.

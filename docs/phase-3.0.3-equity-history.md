@@ -100,9 +100,12 @@ duplicar ticks próximos.
 
 ## Banco, configuração e validação
 
-Não há mudança de schema nem migration. A feature depende da configuração já usada para
-cotações (`MARKET_DATA_ENABLED=true` e `BRAPI_TOKEN` configurado com acesso aos campos
-`rawClose` e eventos). Não há variável nova nem credencial do provider no frontend.
+Não há mudança de schema nem migration. A feature depende da configuração de cotações
+(`MARKET_DATA_ENABLED=true`), da flag opt-in `EQUITY_HISTORY_ENABLED=true` e de
+`BRAPI_TOKEN` configurado com acesso aos campos `rawClose` e eventos. A flag histórica é
+`false` por padrão: com `MARKET_DATA_ENABLED=true` e `EQUITY_HISTORY_ENABLED=false`, as
+cotações pontuais podem permanecer disponíveis enquanto o histórico informa indisponibilidade
+sem consultar o provedor. Não há credencial do provider no frontend.
 
 Testes adicionados cobrem precisão Decimal, compras em datas diferentes, venda parcial e
 total, desdobramento, janela anterior à primeira operação, falta de preço, cobertura

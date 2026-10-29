@@ -43,7 +43,8 @@ async def lifespan(app):
         app.state.quote_service = QuoteService(BrapiProvider(client, token),
             enabled=settings.market_data_enabled, configured=bool(token))
         app.state.equity_history_service = EquityHistoryService(
-            BrapiEquityHistoryProvider(client, token), enabled=settings.market_data_enabled, configured=bool(token))
+            BrapiEquityHistoryProvider(client, token),
+            enabled=settings.market_data_enabled and settings.equity_history_enabled, configured=bool(token))
         app.state.bcb_rates_service = RateService(SGSProvider(rates_client))
         try:
             yield

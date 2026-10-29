@@ -26,3 +26,6 @@ services:
         sync: false
       - key: ALLOWED_USER_IDS
         sync: false
+      # Historical equity prices remain opt-in until the source and its terms are validated.
+      - key: EQUITY_HISTORY_ENABLED
+        value: false
