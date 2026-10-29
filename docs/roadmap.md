@@ -34,6 +34,7 @@ Atualizado em 29/10/2026. Este documento é a fonte principal de verdade do plan
 | v4.2 — Comparação de ativos | **Concluído tecnicamente; dados bloqueados** | Endpoint e UI foram implementados com normalização e sem interpolação; dependem da mesma fonte histórica da 4.1. |
 | v4.3A — Resumo financeiro atual | **Concluído tecnicamente** | Endpoint privado de resumo, composição/fluxos existentes, resultado de ações com cobertura e precisão Decimal corrigida. Sem migration; ainda não publicado. |
 | v4.4 — Rentabilidade temporal completa | **Bloqueado / condicional** | Depende de fluxo externo classificado, eventos pertinentes e avaliações históricas comparáveis. |
+| 5.0A — Navegação responsiva e identidade dinâmica | **Planejado** | Etapa inicial de UX v5; sidebar responsiva e identidade derivada da sessão, sem usar e-mail para autorização. |
 | v5.0.0 | **Planejado** | Simulador e metas são placeholders da Fase 5; os demais módulos abaixo são propostas, não compromissos já implementados. |
 | Investment Dashboard 2.0 | **Planejado, após estabilidade pessoal** | Expansão por convite, com isolamento rigoroso e operação sustentável sem despesa obrigatória. |
 
@@ -85,10 +86,11 @@ Critérios e processo: [critérios de release pessoal](personal-dashboard-releas
 
 ## v5.0.0 — planejamento, dados e relatórios
 
-A Fase 5.0 do app já mostra placeholders de **Simulador** e **Metas**, explicitamente planejados para a versão 5. A sequência abaixo é uma proposta, não autorização de implementação. Os módulos originalmente previstos são preservados, mesmo que condicionais ou opcionais. Ver [plano mestre v5](phase-5-master-plan.md).
+A primeira etapa proposta da v5 é **5.0A — Navegação responsiva e identidade dinâmica**, descrita em [plano 5.0A](phase-5.0A-responsive-navigation-user-identity.md). Ela prepara a navegação e a apresentação da identidade sem alterar a autorização do backend. A Fase 5.0 do app já mostra placeholders de **Simulador** e **Metas**, explicitamente planejados para a versão 5. A sequência abaixo é uma proposta, não autorização de implementação. Os módulos originalmente previstos são preservados, mesmo que condicionais ou opcionais. Ver [plano mestre v5](phase-5-master-plan.md).
 
 | Fase proposta | Conteúdo | Prioridade / dependências |
 |---|---|---|
+| 5.0A — Navegação e identidade | Sidebar responsiva/acessível; nome e avatar derivados da sessão autenticada; fronteira demo/privado mantida. | Etapa preparatória de UX; sem migration e sem custo obrigatório. |
 | 5.1 — Eventos e fluxo de caixa | Definir registros de depósitos/saques externos, proventos e eventos societários sustentados por evidência. | Base necessária para retorno total; regras e migration podem ser necessárias. |
 | 5.2 — Importação CSV revisável | Prévia, validação, detecção de duplicatas, mapeamento e confirmação explícita. | Proposta original preservada; começar por um formato de corretora autorizado e anonimizado. |
 | 5.3 — Relatórios e exportação | Relatório de operações/posições e exportações consistentes com o filtro e o proprietário. | Exportação JSON atual não equivale a relatórios completos. |
