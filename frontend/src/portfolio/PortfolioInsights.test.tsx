@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { PortfolioInsights, type CapitalFlows, type Composition } from './PortfolioInsights'
+import { formatFlowAxisTick } from './format'
 
 let host: HTMLDivElement
 let root: Root
@@ -58,4 +59,14 @@ test('requests fresh filtered flows and marks selected temporal period', async (
   expect(repository.capitalFlows).toHaveBeenCalledTimes(2)
   expect(repository.capitalFlows.mock.calls.map(call => call[0])).toEqual(['Tudo', '1M'])
   expect(host.querySelector('button[aria-pressed="true"]')?.textContent).toBe('1M')
+})
+
+test('formats small flow ticks in BRL and keeps compact tick labels distinct', () => {
+  const normalize = (value: string) => value.replace(/\u00a0/g, ' ')
+  expect(normalize(formatFlowAxisTick(50))).toBe('R$ 50')
+  expect(normalize(formatFlowAxisTick(100))).toBe('R$ 100')
+  expect(normalize(formatFlowAxisTick(200))).toBe('R$ 200')
+  expect(normalize(formatFlowAxisTick(1000))).toBe('R$ 1 mil')
+  const compact = [1000, 1001, 2000, 2001].map(formatFlowAxisTick)
+  expect(new Set(compact).size).toBe(compact.length)
 })

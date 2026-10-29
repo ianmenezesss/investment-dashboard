@@ -1,8 +1,9 @@
 # Fase 3.0 — plano técnico para gráficos e evolução patrimonial
 
-**Estado: planejamento.** Sem implementação, migration ou acesso remoto. Todas as etapas
-de desenvolvimento e homologação usarão dados fictícios. O acesso do proprietário a dados
-reais não será solicitado nem usado nesta fase.
+**Estado: 3.0.1/3.0.2 e 3.0.4 em produção conforme informado pelo responsável; 3.0.3
+implementada localmente para revisão.** A implementação 3.0.3 consulta somente a fonte
+histórica brapi documentada abaixo, usa autenticação existente e não criou migration.
+Detalhes, limites e validação estão em [Fase 3.0.3](phase-3.0.3-equity-history.md).
 
 ## Inventário da base existente
 
@@ -126,9 +127,11 @@ Confiabilidade deve ser comparada com um conjunto fictício de tickers cobrindo 
 ETFs/FIIs se estiverem no escopo: completude de pregões, ajustes, revisões, ticker renames,
 timestamps, códigos de falha, uptime/SLA e processo de retificação. O registro acima é uma
 fotografia pública de preço/termos; limites e ofertas mudam e não são garantia contratual.
-Nenhuma fonte está escolhida. Antes da decisão: comparar amostras sem dados pessoais,
-confirmar licença pessoal para a 1.0 e direitos de exibição/uso derivado para a futura 2.0,
-estimar chamadas/custo, retenção/cache e contingência em indisponibilidade.
+O levantamento de 28/10/2026 não escolhia fonte. Para a implementação privada 3.0.3 em
+29/10/2026, foi selecionada a brapi, condicionada a credencial/plano que forneça `rawClose`
+e eventos de ações. Isso não libera exibição a convidados, redistribuição, nem contratação
+automática; conferir a conta/plano do backend antes de publicar. Consulte
+[Fase 3.0.3](phase-3.0.3-equity-history.md) para termos, integração e limites atuais.
 
 Links oficiais consultados: [histórico e ajustes brapi](https://brapi.dev/docs/acoes/historico),
 [preços brapi](https://brapi.dev/pricing), [termos brapi](https://brapi.dev/legal/terms-of-use),
@@ -161,7 +164,9 @@ Links oficiais consultados: [histórico e ajustes brapi](https://brapi.dev/docs/
 
 ## Contrato de dados e endpoint candidato
 
-Depois de aprovar definições e fonte histórica, avaliar uma leitura owner-scoped, por exemplo
+O endpoint candidato para uma série geral permanece referência conceitual; a 3.0.3 usa uma
+rota privada específica descrita em [Fase 3.0.3](phase-3.0.3-equity-history.md). Para novas
+séries, avaliar uma leitura owner-scoped, por exemplo
 `GET /api/dashboard/history?from=YYYY-MM-DD&to=YYYY-MM-DD&interval=month`. A resposta deve
 carregar pontos normalizados com data, moeda, métricas separadas, cobertura/estado,
 referências das fontes e instante do snapshot. Valores monetários devem ser serializados
@@ -177,7 +182,7 @@ aprovação e migration independente.
 | --- | --- |
 | **3.0.1 — definições e cobertura** | Aprovar dicionário acima, matriz por ativo e carteira, status de cobertura, política de filtros e documentação comparativa de fonte. Exemplos/fixtures somente fictícios. Sem gráfico, endpoint, coleta, migration ou escolha de provedor. |
 | **3.0.2 — fluxos de capital** | Agregar aplicações, amortizações e operações por mês/ano, separadas de resultado realizado/estimado. Testes `Decimal` para limites de período, ordem cronológica, datas sem evento e account scoping; não produzir patrimônio histórico. |
-| **3.0.3 — preço histórico de ações** | Decidir fonte, licença, cobertura, ajustes de splits/proventos, moeda, atraso e cache. Só então reconstruir quantidade × preço nas datas suportadas; testar cotação ausente e eventos corporativos. Se fonte confiável não for viável, documentar recorte e manter gráfico de patrimônio indisponível. |
+| **3.0.3 — preço histórico de ações** | Implementada localmente para revisão com brapi, `rawClose` e fatores de eventos societários. O endpoint privado reconstrói quantidades no fechamento diário e mantém totais nulos quando faltam dados. Exige plano que forneça `rawClose`; ver testes e limitações no documento da subfase. |
 | **3.0.4 — posição por classe e ativo** | Expor composição atual em ações e Renda Fixa com snapshot, cobertura e base explícitos. Criar regra aprovada para posição observada e lotes posteriores; se a sobreposição não puder ser conhecida, não somar ao total. Testar RLS A/B e agregação sem dupla contagem. |
 | **3.0.5 — evolução e interface** | Reaproveitar Recharts e tokens do tema escuro para gráficos responsivos, filtros por períodos suportados, tooltips, fontes, estados vazios/parciais e lacunas. Testes de acessibilidade, mobile, identidade/demo offline e valores `null`; build privado e público se ambos forem alterados. |
 
@@ -186,8 +191,9 @@ responsável aprovar escopo, definições e próxima entrega.
 
 ## Riscos e decisões para aprovação
 
-- **Preços históricos:** qual fonte pode ser usada, com licença e cobertura suficientes?
-  A fonte atual fornece cotações pontuais; não tratar o valor de hoje como histórico.
+- **Preços históricos:** fonte escolhida para carteira pessoal privada: brapi, condicionada a
+  plano/cobertura que exponha `rawClose` e eventos societários. A fonte atual ainda não
+  confirma isso para a credencial do deploy; não tratar o valor de hoje como histórico.
 - **Retorno:** definir se/como incluir proventos, taxas, impostos, depósitos/resgates e
   eventos corporativos. Fluxo de caixa não é retorno; valorização não é lucro realizado.
 - **Renda Fixa observada:** posição inteira pode incluir aplicações posteriores. Definir

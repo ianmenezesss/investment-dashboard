@@ -1,6 +1,6 @@
 # Roadmap do Investment Dashboard
 
-Atualizado em **28/10/2026** após a revisão da Fase 2.0.7 e planejamento da Fase 3.0.
+Atualizado em **29/10/2026** para registrar o estado local da Fase 3.0.3.
 O plano não autoriza implementação automática de funcionalidades futuras.
 
 Revisão de prontidão 2.0.6 registrada em
@@ -66,16 +66,16 @@ validação próprios; nenhuma está disponível como operação funcional nesta
 ## Fase 3.0 — gráficos e evolução patrimonial
 
 Objetivo: visualizações privadas com indicadores explicáveis e dados disponíveis de fato.
-O plano técnico, endpoints candidatos, limites e decisões em aberto estão em
-[Fase 3.0 — plano técnico](phase-3.0-technical-plan.md). Nenhuma entrega abaixo está
-implementada ou autorizada por este roadmap.
+Conforme informado pelo responsável, 3.0.1, 3.0.2 e 3.0.4 estão publicadas; 3.0.3 está
+implementada localmente para revisão e não foi publicada. O plano técnico, endpoints,
+limites e decisões em aberto estão em [Fase 3.0 — plano técnico](phase-3.0-technical-plan.md).
 
 | Subfase planejada | Escopo |
 | --- | --- |
-| 3.0.1 | Definir indicadores, contratos de dados e matriz de cobertura por ativo/carteira; especificar filtros 1M, 3M, 6M, 1A e máximo disponível sem plotar métricas que ainda não têm série confiável. |
-| 3.0.2 | Resumos mensais/anuais de aplicações, resgates e principal, por ativo/carteira; manter rendimentos realizados separados e nulos quando não determináveis. |
-| 3.0.3 | Viabilidade e, após aprovação de fonte, série histórica de preço/valor para posições em ações; reconstruir quantidades por operações e valorar somente em datas com preço histórico válido. |
-| 3.0.4 | Composição e distribuição por classe/ativo com consulta privada única ou poucas consultas agregadas; posições observadas e lotes posteriores não podem ser somados quando houver sobreposição incerta. |
+| 3.0.1 | Publicada conforme informado pelo responsável: indicadores, contratos e cobertura por ativo/carteira. |
+| 3.0.2 | Publicada conforme informado pelo responsável: fluxos de aplicações/compras e resgates/vendas separados de patrimônio e rentabilidade. |
+| 3.0.3 | Implementada localmente para revisão: fonte brapi, fechamento bruto e eventos societários, quantidades reconstruídas pelo ledger e gráfico privado com cobertura explícita. Exige plano com `rawClose`; detalhes e limitações em [Fase 3.0.3](phase-3.0.3-equity-history.md). |
+| 3.0.4 | Publicada conforme informado pelo responsável: composição por classe/ativo com cobertura e sem somar observações/lotes quando há sobreposição incerta. |
 | 3.0.5 | Gráficos responsivos, filtros temporais, tooltips, estados vazios/parciais e lacunas, com cobertura e data de referência visíveis. |
 
 ### Preço e patrimônio são métricas diferentes

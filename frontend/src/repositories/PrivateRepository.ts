@@ -10,6 +10,7 @@ export class PrivateRepository {
   summary(signal?: AbortSignal) { return request<PortfolioValuation>('dashboard/valuation', this.token, { signal }) }
   capitalFlows(period: string, signal?: AbortSignal) { return request<import('../portfolio/PortfolioInsights').CapitalFlows>(`dashboard/capital-flows?period=${period}`, this.token, { signal }) }
   composition(signal?: AbortSignal) { return request<import('../portfolio/PortfolioInsights').Composition>('dashboard/composition', this.token, { signal }) }
+  equityHistory(period: string, signal?: AbortSignal) { return request<import('../api').EquityHistory>(`dashboard/equity-history?period=${period}`, this.token, { signal }) }
   create(input: OperationInput) { return request<Operation>('operations', this.token, { method: 'POST', body: JSON.stringify(input) }) }
   delete(id: number) { return request<void>(`operations/${id}`, this.token, { method: 'DELETE' }) }
   export() { return request('export', this.token) }

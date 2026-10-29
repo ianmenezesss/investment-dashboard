@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { PrivateRepository } from '../repositories/PrivateRepository'
 import { ChartNoAxesCombined } from 'lucide-react'
+import { formatFlowAxisTick } from './format'
 import './portfolio.css'
 
 type FlowPoint = { date: string; contributions: string; redemptions: string; sales: string; net_accumulated: string }
@@ -32,7 +33,7 @@ export function PortfolioInsights({ repository, identity }: { repository: Privat
         <div className="periods">{periods.map(value => <button key={value} aria-pressed={period === value} className={period === value ? 'selected' : ''} onClick={() => setPeriod(value)}>{value}</button>)}</div>
       </div>
       {flows.isLoading ? <p role="status" className="empty compact">Carregando fluxos…</p> : flows.isError ? <p role="alert" className="empty compact">Não foi possível carregar a evolução dos fluxos.</p> : !flows.data?.points.length ? <div className="empty compact"><ChartNoAxesCombined/><h4>Sem fluxos no período</h4><p>Não há movimentações registradas na janela selecionada.</p></div> : <div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={flows.data.points} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid vertical={false} stroke="#222c33" strokeDasharray="3 5"/><XAxis dataKey="date" tickFormatter={value => new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })} axisLine={false} tickLine={false}/><YAxis tickFormatter={value => `${Math.round(value / 1000)} mil`} axisLine={false} tickLine={false}/>
+        <CartesianGrid vertical={false} stroke="#222c33" strokeDasharray="3 5"/><XAxis dataKey="date" tickFormatter={value => new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })} axisLine={false} tickLine={false}/><YAxis tickFormatter={formatFlowAxisTick} axisLine={false} tickLine={false}/>
         <Tooltip formatter={(value, name) => [money(String(value)), name === 'net_accumulated' ? 'Fluxo líquido acumulado' : String(name)]}/>
         <Area type="stepAfter" dataKey="net_accumulated" name="net_accumulated" stroke="#65e3b2" fill="#65e3b2" fillOpacity={0.12}/>
       </AreaChart></ResponsiveContainer></div>}

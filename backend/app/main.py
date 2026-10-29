@@ -16,6 +16,7 @@ from .models import Operation
 from .auth import authenticate
 from .access import private_db
 from .market_data.brapi import BrapiProvider
+from .market_data.equity_history import BrapiEquityHistoryProvider, EquityHistoryService
 from .market_data.service import QuoteService
 from .valuation import PortfolioValuation, value_portfolio
 from .price_basis import purchase_price_basis
@@ -28,6 +29,7 @@ from .fixed_income.returns_router import router as fixed_income_returns_router
 from .fixed_income.observation_routes import router as observation_router
 from .fixed_income.history import router as observed_history_router
 from .portfolio import router as portfolio_router
+from .equity_history import router as equity_history_router
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 
@@ -40,11 +42,14 @@ async def lifespan(app):
         token = settings.brapi_token.get_secret_value().strip()
         app.state.quote_service = QuoteService(BrapiProvider(client, token),
             enabled=settings.market_data_enabled, configured=bool(token))
+        app.state.equity_history_service = EquityHistoryService(
+            BrapiEquityHistoryProvider(client, token), enabled=settings.market_data_enabled, configured=bool(token))
         app.state.bcb_rates_service = RateService(SGSProvider(rates_client))
         try:
             yield
         finally:
             app.state.quote_service = None
+            app.state.equity_history_service = None
             app.state.bcb_rates_service = None
 
 
@@ -56,6 +61,7 @@ app.include_router(fixed_income_returns_router)
 app.include_router(observation_router)
 app.include_router(observed_history_router)
 app.include_router(portfolio_router)
+app.include_router(equity_history_router)
 
 
 @app.exception_handler(RequestValidationError)
