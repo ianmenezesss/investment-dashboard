@@ -10,6 +10,7 @@ import './dashboard-ux.css'
 import './navigation.css'
 import { PUBLIC_DEMO, SUPABASE_AUTH } from './runtime'
 import { useAuth } from './auth/useAuth'
+import { getDisplayIdentity } from './auth/displayIdentity'
 import { LoginPage } from './auth/LoginPage'
 import { DemoRepository } from './repositories/DemoRepository'
 import { PrivateRepository } from './repositories/PrivateRepository'
@@ -143,8 +144,9 @@ export default function App() {
     return <LoginPage loading={SUPABASE_AUTH ? auth.status === 'loading' || connected && !apiError : localConnected && !apiError} error={auth.error || error || (apiError as Error | null)?.message || ''} onLogin={auth.login} local={!SUPABASE_AUTH} onLocalLogin={value => { clearPrivate(); setToken(value); setConnected(true) }} onDemo={() => { void toggleDemo() }} connected={connected} onLogout={logout}/>
   }
   if (!demo && location.pathname === '/login') return <Navigate to="/" replace/>
-  const displayName = demo ? 'Demonstração' : 'Investidor pessoal'
-  const avatarInitial = demo ? 'D' : 'I'
+  const sessionDisplay = getDisplayIdentity(SUPABASE_AUTH ? auth.session?.user : null)
+  const displayName = demo ? 'Demonstração' : sessionDisplay.name
+  const avatarInitial = demo ? 'D' : sessionDisplay.initial
   return <div className={`shell${sidebarCollapsed ? ' sidebar-is-collapsed' : ''}`} data-navigation-collapsed={sidebarCollapsed}>
     <WorkspaceSidebar demo={demo} routeTo={routeTo} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed(value => !value)} displayName={displayName} avatarInitial={avatarInitial}/>
     <main><header><Dialog.Root open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}><Dialog.Trigger asChild><button type="button" className="mobile-menu-trigger" aria-label="Abrir menu de navegação" aria-controls="mobile-navigation-panel"><Menu size={20}/></button></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="mobile-nav-overlay"/><Dialog.Content id="mobile-navigation-panel" className="mobile-nav-content"><Dialog.Title className="sr-only">Menu de navegação</Dialog.Title><Dialog.Close className="mobile-nav-close" aria-label="Fechar menu de navegação"><X size={19}/></Dialog.Close><WorkspaceSidebar demo={demo} routeTo={routeTo} mobile onNavigate={() => setMobileNavigationOpen(false)} displayName={displayName} avatarInitial={avatarInitial}/></Dialog.Content></Dialog.Portal></Dialog.Root><div className="breadcrumb">Workspace <ChevronRight size={13}/> <span>{workspaceNavItems.find(n => n.to === page)?.label}</span></div><span className="local-badge"><span className="status-dot"/> {demo ? 'Modo Demonstração' : 'Ambiente pessoal'}</span></header>
