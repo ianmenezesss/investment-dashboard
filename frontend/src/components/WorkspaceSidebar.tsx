@@ -26,13 +26,15 @@ export function WorkspaceSidebar({ demo, routeTo, collapsed = false, onToggleCol
   const sidebarClass = ['sidebar', collapsed && !mobile && 'sidebar-collapsed', mobile && 'mobile-sidebar'].filter(Boolean).join(' ')
 
   return <aside className={sidebarClass} aria-label="Navegação da carteira">
-    <NavLink className="brand" aria-label="Investment Dashboard · Visão geral" to={routeTo('/')} onClick={onNavigate}>
-      <span className="brand-icon" aria-hidden="true"><ChartNoAxesCombined size={23}/></span>
-      <span className="brand-word">investment</span><span className="brand-dot">.</span>
-    </NavLink>
-    {!mobile && onToggleCollapsed && <button type="button" className="sidebar-collapse-toggle" aria-label={collapsed ? 'Expandir navegação' : 'Recolher navegação'} aria-controls="desktop-primary-navigation" aria-expanded={!collapsed} title={collapsed ? 'Expandir navegação' : 'Recolher navegação'} onClick={onToggleCollapsed}>
-      {collapsed ? <PanelLeftOpen size={17}/> : <PanelLeftClose size={17}/>}
-    </button>}
+    <div className="sidebar-header">
+      <NavLink className="brand" aria-label="Investment Dashboard · Visão geral" to={routeTo('/')} onClick={onNavigate}>
+        <span className="brand-icon" aria-hidden="true"><ChartNoAxesCombined size={23}/></span>
+        <span className="brand-word">investment</span><span className="brand-dot">.</span>
+      </NavLink>
+      {!mobile && onToggleCollapsed && <button type="button" className="sidebar-collapse-toggle" aria-label={collapsed ? 'Expandir navegação' : 'Recolher navegação'} aria-controls="desktop-primary-navigation" aria-expanded={!collapsed} title={collapsed ? 'Expandir navegação' : 'Recolher navegação'} onClick={onToggleCollapsed}>
+        {collapsed ? <PanelLeftOpen size={17}/> : <PanelLeftClose size={17}/>}
+      </button>}
+    </div>
     <div className="workspace" aria-label="Meu patrimônio, carteira pessoal"><div className="avatar" aria-hidden="true">{avatarInitial}</div><div>Meu patrimônio<small>Carteira pessoal</small></div><ChevronRight size={16} aria-hidden="true"/></div>
     <p className="nav-caption">WORKSPACE</p>
     <nav id={mobile ? undefined : 'desktop-primary-navigation'} aria-label="Navegação principal">
