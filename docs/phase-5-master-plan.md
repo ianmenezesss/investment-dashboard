@@ -18,6 +18,18 @@ A arquitetura original reservava uma fase para planejamento: simulador com premi
 
 ## Fases propostas
 
+### 5.0A — Navegação responsiva e identidade dinâmica
+
+**Prioridade:** etapa inicial de experiência de uso; planejada e não autorizada para implementação.
+
+- Em desktop, menu expandido com rótulos e recolhido com ícones, tooltips e nomes acessíveis; preferência local opcional.
+- Em mobile, drawer sobreposto com Escape, fechamento ao navegar, foco contido/devolvido e fundo inerte enquanto aberto.
+- Identidade privada usa nome de exibição da sessão Supabase; sem nome, prefixo do e-mail; sem ambos, rótulo neutro. Avatar usa a inicial e identificadores longos não quebram o layout.
+- Logout, expiração e troca de usuário limpam identidade e cache privados. Demo continua offline, sem ler sessão privada nem chamar API privada.
+- Autorização continua usando `sub` validado no backend, allowlist quando aplicável, `owner_id` e RLS; e-mail/metadados são apenas apresentação.
+- **Migration:** nenhuma prevista. Sem API paga, custo obrigatório ou dependência de preços.
+- **Aceite e testes:** acessibilidade por teclado/leitor de tela, estados desktop/mobile/zoom, persistência opcional, identidade ausente/longa, logout e troca de sessão sem vazamento, e testes de demo offline. Detalhes em [plano 5.0A](phase-5.0A-responsive-navigation-user-identity.md).
+
 ### 5.1 — Caixa, proventos e eventos financeiros
 
 **Prioridade:** alta para medição completa; proposta nova no detalhe de implementação, alinhada às lacunas antigas.
@@ -88,7 +100,7 @@ O refinamento da demonstração pública offline, descrito historicamente como u
 
 ## Ordem e aceitação de release
 
-Ordem proposta: 5.1 → primeiro CSV de 5.2 → relatórios 5.3 → simulador 5.4 → metas 5.5 → 5.6 quando dados/fonte existirem. Simulador pode ser antecipado em protótipo sem persistência porque depende apenas de premissas explícitas, não de 5.6.
+Ordem proposta: 5.0A → 5.1 → primeiro CSV de 5.2 → relatórios 5.3 → simulador 5.4 → metas 5.5 → 5.6 quando dados/fonte existirem. Simulador pode ser antecipado em protótipo sem persistência porque depende apenas de premissas explícitas, não de 5.6.
 
 Release v5.0.0 só após as fases escolhidas para o release terem critérios aprovados, testes e documentação. Uma fase bloqueada por fonte não pode ser apresentada como implementada. A lista exata de escopo v5 permanece decisão do proprietário.
 
