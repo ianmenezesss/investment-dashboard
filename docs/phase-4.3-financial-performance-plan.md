@@ -1,6 +1,6 @@
-# Fase 4.3A — Plano de resumo financeiro atual
+# Fase 4.3A — Resumo financeiro atual
 
-**Status:** Planejado. Este documento especifica uma implementação futura e não autoriza alterações no código, schema, banco ou publicação.
+**Status:** Concluído tecnicamente em 29/10/2026. Esta documentação descreve o código entregue; não declara publicação em produção nem autoriza migrations ou deploy.
 
 ## Objetivo e escopo
 
@@ -41,7 +41,7 @@ Compras de ações + aplicações CDB − vendas líquidas − principal resgata
 Saldo calculado pelo ledger a custo médio, incluindo taxas de compra da posição remanescente.
 
 **Principal CDB aberto**
-Soma do saldo efetivo dos lotes. Contratos em tracking_mode consolidado continuam fora desse agregado; observações declaradas ficam em série separada.
+Soma do saldo efetivo dos lotes. Observações manuais de posição sem lotes permanecem em série separada e não entram no agregado de principal.
 
 **Resultado realizado em ações**
 Para cada venda, receita de venda após taxas − custo médio proporcional removido. Inclui apenas taxas registradas; não é líquido após impostos.
@@ -61,33 +61,29 @@ Comprar 10 ações a R$ 20,00 com R$ 2,00 de taxas resulta em custo R$ 202,00. V
 
 CDB: aplicação R$ 1.000 e resgate de R$ 400 de principal deixam R$ 600 em principal aberto. Caixa recebido pode ser exibido como dado informado, mas a diferença para o principal não deve ser inferida como rendimento realizado sem um contrato financeiro que defina sua composição e tributos.
 
-## Contrato de API proposto
+## Contrato implementado
 
-Endpoint privado sugerido: GET /api/dashboard/performance.
+Endpoint privado `GET /api/dashboard/performance`, com autenticação e consulta derivada do proprietário obtido no contexto do servidor/RLS. Não aceita `owner_id` como fonte de autorização e responde `Cache-Control: no-store`. Não cria um segundo ledger.
 
-A resposta deve ser um snapshot em data de referência, com strings decimais e estado/cobertura por componente. Campos conceituais:
+O modelo Pydantic `FinancialPerformance` devolve valores financeiros como strings decimais e contém:
 
-- as_of e ledger_as_of;
-- flows: equity_purchases_with_fees, cdb_applications_principal, equity_sales_net_fees, cdb_principal_redemptions, net_recorded_flow;
-- equities: open_cost, realized_profit_pre_tax, market_value, unrealized_profit, combined_result, return_on_open_cost, coverage, quote timestamps, missing tickers;
-- fixed_income: effective_open_principal, contract estimates bruta/líquida com status/fonte/premissas, consolidated observations em seção separada;
-- portfolio: total_current_value null quando bases ou cobertura não permitirem comparação; portfolio_return_percent null com reason;
-- diagnostics: empty, partial, stale, unavailable, complete, por bloco.
+- `as_of` e `ledger_as_of`;
+- `flows`: compras com taxas, aplicações de principal, vendas após taxas, resgates de principal, totais registrados e fluxo líquido registrado;
+- `capital`: custo aberto de ações, principal efetivo CDB, total de posições abertas contabilizadas e participações por classe;
+- `equities`: payload da avaliação atual existente, resultado realizado, cobertura, timestamps, tickers sem cotação e resultado combinado antes de impostos, quando completo;
+- `fixed_income`: principal efetivo aberto e posições declaradas separadas. Rendimento bruto/líquido segue calculado por contrato na página existente de renda fixa e não é reestimado nem agregado por esta rota;
+- `composition`: componentes e bases de ações, principal CDB e observações manuais;
+- `portfolio`: valor de mercado consolidado e percentual de retorno permanecem `null`, pois faltam bases comparáveis e dados temporais.
 
-Sem parâmetro owner_id controlado pelo cliente. Usar autenticação, private_db, owner_id/RLS, headers no-store e consultas dos movimentos CDB pela projeção efetiva. Não criar um endpoint público nem duplicar fórmulas no frontend. Contrato Pydantic/OpenAPI deve serializar Decimal como string.
+O endpoint usa `private_db`, consultas explicitamente filtradas por `owner_id`, `effective_movements()` para REPLACE/VOID e o `QuoteService` pontual já existente. O snapshot de ledger é calculado antes de liberar a transação para chamadas de cotação. Não chama o serviço de histórico de preços.
 
-Cotações podem ter instantes distintos; retornar o intervalo quoted_at_min/max e identificar atraso. Um campo total só existe se todo o conjunto declarado tiver valor comparável; do contrário retornar null e componentes/subtotais com escopo explícito.
+As cotações atuais continuam sujeitas aos limites de validade e aos estados da avaliação. Quando a cobertura é parcial, o total de mercado e o resultado combinado são `null`; com cotação utilizável mas stale, a estimativa combinada é identificada visualmente como desatualizada.
 
-## Interface planejada
+## Interface implementada
 
-Ampliar PortfolioInsights e MarketDashboard, sem nova página:
+`PortfolioInsights` apresenta os fluxos registrados, capital em posições abertas, composição pelas bases registradas e resultado acumulado em ações. Mostra cobertura incompleta, falha, carregamento e carteira sem movimentos; a cotação stale recebe aviso e instrução de conferência na corretora. O fluxo de capital continua rotulado como fluxo, não patrimônio ou rentabilidade. As estimativas CDB continuam na interface existente por contrato; posições declaradas permanecem separadas.
 
-- Seções separadas: fluxo registrado, posições abertas, resultado realizado e não realizado.
-- Manter CDB bruto/líquido estimado na interface CDB ou mostrar um resumo de valores elegíveis com premissas e estados.
-- Estado vazio e estados loading, error, partial, stale, unavailable.
-- BRL e datas pt-BR; valores enviados como Decimal string. Não fazer cálculo financeiro com Number no frontend.
-- Renda fixa manual continua em observações separadas.
-- Gráfico atual permanece identificado como gráfico de fluxo. Não desenhar patrimônio histórico na 4.3A.
+O frontend formata valores e percentuais para exibição; fórmulas financeiras e somas contábeis permanecem no backend. Não há retorno percentual total nem gráfico histórico de patrimônio nesta fase.
 
 ## Migrations e persistência
 
@@ -95,42 +91,18 @@ Nenhuma migration para a agregação somente leitura. Não persistir snapshots f
 
 Depósitos/saques, proventos, eventos societários e avaliações históricas exigem estudo e provável persistência append-only própria; são escopo separado e podem requerer migrations aprovadas.
 
-## Testes necessários
+## Validação executada
 
-Backend puro/API:
-- sem operações e posições vazias;
-- compras múltiplas, vendas parciais e totais, taxas e custo médio;
-- resultado positivo e negativo;
-- soma de realizado e não realizado com cotação completa;
-- preço ausente, stale, inválido ou moeda errada;
-- oito casas decimais, multiplicações grandes, arredondamento e consistência de centavos;
-- diferentes datas e janelas, sem reescrever histórico;
-- CDB aplicação/resgate, cash_received null/presente, taxa ausente, produto não suportado;
-- REPLACE/VOID não duplicam valores;
-- posição manual não entra no total de ledger;
-- autenticação ausente e isolamento owner_id/RLS;
-- flag histórica desligada não chama provedor e cotação atual continua independente.
+- `backend/tests/test_performance_api.py`: carteira vazia, compra/venda parcial, taxas, resultado positivo/negativo, cobertura parcial, CDB application/redemption, `cash_received` sem inferência de rendimento, REPLACE/VOID, posição declarada separada, autorização e isolamento por proprietário.
+- `backend/tests/test_finance.py`: custo médio e taxas preexistentes, liquidação total e venda cronológica; testes reproduzem e protegem multiplicação de valores máximos NUMERIC(20,8) sem truncamento e remoção exata de custo em liquidação total com média decimal repetitiva.
+- Backend completo: 363 aprovados, 1 ignorado; integração PostgreSQL descartável: 1 aprovado, com migrations 001–008, persistência, RLS, isolamento e backup/restore.
+- Frontend completo: 162 aprovados; estados de carregamento/erro/vazio, cobertura parcial, formatação monetária e aviso de cotação stale.
+- Build: concluído após divisão dinâmica de módulos pesados; bundle inicial medido em 443,68 kB (antes 806,13 kB), maior chunk 443,68 kB.
 
-Frontend:
-- vazio, carregamento, erro, stale e cobertura parcial;
-- formatação brasileira de valores e datas;
-- textos não chamam fluxo de patrimônio, retorno ou lucro;
-- subtotal não aparece como total;
-- layout móvel, tooltips e navegação preservados.
+`ObservedHistory` já valida `Array.isArray(response.points)` no query function e tem teste de resposta malformada que confirma estado de erro sem dereferenciar `.length` indefinido.
 
-## Dependências, riscos e aceite
+## Limitações e aceite observado
 
-Risco de arredondamento a auditar: finance.summarize usa Decimal, mas não configura contexto local de alta precisão como outros cálculos. Teste primeiro com limites NUMERIC(20,8); só mudar cálculo se houver diferença material comprovada e teste de regressão.
+Não há depósitos/saques externos nem proventos no ledger. Portanto fluxo líquido não é aporte externo nem retorno. Resultado realizado considera só taxas gravadas e é antes de impostos. Resultado não realizado e combinado usam cotações pontuais, nunca uma série histórica; são estimativas quando aplicável. Cotação stale é avisada. Dados CDB brutos/líquidos permanecem por contrato, sem serem confundidos com caixa ou rendimento realizado. Sem migration; nenhuma integração de histórico foi ativada.
 
-Critérios de aceite: autenticação/owner isolation; nenhuma operação ou dados reais alterados; fórmulas batem com fixtures aritméticos; total indisponível sob cobertura incompleta; CDB estimate marcado e não confundido com realização; demo continua offline; testes relacionados, suíte frontend e build aprovados; docs atualizadas; nenhuma migration sem justificativa/aprovação.
-
-## Sequência e controle
-
-1. Aprovar escopo e nomes dos indicadores.
-2. Escrever testes de serviço antes de agregar.
-3. Implementar serviço backend reutilizando funções existentes.
-4. Adicionar endpoint owner-scoped e contrato tipado.
-5. Integrar componentes atuais e estados visuais.
-6. Atualizar documentação de fase e roteiro manual.
-7. Rodar backend, PostgreSQL descartável quando aplicável, frontend, build e diff check.
-8. Revisar diff e criar um commit local exclusivo da 4.3 somente após autorização. Deploy/migration ficam fora sem autorização.
+Critérios técnicos da fase foram atendidos localmente: autenticação e owner isolation, projeção efetiva CDB, parcial/stale/unavailable, Decimal, demo offline, integração Postgres descartável e testes/build completos. Publicação v4 ainda requer conferências operacionais documentadas em [revisão final](phase-4.0-final-review.md); o bloqueio de série histórica da 4.4 permanece.
