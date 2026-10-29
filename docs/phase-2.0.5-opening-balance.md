@@ -76,6 +76,15 @@ por aplicações/resgates posteriores. Uma nova conferência exige nova observa�
 Não somar patrimônio observado com estimativas de novos lotes: a observação pode já
 incluí-los. Não há gráfico histórico ou comparação de bases diferentes como rentabilidade.
 
+`GET /api/fixed-income/investments/{id}/observed-history` retorna somente observações
+manuais do contrato, dentro do intervalo solicitado. Aplicações e resgates do ledger não
+criam snapshots automaticamente; por isso, principal registrado (por exemplo, R$ 150,00)
+pode coexistir corretamente com um gráfico vazio. `coverage=unavailable` e `points=[]`
+significam que não há observação no período, não que o principal seja zero ou que o banco
+falhou. A interface pode explicar isso com: “O principal registrado vem das aplicações e
+resgates. O gráfico mostra apenas posições conferidas manualmente; não há observações neste
+período.” O filtro temporal pode excluir observações existentes fora da janela.
+
 ## API e segurança
 
 Prefixo `/api/fixed-income/investments`; cliente HTTP e autenticação existentes:
