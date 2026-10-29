@@ -11,6 +11,7 @@ from app.main import app
 from app.auth import Principal, authenticate
 from uuid import UUID
 from decimal import Decimal
+from datetime import date
 
 
 @pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"), reason="PostgreSQL de testes não configurado")
@@ -80,6 +81,8 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
                 connection.execute(text("CREATE ROLE investment_test_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS"))
                 connection.execute(text("GRANT SELECT, INSERT, UPDATE, DELETE ON operations TO investment_test_runtime"))
                 connection.execute(text("GRANT USAGE, SELECT ON SEQUENCE operations_id_seq TO investment_test_runtime"))
+                connection.execute(text("ALTER ROLE investment_runtime PASSWORD 'fictional-test-only-password'"))
+                connection.execute(text("GRANT SELECT ON operations TO investment_runtime"))
 
             def restricted_db():
                 with Session(engine) as session:
@@ -93,7 +96,8 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
             ids = {}
             for owner in [a, b]:
                 app.dependency_overrides[authenticate] = lambda owner=owner: Principal(owner)
-                created = client.post("/api/operations", json=dict(buy, owner_id=str(b)))
+                ticker = "ITUB4" if owner == a else "PETR4"
+                created = client.post("/api/operations", json=dict(buy, ticker=ticker, owner_id=str(b)))
                 assert created.status_code == 201
                 ids[owner] = created.json()["id"]
             app.dependency_overrides[authenticate] = lambda: Principal(a)
@@ -113,6 +117,43 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
             verify_archive_postgres(engine, client)
             from application_revisions_postgres import verify_revisions_postgres
             verify_revisions_postgres(engine, client)
+
+            # Use a real restricted login so rollback clears only the transaction-local
+            # owner context, as it does for the production runtime role.
+            from app.equity_history import equity_history_service
+            from app.market_data.equity_history import DailyPrice, TickerHistory
+
+            class FakeHistoryService:
+                async def get(self, tickers, *, price_start, event_start, end):
+                    return {ticker: TickerHistory((DailyPrice(date(2026, 1, 1), Decimal("25")),))
+                            for ticker in tickers}
+
+            assert app.state.equity_history_service.enabled is False
+            disabled_history = client.get("/api/dashboard/equity-history?period=Tudo")
+            assert disabled_history.status_code == 200
+            assert disabled_history.json()["coverage"] == "unavailable"
+            assert disabled_history.json()["provider_errors"] == {"ITUB4": "disabled"}
+
+            runtime_engine = create_engine(engine.url.set(
+                username="investment_runtime", password="fictional-test-only-password"))
+
+            def runtime_db():
+                with Session(runtime_engine) as session:
+                    yield session
+
+            app.dependency_overrides[get_db] = runtime_db
+            app.dependency_overrides[equity_history_service] = lambda: FakeHistoryService()
+            app.dependency_overrides[authenticate] = lambda: Principal(a)
+            history_a = client.get("/api/dashboard/equity-history?period=Tudo")
+            assert history_a.status_code == 200
+            assert {holding["ticker"] for point in history_a.json()["points"]
+                    for holding in point["holdings"]} == {"ITUB4"}
+            app.dependency_overrides[authenticate] = lambda: Principal(b)
+            history_b = client.get("/api/dashboard/equity-history?period=Tudo")
+            assert history_b.status_code == 200
+            assert {holding["ticker"] for point in history_b.json()["points"]
+                    for holding in point["holdings"]} == {"PETR4"}
+            runtime_engine.dispose()
     finally:
         app.dependency_overrides.clear()
         # Banco exclusivamente de teste; não apagar tabelas ou reverter ownership.
