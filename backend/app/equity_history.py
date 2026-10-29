@@ -1,5 +1,6 @@
 """Owner-scoped historical mark-to-market for recorded equity operations."""
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, localcontext
 
@@ -16,6 +17,18 @@ from .portfolio import _subtract_months, local_today
 
 router = APIRouter(prefix="/api/dashboard", tags=["portfolio history"])
 ZERO = Decimal("0")
+
+
+@dataclass(frozen=True)
+class HistoricalOperation:
+    """Immutable operation data retained after the owner-scoped DB transaction ends."""
+    id: int
+    ticker: str
+    kind: str
+    date: date
+    quantity: Decimal
+    price: Decimal
+    fees: Decimal
 
 
 def aggregate_equity_history(operations, histories: dict[str, TickerHistory], *, start: date, end: date):
@@ -125,9 +138,16 @@ async def equity_history(period: str = Query("Tudo", pattern="^(1M|3M|6M|1A|Tudo
                         db: Session = Depends(private_db), service: EquityHistoryService = Depends(equity_history_service)):
     today = local_today()
     months = {"1M": 1, "3M": 3, "6M": 6, "1A": 12}.get(period)
-    operations = list(db.scalars(select(Operation).where(
+    rows = list(db.scalars(select(Operation).where(
         Operation.owner_id == db.info.get("owner_id"), Operation.date <= today
     ).order_by(Operation.date, Operation.id)))
+    # Rollback below is required before provider I/O. Snapshot only the fields used
+    # by the aggregation first: rollback expires ORM instances and clears transaction-
+    # local RLS identity, so refreshing those instances afterward hides their rows.
+    operations = [HistoricalOperation(
+        id=row.id, ticker=row.ticker, kind=row.kind, date=row.date,
+        quantity=row.quantity, price=row.price, fees=row.fees,
+    ) for row in rows]
     if not operations:
         return aggregate_equity_history([], {}, start=_subtract_months(today, months) if months else today, end=today)
 
