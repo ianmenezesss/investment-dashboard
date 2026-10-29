@@ -26,6 +26,8 @@ from .bcb_rates.service import RateService
 from .bcb_rates.router import router as bcb_rates_router
 from .fixed_income.returns_router import router as fixed_income_returns_router
 from .fixed_income.observation_routes import router as observation_router
+from .fixed_income.history import router as observed_history_router
+from .portfolio import router as portfolio_router
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 
@@ -52,6 +54,8 @@ app.include_router(revision_router)
 app.include_router(bcb_rates_router)
 app.include_router(fixed_income_returns_router)
 app.include_router(observation_router)
+app.include_router(observed_history_router)
+app.include_router(portfolio_router)
 
 
 @app.exception_handler(RequestValidationError)

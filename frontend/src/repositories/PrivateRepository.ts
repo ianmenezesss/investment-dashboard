@@ -8,9 +8,12 @@ export class PrivateRepository {
   constructor(private token: string) {}
   list(signal?: AbortSignal) { return request<Operation[]>('operations', this.token, { signal }) }
   summary(signal?: AbortSignal) { return request<PortfolioValuation>('dashboard/valuation', this.token, { signal }) }
+  capitalFlows(period: string, signal?: AbortSignal) { return request<import('../portfolio/PortfolioInsights').CapitalFlows>(`dashboard/capital-flows?period=${period}`, this.token, { signal }) }
+  composition(signal?: AbortSignal) { return request<import('../portfolio/PortfolioInsights').Composition>('dashboard/composition', this.token, { signal }) }
   create(input: OperationInput) { return request<Operation>('operations', this.token, { method: 'POST', body: JSON.stringify(input) }) }
   delete(id: number) { return request<void>(`operations/${id}`, this.token, { method: 'DELETE' }) }
   export() { return request('export', this.token) }
+  observedHistory(id: number, start: string, end: string, signal: AbortSignal) { return request<import("../fixed-income/ObservedHistory").ObservedSeries>(`fixed-income/investments/${id}/observed-history?start=${start}&end=${end}`, this.token, { signal }) }
   cdbs(offset = 0, signal?: AbortSignal) { return request<Cdb[]>(`fixed-income/investments?offset=${offset}&limit=20`, this.token, { signal }) }
   cdb(id: number, signal?: AbortSignal) { return request<CdbDetail>(`fixed-income/investments/${id}`, this.token, { signal }) }
   cdbMovements(id: number, offset = 0, signal?: AbortSignal) { return request<CdbMovement[]>(`fixed-income/investments/${id}/effective-movements?offset=${offset}&limit=100`, this.token, { signal }) }
