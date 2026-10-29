@@ -178,11 +178,14 @@ test('sidebar desktop recolhe, expande e mantém nomes acessíveis nas rotas', a
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
   const toggle = host.querySelector('[aria-label="Recolher navegação"]') as HTMLButtonElement
   expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  expect(toggle.querySelector('svg.lucide-menu')).not.toBeNull()
   await act(async () => toggle.click())
   expect(host.querySelector('.shell')?.getAttribute('data-navigation-collapsed')).toBe('true')
   expect(host.querySelector('.sidebar-collapsed a[aria-label="Ações"]')).not.toBeNull()
   expect(localStorage.getItem('investment-sidebar-collapsed')).toBe('true')
-  await act(async () => (host.querySelector('[aria-label="Expandir navegação"]') as HTMLButtonElement).click())
+  const expand = host.querySelector('[aria-label="Expandir navegação"]') as HTMLButtonElement
+  expect(expand.querySelector('svg.lucide-menu')).not.toBeNull()
+  await act(async () => expand.click())
   expect(host.querySelector('.shell')?.getAttribute('data-navigation-collapsed')).toBe('false')
   client.clear()
 })
@@ -194,6 +197,7 @@ test('menu mobile fecha com Escape e restaura foco ao acionador', async () => {
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
   const trigger = host.querySelector('[aria-label="Abrir menu de navegação"]') as HTMLButtonElement
+  expect(trigger.querySelector('svg.lucide-menu')).not.toBeNull()
   trigger.focus()
   await act(async () => trigger.click())
   const dialog = document.querySelector('#mobile-navigation-panel')
@@ -204,6 +208,34 @@ test('menu mobile fecha com Escape e restaura foco ao acionador', async () => {
   await act(async () => dialog!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
   expect(document.querySelector('#mobile-navigation-panel')).toBeNull()
   expect(document.activeElement).toBe(trigger)
+  client.clear()
+})
+
+test('botão X fecha o drawer mobile e devolve o foco ao hambúrguer', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => financialResponse(input)))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
+  const trigger = host.querySelector('[aria-label="Abrir menu de navegação"]') as HTMLButtonElement
+  trigger.focus()
+  await act(async () => trigger.click())
+  expect(document.querySelector('#mobile-navigation-panel')).not.toBeNull()
+  await act(async () => (document.querySelector('[aria-label="Fechar menu de navegação"]') as HTMLButtonElement).click())
+  expect(document.querySelector('#mobile-navigation-panel')).toBeNull()
+  expect(document.activeElement).toBe(trigger)
+  client.clear()
+})
+
+test('backdrop fecha o drawer mobile', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => financialResponse(input)))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
+  await act(async () => (host.querySelector('[aria-label="Abrir menu de navegação"]') as HTMLButtonElement).click())
+  await act(async () => (document.querySelector('.mobile-nav-overlay') as HTMLDivElement).click())
+  expect(document.querySelector('#mobile-navigation-panel')).toBeNull()
   client.clear()
 })
 
