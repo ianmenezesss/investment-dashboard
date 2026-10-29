@@ -8,12 +8,12 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import create_engine
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from app.auth import Principal, authenticate, verify_jwt
 from app.database import Base, Settings, ensure_production_role, get_db, settings
-from app.main import app
+from app.main import app, classify_database_error
 from app.models import Operation
 
 A = UUID("11111111-1111-4111-8111-111111111111")
@@ -127,14 +127,27 @@ def test_users_only_read_their_own_portfolio_and_export():
         engine.dispose()
 
 
-def test_database_errors_are_sanitized_and_not_cached():
+def test_database_errors_are_sanitized_and_not_cached(caplog):
     def broken_db():
         raise OperationalError("PRIVATE SQL", {"password": "PRIVATE SECRET"}, Exception("PRIVATE HOST"))
     app.dependency_overrides[get_db] = broken_db
     try:
-        result = TestClient(app).get("/health")
+        result = TestClient(app).get("/api/dashboard/equity-history?period=Tudo",
+                                    headers={"Authorization": "Bearer test-only-token-not-for-production"})
         assert result.status_code == 503
         assert "PRIVATE" not in result.text
+        assert "SQL" not in result.text
         assert result.headers["cache-control"] == "no-store"
+        assert result.headers["x-request-id"]
+        assert "route=/api/dashboard/equity-history" in caplog.text
+        assert "period=Tudo" not in caplog.text
+        assert "exception_category=OperationalError" in caplog.text
+        assert "classification=connection_or_operational" in caplog.text
+        assert "PRIVATE" not in caplog.text
     finally:
         app.dependency_overrides.clear()
+
+
+def test_database_permission_sqlstate_is_classified_without_logging_error_details():
+    error = ProgrammingError("PRIVATE SQL", {"account": "PRIVATE VALUE"}, SimpleNamespace(sqlstate="42501"))
+    assert classify_database_error(error) == "permission"

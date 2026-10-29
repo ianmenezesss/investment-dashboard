@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 from contextlib import asynccontextmanager
+import logging
 import httpx
 from decimal import Decimal
 from typing import Literal
@@ -9,6 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import exists, select, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 from .database import ensure_production_role, get_db, settings
 from .finance import summarize
@@ -36,6 +38,9 @@ from .individual_equity_history import EquityPriceHistoryService, router as indi
 from .equity_comparison import router as equity_comparison_router
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
+from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -97,7 +102,40 @@ async def privacy_headers(request, call_next):
 @app.exception_handler(SQLAlchemyError)
 async def database_error(request, exc):
     # Não devolver SQL, parâmetros, credenciais ou stack traces ao cliente.
-    return JSONResponse(status_code=503, content={"detail": "Banco de dados temporariamente indisponível"})
+    request_id = uuid4().hex
+    route = request.scope.get("route")
+    route_name = getattr(route, "path", "unmatched")
+    classification = classify_database_error(exc)
+    # Never pass the exception, SQL, parameters, or traceback to the logger.
+    logger.error("database_request_failed request_id=%s route=%s exception_category=%s classification=%s",
+                 request_id, route_name, type(exc).__name__, classification)
+    return JSONResponse(status_code=503,
+                        content={"detail": "Banco de dados temporariamente indisponível"},
+                        headers={"X-Request-ID": request_id})
+
+
+def classify_database_error(exc: SQLAlchemyError) -> str:
+    """Return a bounded category using only exception type and SQLSTATE metadata."""
+    original = getattr(exc, "orig", None)
+    sqlstate = getattr(original, "sqlstate", None) or getattr(original, "pgcode", None)
+    if isinstance(sqlstate, str):
+        if sqlstate.startswith("08"):
+            return "connection"
+        if sqlstate == "42501" or sqlstate.startswith("28"):
+            return "permission"
+        if sqlstate.startswith(("25", "40")):
+            return "transaction"
+        if sqlstate.startswith("42"):
+            return "sql"
+    if isinstance(exc, OperationalError):
+        return "connection_or_operational"
+    if isinstance(exc, IntegrityError):
+        return "transaction"
+    if isinstance(exc, ProgrammingError):
+        return "sql_or_permission"
+    if isinstance(exc, DBAPIError):
+        return "driver"
+    return "other"
 
 
 @app.exception_handler(Exception)
