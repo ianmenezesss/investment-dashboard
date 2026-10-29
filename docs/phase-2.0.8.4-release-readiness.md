@@ -4,7 +4,7 @@ Estado em `f6a865d`: produção informada em 2.0.7 / Alembic 004; migrations loc
 
 ## Parecer e gates
 
-**NO-GO para publicar agora.** Restam gates operacionais: confirmar a role SQL efetiva da API, obter evidência de backup recuperável do banco de produção e seu restore em clone, e concluir homologação autenticada com duas contas. O runner SQL descartável aprovado usa identidades simuladas e não comprova login Supabase.
+**Preparação local aprovada; publicação aguarda autorização.** Backup da produção em Alembic 004 e restauração em PostgreSQL 17 descartável aprovados em 29/10/2026: 414803 bytes, SHA-256 `8a14d2d330065c6af03cf4c0526ecea2b1220b7c7c9e0f92edc9c27599ab3fab`, `RESTORE_OK=PASS`, `VALIDACAO_SCHEMA_OK=PASS`, constraints e RLS/FORCE RLS verificados. O gate local da conexão `investment_runtime` passou em schema 004 (`SQL_IDENTITY`, `RLS_FORCE` e `RENDER_CONFIG_MATCH`); isso compara a URL exibida no painel Render, sem observar o processo em execução no plano gratuito. A homologação A/B com dois JWTs reais passou contra FastAPI e PostgreSQL 17 descartável em head 008 (`AUTH_AB_ISOLATION=PASS`), sem escrita financeira em produção. Após aplicar 005–008, exigir `GRANTS_008=PASS` antes do deploy; ainda não houve autorização para push, migration remota ou deploy.
 
 Não usar dados pessoais na homologação. Registrar somente resultados, versão Alembic e identificadores não sensíveis; não registrar URL, senha, token, extrato ou valores reais.
 

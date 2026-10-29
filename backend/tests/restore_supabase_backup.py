@@ -1,4 +1,5 @@
 """Restore a user-provided Supabase custom dump into an isolated local PostgreSQL 17."""
+import argparse
 import hashlib
 import json
 import os
@@ -23,6 +24,19 @@ MIGRATION_TABLES = {
     "008": {"operations", "fixed_income_investments", "fixed_income_lots", "fixed_income_movements", "fixed_income_observations", "fixed_income_investment_archives", "fixed_income_application_revisions"},
 }
 PROJECT_TABLES = set().union(*MIGRATION_TABLES.values())
+
+
+def select_backup_path(argv=None):
+    parser = argparse.ArgumentParser(description="Restore a local Supabase backup into a disposable PostgreSQL")
+    parser.add_argument("--backup", type=Path, default=BACKUP,
+                        help="Existing .dump inside the configured backup directory")
+    selected = parser.parse_args(argv).backup.expanduser().resolve()
+    allowed_dir = BACKUP.parent.resolve()
+    if selected.parent != allowed_dir or selected.suffix.lower() != ".dump":
+        raise RuntimeError("Backup deve ser um arquivo .dump na pasta de backups permitida")
+    if not selected.is_file() or selected.stat().st_size == 0:
+        raise RuntimeError("Backup inexistente ou vazio; nenhuma restauração foi iniciada")
+    return selected
 
 
 def safe_output(value, password):
@@ -97,11 +111,10 @@ def validate_archive_schema(revision, archive_tables, restored_tables):
 
 
 def main():
+    backup = select_backup_path()
     temp = Path(os.environ.get("INVESTMENT_TEMP_DIR", ""))
     if not temp.is_dir() or (os.name == "nt" and str(temp.resolve()).lower() != r"e:\investmentdashboard\temp"):
         raise RuntimeError("INVESTMENT_TEMP_DIR deve ser E:\\InvestmentDashboard\\temp")
-    if not BACKUP.is_file():
-        raise RuntimeError(f"Backup não encontrado: {BACKUP}")
     if input("Este processo cria e remove somente um container/banco descartável local. Digite DESCARTAVEL para continuar: ").strip() != "DESCARTAVEL":
         raise RuntimeError("Confirmação DESCARTAVEL não recebida")
     run_id = uuid4().hex[:12]
@@ -114,7 +127,7 @@ def main():
     schema_ok = False
     log_path = temp / f"investment-realbackup-restore-{run_id}.log"
     lines = [f"Restore descartável de backup Supabase; run={run_id}",
-             f"Backup SHA256={hashlib.sha256(BACKUP.read_bytes()).hexdigest()}; bytes={BACKUP.stat().st_size}"]
+             f"Backup SHA256={hashlib.sha256(backup.read_bytes()).hexdigest()}; bytes={backup.stat().st_size}"]
 
     def docker(*args, input_data=None):
         result = subprocess.run(["docker", *args], input=input_data, capture_output=True,
@@ -134,7 +147,7 @@ def main():
     try:
         docker("info", "--format", "{{.ServerVersion}}")
         docker("image", "inspect", "postgres:17-alpine")
-        docker(*docker_run_args(container, name, password, BACKUP, run_id))
+        docker(*docker_run_args(container, name, password, backup, run_id))
         created = True
         for _ in range(60):
             probe = subprocess.run(["docker", "exec", container, "pg_isready", "-h", "127.0.0.1", "-p", "5432", "-U", "postgres", "-d", name], capture_output=True)
