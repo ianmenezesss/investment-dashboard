@@ -206,7 +206,7 @@ aprovação e migration independente.
 | **3.0.1 — definições e cobertura** | Concluída conforme estado de publicação informado pelo responsável. |
 | **3.0.2 — fluxos de capital** | Concluída conforme estado de publicação informado pelo responsável; métricas de fluxo continuam separadas de patrimônio e rentabilidade. |
 | **3.0.3 — preço histórico de ações** | Implementação preservada; fonte/termos/cobertura apropriados para a execução ainda não validados. Não declarar concluída. Detalhes no documento da subfase. |
-| **3.0.4 — histórico, capital e composição** | Concluída e validada localmente: histórico unificado, fluxos acumulados e composição por bases abertas; sem migration. Não publicada nesta rodada. Ver revisão final. |
+| **3.0.4 — histórico, capital e composição** | Concluída e validada localmente: histórico unificado, fluxos acumulados e composição por bases abertas; sem migration. Publicação reportada pelo responsável; SHA Vercel e revisão Alembic remota não verificados nesta auditoria. Ver revisão final e `CHANGELOG.md`. |
 | **3.0.5 — evolução e interface** | A proposta anterior de filtros, gráficos, tooltips, responsividade e estados foi incorporada à interface 3.0.3/3.0.4. Nenhum escopo adicional foi aprovado. |
 
 Cada etapa pode ser interrompida sem falsificar histórico. Não implementar Fase 3.0 até o

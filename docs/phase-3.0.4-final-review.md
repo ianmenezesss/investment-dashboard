@@ -118,11 +118,22 @@ Use dados fictícios ou uma base local descartável; não crie operações de te
 
 ## Recomendação de publicação
 
-A funcionalidade 3.0.4 é independente da fonte histórica e pode integrar uma publicação
-controlada com `EQUITY_HISTORY_ENABLED=false`. A implementação 3.0.3 permanece preservada e
-indisponível até validação de fonte, cobertura e termos; isso não desliga cotações pontuais
-que usem a configuração geral existente. **Decisão desta revisão: NO-GO para executar a
-publicação agora**, pois não foram inspecionadas a configuração real do Render/Vercel/Supabase,
-a revisão do banco remoto nem o fluxo visual no navegador. A decisão técnica do código é
-**GO condicionado** à conferência manual abaixo e à confirmação do schema/roles de produção.
-Nenhuma ação remota foi executada.
+A funcionalidade 3.0.4 é independente da fonte histórica e permanece compatível com
+`EQUITY_HISTORY_ENABLED=false`. A implementação 3.0.3 permanece preservada e indisponível
+até validação de fonte, cobertura e termos; isso não desliga cotações pontuais que usem a
+configuração geral existente.
+
+## Auditoria de release v3.0.4 — 29/10/2026
+
+O commit `f021ad8` foi confirmado em `main`. O responsável reporta a publicação Vercel e o
+uso funcional do site. A inspeção do painel Vercel não foi autorizada pelo ambiente desta
+auditoria; portanto o SHA implantado não foi confirmado. O `GET /health` público do Render
+respondeu `200`; no código, essa verificação testa a conexão e rejeita papel superuser ou
+`BYPASSRLS`, além de exigir RLS forçado em `public.operations`. Ela não verifica
+`alembic_version` nem todos os grants de 008. Confirme a revisão no painel/console do Render.
+
+**Decisão: pronto com ressalvas.** Código e validações locais passaram; antes de registrar a
+release oficial, confirme que a Vercel está no commit `f021ad8` e que o banco Render está em
+008 com o papel runtime provisionado. O histórico de preços da 3.0.3 continua pendente; a
+variável `EQUITY_HISTORY_ENABLED` permanece `false` por padrão. Não foi feita alteração
+remota.

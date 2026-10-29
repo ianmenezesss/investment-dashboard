@@ -1,7 +1,13 @@
 # Roadmap do Investment Dashboard
 
-Atualizado em **29/10/2026** para registrar a revisão local da Fase 3.0.4.
+Atualizado em **29/10/2026** para registrar a auditoria de release da v3.0.4.
 O plano não autoriza implementação automática de funcionalidades futuras.
+
+O commit `f021ad8` está confirmado em `main` local e remoto. A publicação Vercel foi
+reportada pelo responsável, mas seu SHA não foi inspecionado no painel. O health público
+do Render respondeu `200`; isso valida conexão e controles básicos do papel runtime, mas
+não informa a revisão Alembic. Confirme no Render que `alembic_version` está em `008` antes
+de considerar a compatibilidade de produção totalmente verificada.
 
 Revisão de prontidão 2.0.6 registrada em
 [phase-2.0.6-production-readiness.md](phase-2.0.6-production-readiness.md): sem novas
@@ -68,8 +74,9 @@ validação próprios; nenhuma está disponível como operação funcional nesta
 Objetivo: visualizações privadas com indicadores explicáveis e dados disponíveis de fato.
 3.0.1 e 3.0.2 constam como publicadas segundo relato do responsável. A implementação
 histórica de preços da 3.0.3 foi preservada, mas segue pendente de uma fonte adequada,
-gratuita ou com uso permitido, com cobertura e campos suficientes. A 3.0.4 está concluída
-e validada localmente para revisão; não se declara publicada nesta rodada. O plano técnico,
+gratuita ou com uso permitido, com cobertura e campos suficientes. A 3.0.4 está concluída,
+validada localmente e no commit `f021ad8`; a publicação é reportada pelo responsável, sem
+confirmação independente do SHA implantado. O plano técnico,
 endpoints, limites e decisões em aberto estão em [Fase 3.0 — plano técnico](phase-3.0-technical-plan.md)
 e a validação final da 3.0.4 em [revisão final 3.0.4](phase-3.0.4-final-review.md).
 
@@ -78,8 +85,26 @@ e a validação final da 3.0.4 em [revisão final 3.0.4](phase-3.0.4-final-revie
 | 3.0.1 | Publicada conforme informado pelo responsável: indicadores, contratos e cobertura por ativo/carteira. |
 | 3.0.2 | Publicada conforme informado pelo responsável: fluxos de aplicações/compras e resgates/vendas separados de patrimônio e rentabilidade. |
 | 3.0.3 | Código local preservado: reconstrói quantidades pelo ledger e usa fechamento bruto/eventos societários da integração existente. A adequação da fonte, acesso a `rawClose`, cobertura e termos permanece pendente; não está concluída nem liberada para publicação. Ver [Fase 3.0.3](phase-3.0.3-equity-history.md). |
-| 3.0.4 | Concluída e validada localmente: histórico unificado de ações/CDB, capital movimentado e composição por bases abertas. Sem migration; publicação ainda não realizada. Ver [revisão final](phase-3.0.4-final-review.md). |
+| 3.0.4 | Concluída e validada: histórico unificado de ações/CDB, capital movimentado e composição por bases abertas. Sem migration. Publicação reportada; SHA Vercel e revisão Alembic de produção pendentes de confirmação independente. Ver [revisão final](phase-3.0.4-final-review.md) e [notas](../CHANGELOG.md). |
 | 3.0.5 | A proposta anterior de filtros, tooltips, estados de cobertura e layout foi incorporada às interfaces 3.0.3/3.0.4. Não há escopo adicional aprovado para esta subfase. |
+
+## Proposta v4.0.0 — não aprovada
+
+Esta proposta organiza opções para o próximo ciclo; não autoriza implementação, gasto,
+integração externa ou alteração de schema.
+
+1. **4.0.0 — confiabilidade operacional:** documentar versão/deployment SHA, verificar
+   backups e restauração, e manter testes de autenticação, RLS e permissões de runtime.
+2. **4.1 — importação revisável:** avaliar importação de CSV de corretora com prévia,
+   validação, detecção de duplicatas e confirmação explícita antes de acrescentar ao ledger.
+3. **4.2 — eventos de carteira:** definir suporte a proventos e eventos societários apenas
+   com registros observáveis, regras documentadas e testes; sem presumir valores ausentes.
+4. **4.3 — evolução patrimonial histórica:** considerar snapshots somente se houver fonte de
+   preços gratuita e permitida com cobertura suficiente. Até lá, manter lacunas indisponíveis.
+
+Critérios para qualquer escopo: preservar operações originais e REPLACE/VOID, isolamento por
+proprietário, decimais exatos, demo pública offline e validação local antes de qualquer
+publicação. Nenhuma API paga ou scraping está proposto.
 
 ### Preço e patrimônio são métricas diferentes
 
