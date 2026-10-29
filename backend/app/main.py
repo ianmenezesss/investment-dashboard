@@ -30,6 +30,7 @@ from .fixed_income.observation_routes import router as observation_router
 from .fixed_income.history import router as observed_history_router
 from .portfolio import router as portfolio_router
 from .equity_history import router as equity_history_router
+from .individual_equity_history import EquityPriceHistoryService, router as individual_equity_history_router
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 
@@ -37,20 +38,25 @@ from fastapi.exception_handlers import request_validation_exception_handler
 @asynccontextmanager
 async def lifespan(app):
     # Constructing the client makes no external request. No polling or startup fetch.
-    async with httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as client, \
+    async with httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as market_client, \
+            httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as history_client, \
             httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as rates_client:
         token = settings.brapi_token.get_secret_value().strip()
-        app.state.quote_service = QuoteService(BrapiProvider(client, token),
+        app.state.quote_service = QuoteService(BrapiProvider(market_client, token),
             enabled=settings.market_data_enabled, configured=bool(token))
         app.state.equity_history_service = EquityHistoryService(
-            BrapiEquityHistoryProvider(client, token),
+            BrapiEquityHistoryProvider(history_client, token),
             enabled=settings.market_data_enabled and settings.equity_history_enabled, configured=bool(token))
+        # Nenhum provedor individual é configurado sem validação de dados/licença.
+        app.state.individual_equity_price_history_service = EquityPriceHistoryService(
+            provider=None, enabled=settings.individual_equity_history_enabled)
         app.state.bcb_rates_service = RateService(SGSProvider(rates_client))
         try:
             yield
         finally:
             app.state.quote_service = None
             app.state.equity_history_service = None
+            app.state.individual_equity_price_history_service = None
             app.state.bcb_rates_service = None
 
 
@@ -63,6 +69,7 @@ app.include_router(observation_router)
 app.include_router(observed_history_router)
 app.include_router(portfolio_router)
 app.include_router(equity_history_router)
+app.include_router(individual_equity_history_router)
 
 
 @app.exception_handler(RequestValidationError)

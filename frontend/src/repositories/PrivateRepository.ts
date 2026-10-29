@@ -14,6 +14,9 @@ export class PrivateRepository {
   composition(signal?: AbortSignal) { return request<import('../portfolio/PortfolioInsights').Composition>('dashboard/composition', this.token, { signal }) }
   movements(signal?: AbortSignal) { return request<UnifiedMovement[]>('dashboard/movements', this.token, { signal }) }
   equityHistory(period: string, signal?: AbortSignal) { return request<import('../api').EquityHistory>(`dashboard/equity-history?period=${period}`, this.token, { signal }) }
+  equityPriceHistory(ticker: string, period: import('../api').IndividualEquityPriceHistory['period'], signal?: AbortSignal) {
+    return request<import('../api').IndividualEquityPriceHistory>(`dashboard/equities/${encodeURIComponent(ticker)}/price-history?period=${period}`, this.token, { signal })
+  }
   create(input: OperationInput) { return request<Operation>('operations', this.token, { method: 'POST', body: JSON.stringify(input) }) }
   delete(id: number) { return request<void>(`operations/${id}`, this.token, { method: 'DELETE' }) }
   export() { return request('export', this.token) }

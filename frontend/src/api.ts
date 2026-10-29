@@ -9,6 +9,20 @@ export type EquityHistory = {
   coverage: 'complete' | 'partial' | 'unavailable' | 'empty'; source: 'brapi'; price_basis: 'raw_close'
   convention: string; points: EquityHistoryPoint[]; missing_tickers: string[]; provider_errors: Record<string, string>
 }
+export type IndividualEquityPriceHistory = {
+  ticker: string
+  period: '1M' | '3M' | '6M' | '1A' | 'MAX'
+  currency: string
+  source: string | null
+  price_basis: 'raw_close' | 'adjusted_close' | 'unknown'
+  period_start: string | null
+  period_end: string
+  coverage_start: string | null
+  coverage_end: string | null
+  points: { date: string; close: string }[]
+  availability: 'available' | 'disabled' | 'unavailable' | 'empty'
+  reason: 'feature_disabled' | 'provider_not_configured' | 'provider_unavailable' | 'ticker_not_found' | 'invalid_provider_response' | null
+}
 export type Summary = { acquisition_cost: string; total_purchases: string; sale_proceeds: string; realized_profit: string; market_value: null; holdings: { ticker: string; quantity: string; cost: string; average_price: string }[] }
 export type MarketQuote = {
   ticker: string; price: string | null; currency: string; provider: string

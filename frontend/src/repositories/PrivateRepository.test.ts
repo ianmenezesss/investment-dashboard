@@ -16,6 +16,12 @@ test('repositório privado usa HTTP autenticado e nunca lê ou grava localStorag
   } finally { vi.restoreAllMocks() }
 })
 
+test('histórico individual usa o endpoint autenticado e codifica o ticker no caminho', async () => {
+  const repo = new PrivateRepository('private-history-token')
+  await repo.equityPriceHistory('ITUB4', 'MAX')
+  expect(http).toHaveBeenCalledWith('dashboard/equities/ITUB4/price-history?period=MAX', 'private-history-token', { signal: undefined })
+})
+
 test('API privada expõe preview, revisão e histórico com a chave idempotente no header', async () => {
   http.mockResolvedValueOnce({ kind: 'REPLACE' }).mockResolvedValueOnce({ id: 8 }).mockResolvedValueOnce([])
   const repo = new PrivateRepository('private-token')

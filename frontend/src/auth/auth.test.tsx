@@ -155,6 +155,8 @@ function financialResponse(input: string) {
         ? { as_of: '2025-01-01', equities: [], fixed_income: [], declared_positions: [], missing_fixed_income: [], market_values: null, coverage: 'available', missing_components: [], equity_basis: 'open_acquisition_cost', fixed_income_basis: 'effective_open_principal', declared_values_separate: true, class_totals: { equities_open_cost: '0', fixed_income_open_principal: '0', declared_positions: '0' } }
         : path.endsWith('/dashboard/equity-history')
           ? { period_start: '2025-01-01', period_end: '2025-01-01', coverage_start: null, coverage_end: null, coverage: 'empty', source: 'brapi', price_basis: 'raw_close', convention: '', points: [], missing_tickers: [], provider_errors: {} }
+          : path.includes('/dashboard/equities/') && path.endsWith('/price-history')
+            ? { ticker: path.split('/').at(-2), period: new URL(input, 'https://test.invalid').searchParams.get('period'), currency: 'BRL', source: null, price_basis: 'unknown', period_start: null, period_end: '2025-01-01', coverage_start: null, coverage_end: null, points: [], availability: 'disabled', reason: 'feature_disabled' }
           : path.endsWith('/dashboard/movements') ? [] : []
   return new Response(JSON.stringify(payload), { status: 200 })
 }
