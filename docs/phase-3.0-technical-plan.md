@@ -21,8 +21,10 @@ reais não será solicitado nem usado nesta fase.
 ### Renda Fixa
 
 - `fixed_income_investments`, `fixed_income_lots` e `fixed_income_movements` registram
-  contratos, aplicações e amortizações de principal. Eventos e snapshots são privados por
-  `owner_id`; endpoints usam `private_db` e as migrations aplicam RLS.
+  contratos, aplicações e amortizações de principal. A Fase 2.0.8 acrescentou revisões
+  append-only REPLACE/VOID: saldos, rendimentos e gráficos futuros devem usar exclusivamente
+  a projeção efetiva do ledger, nunca somar movimentos originais e revisões. Eventos e
+  snapshots são privados por `owner_id`; endpoints usam `private_db` e as migrations aplicam RLS.
 - `fixed_income_observations` preserva posição informada em datas escolhidas. Ela não cria
   histórico anterior à data declarada nem snapshots diários automáticos.
 - `GET /api/fixed-income/investments`, detalhe, `/movements` e `/observations` expõem os
