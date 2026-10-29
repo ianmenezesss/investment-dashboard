@@ -1,6 +1,6 @@
 # Fase 5.0A — Navegação responsiva e identidade dinâmica
 
-**Estado:** planejado; documentação não autoriza implementação. Esta etapa precede as fases 5.1–5.6 e prepara a experiência da aplicação para telas menores e para a expansão pessoal restrita. Mantém o custo obrigatório em zero.
+**Estado:** implementado e validado localmente em 29/10/2026. Esta etapa precede as fases 5.1–5.6 e prepara a experiência da aplicação para telas menores e para a expansão pessoal restrita. Mantém o custo obrigatório em zero.
 
 ## Objetivos
 
@@ -76,3 +76,12 @@ Esta proposta apenas altera apresentação no cliente. O identificador de autori
 - Não implementa simulador, metas, onboarding de convidados, cadastro público nem edição de perfil.
 - As fases 5.1–5.6 e seus critérios permanecem como registrados no [roadmap](roadmap.md) e no [plano mestre da Fase 5](phase-5-master-plan.md).
 - A etapa não resolve nem altera a disponibilidade dos históricos de preços 3.0.3, 4.1 ou 4.2.
+
+## Registro de implementação
+
+- `WorkspaceSidebar` centraliza os mesmos links para desktop e drawer mobile. A sidebar desktop recolhe/expande com preferência local; no mobile, o drawer usa o diálogo acessível existente, fecha por Escape, botão e navegação, mantém foco modal e devolve foco ao acionador.
+- A identidade de apresentação prioriza `user_metadata.full_name`, `name` e `display_name`, usa o prefixo do e-mail como fallback e mostra “Investidor” quando ambos faltam. Nome e e-mail não participam da identidade de cache ou autorização; o cache e a sessão continuam isolados pelo ID de usuário validado.
+- Logout e troca de usuário continuam usando a limpeza de cache de `useAuth`. A demonstração permanece sem autenticação, chamadas privadas ou dependência da identidade autenticada.
+- A mensagem do histórico agregado agora diz explicitamente “consulta ao histórico agregado de preços”, sem confundir o recurso com cotações atuais.
+- Sem alterações backend, migrations, flags de histórico, permissões ou dependências. Foram adicionados testes de sidebar, drawer, identidade, troca/logout, demo offline e cópia de indisponibilidade.
+- Validação local: frontend 168 testes aprovados; backend 364 aprovados e 1 ignorado; build concluído; `npm audit --audit-level=moderate` sem vulnerabilidades. A revisão visual manual em viewport mobile/desktop permanece para o proprietário antes da publicação.

@@ -1,14 +1,15 @@
-# Handoff de desenvolvimento — próxima etapa v5.0.0
+# Handoff de desenvolvimento — Investment Dashboard v5.0.0
 
-**Preparado em:** 29/10/2026. Este documento transfere contexto técnico; não inicia nem autoriza implementação da versão 5.
+**Atualizado em:** 29/10/2026. Este documento transfere contexto técnico após a implementação local da Fase 5.0A; não autoriza publicação nem inicia as etapas seguintes.
 
 ## Estado de partida
 
-- Linha de desenvolvimento `feat/v4-investment-analytics`; produção v3.0.4 continua preservada na `main` até publicação manual.
+- v4.0.0 está publicada conforme confirmação do proprietário. As verificações operacionais confirmadas incluem HTTP 200 nos endpoints de operações, valuation, performance e históricos; históricos sem fonte aprovada continuam indisponíveis como projetado. Não foi feita verificação independente dos painéis de produção nesta atualização.
+- Fase 5.0A implementada localmente na branch `feat/v5-0a-responsive-navigation-identity`: navegação mobile/desktop acessível e identidade de apresentação derivada da sessão. Sem mudanças no backend, schema, migrations, permissões ou dependências.
 - 4.1 e 4.2 têm contratos privados, interfaces e testes, mas dados históricos reais seguem indisponíveis: não há provedor aprovado e as flags ficam false.
 - 4.3A entrega `GET /api/dashboard/performance` e resumo atual em `PortfolioInsights`, usando o ledger/serviços financeiros existentes. Sem migration.
 - 4.4 está corretamente bloqueada, sem série de patrimônio inventada, enquanto faltam fluxos externos, eventos/proventos e avaliações históricas compatíveis.
-- `/simulador` e `/metas` continuam placeholders com texto da Fase 5. Nenhuma função v5 foi implementada.
+- `/simulador` e `/metas` continuam placeholders; permanecem identificados como funcionalidades planejadas da Fase 5.
 - Estado de validação local e ressalvas operacionais estão em [revisão final da v4](phase-4.0-final-review.md).
 
 ## Arquitetura e decisões reutilizáveis

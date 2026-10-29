@@ -71,5 +71,5 @@ test('shows loading, error and empty/no-raw-price states', async () => {
   expect(host.textContent).toContain('rawClose')
   client.clear()
   await render({ equityHistory: async () => ({ ...response, points: [], coverage: 'unavailable', provider_errors: { ITUB4: 'disabled' } }) })
-  expect(host.textContent).toContain('O serviço de cotações está desabilitado na configuração do backend')
+  expect(host.textContent).toContain('A consulta ao histórico agregado de preços está desabilitada na configuração do backend')
 })

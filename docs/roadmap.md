@@ -32,9 +32,10 @@ Atualizado em 29/10/2026. Este documento é a fonte principal de verdade do plan
 | Histórico de preços 3.0.3 | **Bloqueado** | Código preservado; EQUITY_HISTORY_ENABLED permanece desligada por padrão. Falta fonte gratuita, permitida e adequada. |
 | v4.1 — Histórico individual de ações | **Concluído tecnicamente; dados bloqueados** | Endpoint e UI usam contrato independente. INDIVIDUAL_EQUITY_HISTORY_ENABLED é false por padrão e não há provedor aprovado. |
 | v4.2 — Comparação de ativos | **Concluído tecnicamente; dados bloqueados** | Endpoint e UI foram implementados com normalização e sem interpolação; dependem da mesma fonte histórica da 4.1. |
-| v4.3A — Resumo financeiro atual | **Concluído tecnicamente** | Endpoint privado de resumo, composição/fluxos existentes, resultado de ações com cobertura e precisão Decimal corrigida. Sem migration; ainda não publicado. |
+| v4.3A — Resumo financeiro atual | **Concluído e publicado** | Endpoint privado de resumo, composição/fluxos existentes, resultado de ações com cobertura e precisão Decimal corrigida. Publicação e operação confirmadas pelo proprietário; este registro não representa leitura independente dos painéis hospedados. |
+| Release v4.0.0 | **Publicada; verificações operacionais reportadas como concluídas** | Proprietário confirmou `/api/operations`, `/api/dashboard/valuation`, `/api/dashboard/performance`, `/api/dashboard/equity-history`, histórico individual e comparação respondendo HTTP 200 em produção. Históricos sem provedor seguem indisponíveis de forma explícita. |
 | v4.4 — Rentabilidade temporal completa | **Bloqueado / condicional** | Depende de fluxo externo classificado, eventos pertinentes e avaliações históricas comparáveis. |
-| 5.0A — Navegação responsiva e identidade dinâmica | **Planejado** | Etapa inicial de UX v5; sidebar responsiva e identidade derivada da sessão, sem usar e-mail para autorização. |
+| 5.0A — Navegação responsiva e identidade dinâmica | **Concluído localmente** | Menu mobile acessível, sidebar desktop recolhível, identidade visual derivada da sessão e testes; sem alteração de backend/migration. Revisão visual final do proprietário permanece antes de publicação. |
 | v5.0.0 | **Planejado** | Simulador e metas são placeholders da Fase 5; os demais módulos abaixo são propostas, não compromissos já implementados. |
 | Investment Dashboard 2.0 | **Planejado, após estabilidade pessoal** | Expansão por convite, com isolamento rigoroso e operação sustentável sem despesa obrigatória. |
 
@@ -64,7 +65,7 @@ Veja [arquitetura original](architecture.md), [demo e fronteira privada](demo-an
 
 ### 4.3A — Resumo financeiro atual
 
-**Estado:** concluído tecnicamente, localmente validado e ainda não publicado. O endpoint privado `GET /api/dashboard/performance` compõe custo/resultado de ações, fluxos registrados, principal CDB efetivo, composição e cobertura das cotações atuais. `PortfolioInsights` mostra os dados pelas bases e estados documentados no [plano 4.3](phase-4.3-financial-performance-plan.md).
+**Estado:** concluído tecnicamente e publicado conforme confirmação do proprietário. O endpoint privado `GET /api/dashboard/performance` compõe custo/resultado de ações, fluxos registrados, principal CDB efetivo, composição e cobertura das cotações atuais. `PortfolioInsights` mostra os dados pelas bases e estados documentados no [plano 4.3](phase-4.3-financial-performance-plan.md).
 
 - Usa `Decimal`, o ledger de ações existente e `effective_movements()` para revisões REPLACE/VOID; posição declarada sem lotes fica separada.
 - Resultado realizado é após taxas registradas e antes de impostos. Resultado não realizado/combinado requer cobertura de cotação completa; cotações stale são avisadas.
@@ -80,9 +81,9 @@ Depende de registro suficiente de fluxos externos, proventos e eventos incluído
 
 ### Release v4.0.0
 
-**Proposta:** release candidate tecnicamente preparado após a 4.3A passar critérios funcionais, financeiros, de segurança e release. A falta de fonte histórica não bloqueia o escopo pessoal se 4.1/4.2 mostrarem indisponibilidade de forma honesta, não fizerem chamadas indevidas e as cotações atuais continuarem independentes. A 4.4 não é requisito de lançamento enquanto bloqueada. Implantação, banco hospedado, login hospedado e validação manual ainda precisam de conferência operacional; este registro não declara validação em produção.
+**Estado:** publicada. O proprietário confirmou as verificações operacionais descritas na linha “Release v4.0.0” acima. Nesta atualização documental não houve acesso independente aos painéis de Render, Vercel ou Supabase; não se registra SHA implantado nem revisão remota do banco sem evidência desses painéis. A falta de fonte histórica não bloqueia o escopo pessoal porque 4.1/4.2 permanecem explicitamente indisponíveis e não inventam preços; as cotações atuais são independentes. A 4.4 continua bloqueada.
 
-Critérios e processo: [critérios de release pessoal](personal-dashboard-release-criteria.md). Nenhuma publicação é autorizada por este roadmap.
+Critérios e processo: [critérios de release pessoal](personal-dashboard-release-criteria.md). Este registro é retrospectivo e não autoriza novo deploy.
 
 ## v5.0.0 — planejamento, dados e relatórios
 

@@ -1,14 +1,16 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDownLeft, ArrowUpRight, ChartNoAxesCombined, LayoutDashboard, Wallet, Landmark, History, FlaskConical, Flag, Plus, Download, X, ShieldCheck, ChevronRight, Eye, Trash2, RotateCcw, LogOut, LogIn, FlaskConical as DemoIcon } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, ChartNoAxesCombined, Wallet, FlaskConical, Plus, Download, X, ShieldCheck, ChevronRight, Eye, Trash2, RotateCcw, LogOut, LogIn, Menu, FlaskConical as DemoIcon } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from './components/ui/button'
 import { ApiError } from './api'
 import './style.css'
 import './dashboard-ux.css'
+import './navigation.css'
 import { PUBLIC_DEMO, SUPABASE_AUTH } from './runtime'
 import { useAuth } from './auth/useAuth'
+import { getDisplayIdentity } from './auth/displayIdentity'
 import { LoginPage } from './auth/LoginPage'
 import { DemoRepository } from './repositories/DemoRepository'
 import { PrivateRepository } from './repositories/PrivateRepository'
@@ -17,6 +19,7 @@ import { DemoAccessPage } from './demo/DemoAccessPage'
 import { ConfirmDialog } from './components/ui/ConfirmDialog'
 import { MarketDashboard } from './components/MarketDashboard'
 import { FinancialHint } from './components/FinancialHint'
+import { WorkspaceSidebar, workspaceNavItems } from './components/WorkspaceSidebar'
 const FixedIncomePage = lazy(() => import('./fixed-income/FixedIncomePage').then(module => ({ default: module.FixedIncomePage })))
 const PortfolioInsights = lazy(() => import('./portfolio/PortfolioInsights').then(module => ({ default: module.PortfolioInsights })))
 const EquityHistory = lazy(() => import('./portfolio/EquityHistory').then(module => ({ default: module.EquityHistory })))
@@ -30,7 +33,6 @@ const number = (v: string | number) => Number(v).toLocaleString('pt-BR', { maxim
 const palette = ['#68e5b4', '#8298f8', '#e8c77c', '#d494dc', '#7bc7e6', '#edac86']
 const noSubscription = () => () => {}
 const emptySnapshot = () => null
-const nav = [{ to: '/', label: 'Visão geral', icon: LayoutDashboard }, { to: '/acoes', label: 'Ações', icon: ChartNoAxesCombined }, { to: '/cdbs', label: 'Renda fixa', icon: Landmark }, { to: '/historico', label: 'Histórico', icon: History }, { to: '/simulador', label: 'Simulador', icon: FlaskConical }, { to: '/metas', label: 'Metas', icon: Flag }]
 
 export default function App() {
   const location = useLocation()
@@ -51,6 +53,10 @@ export default function App() {
   const [period, setPeriod] = useState('Tudo')
   const [search, setSearch] = useState('')
   const [sortAsc, setSortAsc] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return window.localStorage.getItem('investment-sidebar-collapsed') === 'true' } catch { return false }
+  })
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
   const client = useQueryClient()
   const clearPrivate = useCallback(() => { void client.cancelQueries(); client.clear(); setModal(false); setConfirmation(null); setConfirmError(''); setError(''); setFixedAccessError(null); setFixedNewRequest(0) }, [client])
   const auth = useAuth(!demo && SUPABASE_AUTH && !PUBLIC_DEMO, clearPrivate)
@@ -61,6 +67,10 @@ export default function App() {
   const demoState = useSyncExternalStore(demoRepository?.subscribe ?? noSubscription, demoRepository?.getSnapshot ?? emptySnapshot)
   const privateRepository = useMemo(() => new PrivateRepository(activeToken), [activeToken])
   const page = demo && !PUBLIC_DEMO ? location.pathname.slice(5) || '/' : location.pathname
+  useEffect(() => {
+    try { window.localStorage.setItem('investment-sidebar-collapsed', String(sidebarCollapsed)) } catch { /* preferência opcional */ }
+  }, [sidebarCollapsed])
+  useEffect(() => { setMobileNavigationOpen(false) }, [location.pathname])
   useEffect(() => { if (page === '/cdbs') setModal(false) }, [page])
   const routeTo = (path: string) => demo && !PUBLIC_DEMO ? '/demo' + (path === '/' ? '' : path) : path
   const summary = useQuery({ queryKey: ['summary', identity], queryFn: ({ signal }) => privateRepository.summary(signal), enabled: connected && !demo, retry: false, staleTime: 30 * 60 * 1000, refetchInterval: false })
@@ -134,11 +144,14 @@ export default function App() {
     return <LoginPage loading={SUPABASE_AUTH ? auth.status === 'loading' || connected && !apiError : localConnected && !apiError} error={auth.error || error || (apiError as Error | null)?.message || ''} onLogin={auth.login} local={!SUPABASE_AUTH} onLocalLogin={value => { clearPrivate(); setToken(value); setConnected(true) }} onDemo={() => { void toggleDemo() }} connected={connected} onLogout={logout}/>
   }
   if (!demo && location.pathname === '/login') return <Navigate to="/" replace/>
-  return <div className="shell">
-    <aside className="sidebar"><a className="brand" href="/"><span className="brand-icon"><ChartNoAxesCombined size={23}/></span> investment<span className="brand-dot">.</span></a><div className="workspace"><div className="avatar">IP</div><div>Meu patrimônio<small>Carteira pessoal</small></div><ChevronRight size={16}/></div><p className="nav-caption">WORKSPACE</p><nav>{nav.filter(n => !demo || ['/', '/acoes', '/historico'].includes(n.to)).map(n => <NavLink end to={routeTo(n.to)} key={n.to}><n.icon size={19}/>{n.label}{['/simulador', '/metas'].includes(n.to) && <span className="nav-planned">Em breve</span>}</NavLink>)}</nav><div className="sidebar-bottom"><ShieldCheck size={22}/><p>Seu futuro começa aqui.<small>Uma decisão de cada vez.</small></p></div><div className="profile"><div className="avatar">EU</div><div>Investidor pessoal<small>{demo ? 'Carteira demonstrativa' : 'Acesso privado'}</small></div><span className="status-dot"/></div></aside>
-    <main><header><div className="breadcrumb">Workspace <ChevronRight size={13}/> <span>{nav.find(n => n.to === page)?.label}</span></div><span className="local-badge"><span className="status-dot"/> {demo ? 'Modo Demonstração' : 'Ambiente pessoal'}</span></header>
+  const sessionDisplay = getDisplayIdentity(SUPABASE_AUTH ? auth.session?.user : null)
+  const displayName = demo ? 'Demonstração' : sessionDisplay.name
+  const avatarInitial = demo ? 'D' : sessionDisplay.initial
+  return <div className={`shell${sidebarCollapsed ? ' sidebar-is-collapsed' : ''}`} data-navigation-collapsed={sidebarCollapsed}>
+    <WorkspaceSidebar demo={demo} routeTo={routeTo} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed(value => !value)} displayName={displayName} avatarInitial={avatarInitial}/>
+    <main><header><Dialog.Root open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}><Dialog.Trigger asChild><button type="button" className="mobile-menu-trigger" aria-label="Abrir menu de navegação" aria-controls="mobile-navigation-panel"><Menu size={20}/></button></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="mobile-nav-overlay"/><Dialog.Content id="mobile-navigation-panel" className="mobile-nav-content"><Dialog.Title className="sr-only">Menu de navegação</Dialog.Title><Dialog.Close className="mobile-nav-close" aria-label="Fechar menu de navegação"><X size={19}/></Dialog.Close><WorkspaceSidebar demo={demo} routeTo={routeTo} mobile onNavigate={() => setMobileNavigationOpen(false)} displayName={displayName} avatarInitial={avatarInitial}/></Dialog.Content></Dialog.Portal></Dialog.Root><div className="breadcrumb">Workspace <ChevronRight size={13}/> <span>{workspaceNavItems.find(n => n.to === page)?.label}</span></div><span className="local-badge"><span className="status-dot"/> {demo ? 'Modo Demonstração' : 'Ambiente pessoal'}</span></header>
 
-      <section className="page-title"><div><p className="eyebrow">CLAREZA PARA O SEU PRÓXIMO PASSO</p><h1>{nav.find(n => n.to === page)?.label ?? 'Página não encontrada'}</h1><p>Acompanhe suas escolhas. Construa seu amanhã.</p></div><div className="actions">{page !== '/cdbs' && <Button variant="outline" onClick={exportData} disabled={!demo && !connected}><Download size={16}/> Exportar</Button>}<Button onClick={() => page === '/cdbs' ? setFixedNewRequest(value => value + 1) : setModal(true)} disabled={!demo && !connected || demo && page === '/cdbs'}><Plus size={17}/> Nova operação</Button></div></section>
+      <section className="page-title"><div><p className="eyebrow">CLAREZA PARA O SEU PRÓXIMO PASSO</p><h1>{workspaceNavItems.find(n => n.to === page)?.label ?? 'Página não encontrada'}</h1><p>Acompanhe suas escolhas. Construa seu amanhã.</p></div><div className="actions">{page !== '/cdbs' && <Button variant="outline" onClick={exportData} disabled={!demo && !connected}><Download size={16}/> Exportar</Button>}<Button onClick={() => page === '/cdbs' ? setFixedNewRequest(value => value + 1) : setModal(true)} disabled={!demo && !connected || demo && page === '/cdbs'}><Plus size={17}/> Nova operação</Button></div></section>
       <section className={demo ? 'mode-banner demo-banner' : 'mode-banner private-banner'} aria-label={demo ? 'Modo demonstração' : 'Conta conectada'}>
         <div className="mode-summary"><span className="mode-icon">{demo ? <DemoIcon size={20}/> : <ShieldCheck size={20}/>}</span><div><strong>{demo ? 'Modo demonstração' : 'Carteira conectada'}</strong><p>{demo ? 'Dados fictícios armazenados neste navegador' : auth.session?.user.email ?? 'Desenvolvimento local'}</p></div></div>
         <div className="mode-actions">{demo ? <><Button variant="outline" onClick={resetDemo}><RotateCcw size={16}/> Restaurar</Button><Button variant="outline" onClick={() => { void toggleDemo() }}><LogIn size={16}/> Entrar</Button></> : <><Button variant="outline" onClick={() => { void toggleDemo() }}><DemoIcon size={16}/> Explorar demonstração</Button><Button variant="outline" onClick={logout}><LogOut size={16}/> Sair</Button></>}</div>
