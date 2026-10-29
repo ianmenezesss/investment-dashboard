@@ -36,7 +36,7 @@ export function EquityHistory({ repository, identity }: { repository: PrivateRep
   const delta = deltaPoint?.difference_over_net_flows
   const providerReasons = Object.values(data?.provider_errors ?? {})
   const providerMessage = providerReasons.includes('missing_token') ? 'Configure o acesso à fonte de cotações no backend para consultar preços históricos.'
-    : providerReasons.includes('disabled') ? 'O serviço de cotações está desabilitado na configuração do backend.'
+    : providerReasons.includes('disabled') ? 'A consulta ao histórico agregado de preços está desabilitada na configuração do backend.'
       : providerReasons.includes('raw_price_unavailable') ? 'A fonte não forneceu fechamentos originais. O histórico de valor exige acesso a rawClose no plano habilitado.'
         : providerReasons.some(reason => ['raw_history_not_available', 'provider_auth_error'].includes(reason)) ? 'O acesso configurado não permite consultar os fechamentos originais. O histórico de preços permanece indisponível sem acesso a rawClose.'
         : providerReasons.some(reason => ['provider_timeout', 'provider_unavailable', 'provider_http_error', 'rate_limited'].includes(reason))
