@@ -36,6 +36,7 @@ beforeEach(() => {
   mock.auth.onAuthStateChange.mockImplementation(callback => { mock.callback = callback; return { data: { subscription: { unsubscribe: vi.fn() } } } })
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
   sessionStorage.clear()
+  localStorage.removeItem('investment-sidebar-collapsed')
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals() })
 
@@ -168,6 +169,89 @@ function financialResponse(input: string) {
           : path.endsWith('/dashboard/movements') ? [] : []
   return new Response(JSON.stringify(payload), { status: 200 })
 }
+
+test('sidebar desktop recolhe, expande e mantém nomes acessíveis nas rotas', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => financialResponse(input)))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
+  const toggle = host.querySelector('[aria-label="Recolher navegação"]') as HTMLButtonElement
+  expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  await act(async () => toggle.click())
+  expect(host.querySelector('.shell')?.getAttribute('data-navigation-collapsed')).toBe('true')
+  expect(host.querySelector('.sidebar-collapsed a[aria-label="Ações"]')).not.toBeNull()
+  expect(localStorage.getItem('investment-sidebar-collapsed')).toBe('true')
+  await act(async () => (host.querySelector('[aria-label="Expandir navegação"]') as HTMLButtonElement).click())
+  expect(host.querySelector('.shell')?.getAttribute('data-navigation-collapsed')).toBe('false')
+  client.clear()
+})
+
+test('menu mobile fecha com Escape e restaura foco ao acionador', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => financialResponse(input)))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
+  const trigger = host.querySelector('[aria-label="Abrir menu de navegação"]') as HTMLButtonElement
+  trigger.focus()
+  await act(async () => trigger.click())
+  const dialog = document.querySelector('#mobile-navigation-panel')
+  expect(dialog).not.toBeNull()
+  expect(trigger.getAttribute('aria-expanded')).toBe('true')
+  expect(host.getAttribute('aria-hidden')).toBe('true')
+  expect(dialog?.querySelector('[aria-label="Navegação principal"] a[aria-label="Ações"]')).not.toBeNull()
+  await act(async () => dialog!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  expect(document.querySelector('#mobile-navigation-panel')).toBeNull()
+  expect(document.activeElement).toBe(trigger)
+  client.clear()
+})
+
+test('menu mobile navega e fecha sem ativar endpoints privados adicionais na demo', async () => {
+  const fetchMock = vi.fn()
+  vi.stubGlobal('fetch', fetchMock)
+  const client = new QueryClient()
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => (host.querySelector('.login-demo') as HTMLButtonElement).click())
+  await act(async () => (host.querySelector('[aria-label="Abrir menu de navegação"]') as HTMLButtonElement).click())
+  const link = document.querySelector('#mobile-navigation-panel a[href="/demo/historico"]') as HTMLAnchorElement
+  expect(link).not.toBeNull()
+  await act(async () => link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })))
+  expect(host.textContent).toContain('Histórico de operações')
+  expect(document.querySelector('#mobile-navigation-panel')).toBeNull()
+  expect(fetchMock).not.toHaveBeenCalled()
+  client.clear()
+})
+
+test('identidade visível acompanha metadados, troca de usuário e logout sem afetar a chave de autorização', async () => {
+  const named = { ...session, user: { ...session.user, user_metadata: { full_name: 'Ana Investidora' } } } as Session
+  mock.auth.getSession.mockResolvedValue({ data: { session: named }, error: null })
+  mock.auth.getUser.mockResolvedValue({ data: { user: named.user }, error: null })
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => financialResponse(input)))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  client.setQueryData(['private-cache', named.user.id], 'private data')
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)) })
+  expect(host.querySelector('.profile-copy')?.textContent).toContain('Ana Investidora')
+  expect([...host.querySelectorAll('.profile .avatar')].map(element => element.textContent)).toContain('A')
+
+  const switched = { ...named, user: { ...named.user, id: '22222222-2222-4222-8222-222222222222', email: 'bruno@example.test', user_metadata: { name: 'Bruno' } } } as Session
+  mock.auth.getUser.mockResolvedValue({ data: { user: switched.user }, error: null })
+  await act(async () => mock.callback!('SIGNED_IN', switched))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
+  expect(host.querySelector('.profile-copy')?.textContent).toContain('Bruno')
+  expect(host.querySelector('.profile-copy')?.textContent).not.toContain('Ana Investidora')
+  expect(client.getQueryData(['private-cache', named.user.id])).toBeUndefined()
+  expect(client.getQueryData(['summary', named.user.id])).toBeUndefined()
+  expect(client.getQueryData(['summary', switched.user.id])).not.toBeUndefined()
+
+  const logout = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Sair') as HTMLButtonElement
+  await act(async () => logout.click())
+  expect(host.querySelector('.profile-copy')).toBeNull()
+  expect(host.querySelector('form[aria-label="Login da carteira"]')).not.toBeNull()
+  expect(client.getQueryData(['summary', switched.user.id])).toBeUndefined()
+  client.clear()
+})
 
 test('renovação no retorno à aba mantém dashboard enquanto a API revalida com o novo JWT', async () => {
   mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
