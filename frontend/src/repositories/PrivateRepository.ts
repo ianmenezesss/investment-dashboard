@@ -17,6 +17,12 @@ export class PrivateRepository {
   equityPriceHistory(ticker: string, period: import('../api').IndividualEquityPriceHistory['period'], signal?: AbortSignal) {
     return request<import('../api').IndividualEquityPriceHistory>(`dashboard/equities/${encodeURIComponent(ticker)}/price-history?period=${period}`, this.token, { signal })
   }
+  equityComparison(tickers: string[], period: import('../api').IndividualEquityPriceHistory['period'], signal?: AbortSignal) {
+    const params = new URLSearchParams()
+    tickers.forEach(ticker => params.append('tickers', ticker))
+    params.set('period', period)
+    return request<import('../api').EquityComparison>(`dashboard/equities/compare?${params.toString()}`, this.token, { signal })
+  }
   create(input: OperationInput) { return request<Operation>('operations', this.token, { method: 'POST', body: JSON.stringify(input) }) }
   delete(id: number) { return request<void>(`operations/${id}`, this.token, { method: 'DELETE' }) }
   export() { return request('export', this.token) }

@@ -22,6 +22,12 @@ test('histórico individual usa o endpoint autenticado e codifica o ticker no ca
   expect(http).toHaveBeenCalledWith('dashboard/equities/ITUB4/price-history?period=MAX', 'private-history-token', { signal: undefined })
 })
 
+test('comparação privada envia tickers e período como parâmetros repetidos autenticados', async () => {
+  const repo = new PrivateRepository('comparison-token')
+  await repo.equityComparison(['ITUB4', 'BBAS3'], '6M')
+  expect(http).toHaveBeenCalledWith('dashboard/equities/compare?tickers=ITUB4&tickers=BBAS3&period=6M', 'comparison-token', { signal: undefined })
+})
+
 test('API privada expõe preview, revisão e histórico com a chave idempotente no header', async () => {
   http.mockResolvedValueOnce({ kind: 'REPLACE' }).mockResolvedValueOnce({ id: 8 }).mockResolvedValueOnce([])
   const repo = new PrivateRepository('private-token')

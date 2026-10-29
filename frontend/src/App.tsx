@@ -22,6 +22,7 @@ import { FixedIncomePage } from './fixed-income/FixedIncomePage'
 import { PortfolioInsights } from './portfolio/PortfolioInsights'
 import { EquityHistory } from './portfolio/EquityHistory'
 import { IndividualEquityHistory } from './portfolio/IndividualEquityHistory'
+import { AssetComparison } from './portfolio/AssetComparison'
 import { MovementHistory } from './portfolio/MovementHistory'
 import { formatFlowAxisTick } from './portfolio/format'
 
@@ -154,6 +155,10 @@ export default function App() {
         {demo && page === '/acoes' && <article className="panel"><div className="panel-heading"><h3>Posições por custo médio</h3></div><div className="table-scroll"><table><thead><tr><th>Ativo</th><th>Quantidade</th><th>Preço médio</th><th>Custo da posição</th></tr></thead><tbody>{data?.holdings.map(h => <tr key={h.ticker}><td>{h.ticker}</td><td>{number(h.quantity)}</td><td>{money(h.average_price)}</td><td>{money(h.cost)}</td></tr>)}</tbody></table></div></article>}
       </>}
       {!demo && page === '/acoes' && data && <IndividualEquityHistory
+        repository={privateRepository} identity={identity}
+        tickers={data.holdings.map(holding => holding.ticker)}
+      />}
+      {!demo && page === '/acoes' && data && <AssetComparison
         repository={privateRepository} identity={identity}
         tickers={data.holdings.map(holding => holding.ticker)}
       />}

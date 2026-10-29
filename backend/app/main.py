@@ -31,6 +31,7 @@ from .fixed_income.history import router as observed_history_router
 from .portfolio import router as portfolio_router
 from .equity_history import router as equity_history_router
 from .individual_equity_history import EquityPriceHistoryService, router as individual_equity_history_router
+from .equity_comparison import router as equity_comparison_router
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 
@@ -70,6 +71,7 @@ app.include_router(observed_history_router)
 app.include_router(portfolio_router)
 app.include_router(equity_history_router)
 app.include_router(individual_equity_history_router)
+app.include_router(equity_comparison_router)
 
 
 @app.exception_handler(RequestValidationError)

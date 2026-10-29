@@ -23,6 +23,21 @@ export type IndividualEquityPriceHistory = {
   availability: 'available' | 'disabled' | 'unavailable' | 'empty'
   reason: 'feature_disabled' | 'provider_not_configured' | 'provider_unavailable' | 'ticker_not_found' | 'invalid_provider_response' | null
 }
+export type EquityComparison = {
+  tickers: string[]
+  period: IndividualEquityPriceHistory['period']
+  currency: string | null
+  source: string | null
+  price_basis: IndividualEquityPriceHistory['price_basis'] | null
+  period_start: string | null
+  period_end: string
+  common_start_date: string | null
+  coverage: { ticker: string; coverage_start: string; coverage_end: string; base_price: string }[]
+  points: { date: string; values: Record<string, string | null> }[]
+  availability: 'available' | 'disabled' | 'unavailable' | 'empty'
+  reason: 'feature_disabled' | 'provider_not_configured' | 'provider_unavailable' | 'ticker_not_found'
+    | 'invalid_provider_response' | 'incompatible_data' | 'no_common_date' | 'empty_history' | null
+}
 export type Summary = { acquisition_cost: string; total_purchases: string; sale_proceeds: string; realized_profit: string; market_value: null; holdings: { ticker: string; quantity: string; cost: string; average_price: string }[] }
 export type MarketQuote = {
   ticker: string; price: string | null; currency: string; provider: string
