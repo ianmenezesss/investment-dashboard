@@ -25,9 +25,14 @@ jobs:
       - name: Backend tests
         working-directory: backend
         run: python -m pytest -q
+      - name: Prepare PostgreSQL integration image
+        run: docker pull postgres:17-alpine
       - name: PostgreSQL integration in isolated container
         working-directory: backend
-        run: python tests/run_postgres.py
+        run: |
+          temp_dir="$(mktemp -d "${RUNNER_TEMP}/investment-dashboard-postgres.XXXXXX")"
+          trap 'rm -rf -- "$temp_dir"' EXIT
+          INVESTMENT_TEMP_DIR="$temp_dir" python tests/run_postgres.py
       - name: Frontend checks
         working-directory: frontend
         run: npm ci && npm test && npm run build && npm audit --audit-level=high
