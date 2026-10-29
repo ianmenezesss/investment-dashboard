@@ -28,6 +28,46 @@ def test_capital_flows_decimal_cutoff_and_separate_gross_withdrawals():
     assert result["coverage"] == "available" and result["market_value"] is None and result["return"] is None
 
 
+def test_capital_flow_totals_separate_recorded_trades_and_effective_principal():
+    from types import SimpleNamespace as Row
+    operations = [
+        Row(id=1, date=date(2025, 1, 1), kind="BUY", quantity=D("10"), price=D("10"), fees=D("1")),
+        Row(id=2, date=date(2025, 1, 2), kind="BUY", quantity=D("10"), price=D("30"), fees=D("3")),
+        Row(id=3, date=date(2025, 1, 3), kind="SELL", quantity=D("10"), price=D("25"), fees=D("2")),
+        Row(id=4, date=date(2025, 1, 4), kind="SELL", quantity=D("10"), price=D("20"), fees=D("1")),
+        Row(id=5, date=date(2025, 1, 5), kind="BUY", quantity=D("5"), price=D("40"), fees=D("2")),
+    ]
+    movements = [
+        Row(id=1, date=date(2025, 1, 1), kind="APPLICATION", principal_amount=D("50")),
+        Row(id=2, date=date(2025, 1, 4), kind="REDEMPTION", principal_amount=D("20")),
+    ]
+    result = aggregate_capital_flows(operations, movements, start=date.min, end=date(2025, 1, 5))
+    assert D(result["equity_purchases"]) == D("606")
+    assert D(result["cdb_applications"]) == D("50")
+    assert D(result["gross_contributions"]) == D("656")
+    assert D(result["equity_sale_proceeds"]) == D("447")
+    assert D(result["cdb_redemptions"]) == D("20")
+    assert D(result["cumulative_contributions"]) == D("656")
+    assert D(result["cumulative_withdrawals"]) == D("467")
+    assert D(result["net_accumulated"]) == D("189")
+    assert [D(point["net_accumulated"]) for point in result["points"]] == [D("151"), D("454"), D("206"), D("-13"), D("189")]
+    assert [D(point["cumulative_contributions"]) for point in result["points"]] == [D("151"), D("454"), D("454"), D("454"), D("656")]
+    assert [D(point["cumulative_withdrawals"]) for point in result["points"]] == [D("0"), D("0"), D("248"), D("467"), D("467")]
+    window = aggregate_capital_flows(operations, movements, start=date(2025, 1, 3), end=date(2025, 1, 4))
+    assert D(window["equity_purchases"]) == 0 and D(window["cdb_applications"]) == 0
+    assert D(window["equity_sale_proceeds"]) == D("447") and D(window["cdb_redemptions"]) == D("20")
+    assert D(window["cumulative_contributions"]) == D("454")
+    assert D(window["cumulative_withdrawals"]) == D("467")
+
+
+def test_capital_flow_metrics_are_zero_and_unavailable_without_operations():
+    result = aggregate_capital_flows([], [], start=date.min, end=date(2025, 1, 5))
+    assert result["points"] == []
+    assert D(result["gross_contributions"]) == D(result["equity_purchases"]) == D(result["cdb_applications"]) == 0
+    assert D(result["cumulative_contributions"]) == D(result["cumulative_withdrawals"]) == D(result["net_accumulated"]) == 0
+    assert result["coverage"] == "unavailable"
+
+
 def test_month_filter_uses_calendar_month_and_clamps_month_end():
     assert _subtract_months(date(2025, 3, 31), 1) == date(2025, 2, 28)
 
@@ -71,6 +111,10 @@ def test_private_flow_endpoint_uses_effective_cdb_projection_owner_scope_and_wit
     assert D(points["2025-03-01"]["redemptions"]) == D("20.00000001")
     assert D(points["2025-01-05"]["sales"]) == D("6")
     assert D(points["2025-01-03"]["contributions"]) == D("20.60")
+    assert D(data["equity_purchases"]) == D("20.60")
+    assert D(data["cdb_applications"]) == D("120.87654321")
+    assert D(data["cumulative_contributions"]) == D("141.47654321")
+    assert D(data["cumulative_withdrawals"]) == D("26.00000001")
     app.dependency_overrides[authenticate] = lambda: Principal(B)
     b_data = client.get("/api/dashboard/capital-flows?period=Tudo").json()
     assert D(b_data["gross_contributions"]) == D("8991")

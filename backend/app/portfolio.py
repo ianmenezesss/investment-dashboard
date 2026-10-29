@@ -37,8 +37,8 @@ def _subtract_months(value: date, months: int) -> date:
 
 
 def aggregate_capital_flows(operations, movements, *, start: date, end: date):
-    """Net recorded capital flows. No market value, wealth, or return is inferred."""
-    by_day = defaultdict(lambda: [ZERO, ZERO, ZERO])  # contributions, CDB principal redemptions, equity sales
+    """Recorded cash movements and principal flows; never market value or return."""
+    by_day = defaultdict(lambda: [ZERO, ZERO, ZERO, ZERO])  # equity purchases, CDB applications, principal redemptions, net equity sales
     all_dates = []
     with localcontext() as ctx:
         ctx.prec = 64
@@ -49,14 +49,14 @@ def aggregate_capital_flows(operations, movements, *, start: date, end: date):
                 by_day[op.date][0] += amount
             else:
                 amount -= op.fees
-                by_day[op.date][2] += amount
+                by_day[op.date][3] += amount
             all_dates.append(op.date)
         for movement in movements:
             amount = movement.principal_amount
             if movement.kind == "APPLICATION":
-                by_day[movement.date][0] += amount
-            elif movement.kind == "REDEMPTION":
                 by_day[movement.date][1] += amount
+            elif movement.kind == "REDEMPTION":
+                by_day[movement.date][2] += amount
             all_dates.append(movement.date)
 
         cumulative_in = cumulative_out = ZERO
@@ -64,31 +64,46 @@ def aggregate_capital_flows(operations, movements, *, start: date, end: date):
         for day in sorted(by_day):
             if day > end:
                 continue
-            contributions, redemptions, sales = by_day[day]
+            equity_purchases, applications, redemptions, sales = by_day[day]
+            contributions = equity_purchases + applications
             if day < start:
                 cumulative_in += contributions
                 cumulative_out += redemptions + sales
                 continue
             if not points and start != date.min and day > start:
                 points.append({"date": start.isoformat(), "contributions": _money(ZERO),
-                    "redemptions": _money(ZERO), "sales": _money(ZERO), "net_accumulated": _money(cumulative_in - cumulative_out)})
+                    "redemptions": _money(ZERO), "sales": _money(ZERO),
+                    "cumulative_contributions": _money(cumulative_in),
+                    "cumulative_withdrawals": _money(cumulative_out),
+                    "net_accumulated": _money(cumulative_in - cumulative_out)})
             cumulative_in += contributions
             cumulative_out += redemptions + sales
             if start <= day <= end:
                 points.append({"date": day.isoformat(), "contributions": _money(contributions),
                     "redemptions": _money(redemptions), "sales": _money(sales), "net_accumulated": _money(cumulative_in - cumulative_out)})
+                points[-1]["cumulative_contributions"] = _money(cumulative_in)
+                points[-1]["cumulative_withdrawals"] = _money(cumulative_out)
         observed = [day for day in all_dates if day <= end]
         coverage_start = min(observed).isoformat() if observed else None
         coverage_end = max(observed).isoformat() if observed else None
         visible = [day for day in observed if day >= start]
         if start != date.min and not points and observed:
-            points.append({"date": start.isoformat(), "contributions": _money(ZERO), "redemptions": _money(ZERO), "sales": _money(ZERO), "net_accumulated": _money(cumulative_in - cumulative_out)})
+            points.append({"date": start.isoformat(), "contributions": _money(ZERO), "redemptions": _money(ZERO), "sales": _money(ZERO),
+                "cumulative_contributions": _money(cumulative_in), "cumulative_withdrawals": _money(cumulative_out),
+                "net_accumulated": _money(cumulative_in - cumulative_out)})
+        period_equity_purchases = sum((values[0] for day, values in by_day.items() if start <= day <= end), ZERO)
+        period_applications = sum((values[1] for day, values in by_day.items() if start <= day <= end), ZERO)
+        period_redemptions = sum((values[2] for day, values in by_day.items() if start <= day <= end), ZERO)
+        period_sales = sum((values[3] for day, values in by_day.items() if start <= day <= end), ZERO)
         return {"period_start": start.isoformat(), "period_end": end.isoformat(),
             "coverage_start": coverage_start, "coverage_end": coverage_end,
             "coverage": "available" if points and coverage_start and (start == date.min or date.fromisoformat(coverage_start) <= start) else "partial" if points else "unavailable",
-            "points": points, "gross_contributions": _money(sum((values[0] for day, values in by_day.items() if start <= day <= end), ZERO)),
-            "redemptions": _money(sum((values[1] for day, values in by_day.items() if start <= day <= end), ZERO)),
-            "sales": _money(sum((values[2] for day, values in by_day.items() if start <= day <= end), ZERO)),
+            "points": points, "gross_contributions": _money(period_equity_purchases + period_applications),
+            "equity_purchases": _money(period_equity_purchases), "cdb_applications": _money(period_applications),
+            "redemptions": _money(period_redemptions), "cdb_redemptions": _money(period_redemptions),
+            "sales": _money(period_sales), "equity_sale_proceeds": _money(period_sales),
+            "cumulative_contributions": _money(cumulative_in),
+            "cumulative_withdrawals": _money(cumulative_out),
             "withdrawals": _money(cumulative_out),
             "net_accumulated": _money(cumulative_in - cumulative_out),
             "visible_events": len(visible), "market_value": None, "return": None}
