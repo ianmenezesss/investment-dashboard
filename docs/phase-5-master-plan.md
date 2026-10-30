@@ -1,6 +1,6 @@
 # Plano mestre — v5.0.0
 
-**Status em 29/10/2026:** desenvolvimento local na branch `feat/v5-development`. A 5.0A, 5.1 e 5.2A estão implementadas e validadas localmente; adaptadores bancários 5.2B aguardam amostras verificadas. Ver [documentação 5.2](phase-5.2-csv-import.md) e [preparação 5.2B](phase-5.2b-adapter-readiness.md). Este status não autoriza publicação.
+**Status em 29/10/2026:** desenvolvimento na branch `feat/v5-development`. A 5.0A e 5.1 estão implementadas. A importação CSV 5.2A foi retirada por decisão do proprietário; 5.2B está suspensa. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção. Este status não autoriza publicação.
 
 ## Relação com o planejamento original
 
@@ -8,12 +8,12 @@ A arquitetura original reservava uma fase para planejamento: simulador com premi
 
 ## Princípios de v5
 
-- Zero despesa obrigatória; open source, registros manuais e CSV primeiro.
+- Zero despesa obrigatória; open source e registros financeiros manuais.
 - Simulações são cenários, não previsão ou promessa de retorno.
 - Nenhuma taxa ou retorno é preenchido automaticamente sem origem e consentimento.
 - Supabase Auth e isolamento por proprietário são preservados.
 - Demo continua offline e não mostra carteira privada.
-- Importação sempre tem preview, validação, duplicate detection e confirmação.
+- Autenticação, isolamento por proprietário e RLS são preservados nos fluxos privados.
 - Pagamento, API comercial ou Open Finance não é pré-requisito. Ideias permanecem opcionais.
 
 ## Fases propostas
@@ -32,7 +32,7 @@ A arquitetura original reservava uma fase para planejamento: simulador com premi
 
 ### 5.1 — Caixa, proventos e eventos financeiros
 
-**Prioridade:** alta para medição completa. **Estado:** implementada localmente; especificação em [plano 5.1](phase-5.1-cash-flow-and-income-events.md). A migration 009 ainda não foi aplicada a banco persistente.
+**Prioridade:** alta para medição completa. **Estado:** implementada; especificação em [plano 5.1](phase-5.1-cash-flow-and-income-events.md). O proprietário informa que a migration 009 foi aplicada ao Supabase de produção e que as tabelas de eventos existem; esta alteração não modificou nem consultou o banco.
 
 - Definir depósitos e saques externos, distinguindo compra/venda e aplicação/resgate.
 - Proventos de ações (dividendos/JCP), reinvestimento e observações de eventos corporativos usam origem declarada e revisão auditável. Observações corporativas não alteram posição ou custo.
@@ -43,18 +43,9 @@ A arquitetura original reservava uma fase para planejamento: simulador com premi
 - **Migration:** 009 cria entidades append-only, RLS/FORCE RLS, triggers e grants mínimos; sem backfill de operações antigas.
 - **Aceite validado:** valores `Decimal`, períodos, idempotência, REPLACE/VOID, isolamento de proprietário, histórico unificado e testes de PostgreSQL descartável. Tarifas de transferência e eventos societários quantitativos seguem fora do escopo.
 
-### 5.2 — Importação CSV revisável
+### 5.2 — Importação CSV (retirada)
 
-**Prioridade:** alta para preservar histórico sem digitação repetida; item já planejado em roadmap anterior.
-
-**Estado:** 5.2A implementada para importação genérica dos eventos 5.1; adaptadores específicos continuam bloqueados por falta de fixture real anonimizada e semântica de campos verificada.
-
-- A 5.2A aceita somente data, tipo, valor em caixa e ticker para eventos 5.1; não importa trades, quantidades, preços, taxas, moedas ou eventos societários quantitativos.
-- Upload local, mapeamento manual, prévia, validação, cancelamento e confirmação explícita. O arquivo não é armazenado nem enviado a terceiros.
-- Endpoint privado em lote valida até 500 linhas, usa transação e rollback, idempotência de lote/linha, detecção de duplicatas e relatório de importadas/duplicadas; inválidas permanecem na prévia local.
-- Sem migration: as chaves usam o request ID idempotente já existente no ledger 5.1.
-- 5.2B: antes de qualquer adaptador, registrar fixture anonimizada, dicionário de campos, exemplos de estados/estornos, regras de sinal/data/moeda e identificadores estáveis. Não afirmar suporte bancário sem validação.
-- **Aceite técnico 5.2A:** testes de lote atômico, idempotência, duplicatas, validação, preview/cancel, autorização e isolamento; suíte completa e PostgreSQL descartável.
+**Estado:** a importação 5.2A foi retirada da interface, do cliente e da API. Cadastro manual de operações e eventos, Histórico e dados persistidos permanecem. Não apagar tabelas nem dados existentes; migration 009 não é revertida. A preparação 5.2B para adaptadores está suspensa e não deve ser iniciada sem nova decisão do proprietário. O registro histórico está em [documentação arquivada da 5.2](phase-5.2-csv-import.md).
 
 ### 5.3 — Relatórios e exportação
 
@@ -95,14 +86,14 @@ O refinamento da demonstração pública offline, descrito historicamente como u
 
 ## Itens opcionais preservados
 
-- Open Finance e agregadores: apenas se houver alternativa realmente gratuita e consentimento compatível; fluxo manual/CSV é fallback. Não manter tokens bancários no frontend.
+- Open Finance e agregadores: apenas se houver alternativa realmente gratuita e consentimento compatível; o fluxo manual permanece disponível. Não manter tokens bancários no frontend.
 - API paga, premium ou comercial: não obrigatória; somente discutir se o proprietário rever a decisão de custo zero.
-- Importação de novos layouts, conciliação automática e reconstrução documental: por etapas e com dados de origem.
+- Importação de novos layouts e conciliação automática estão suspensas e dependem de nova decisão; reconstrução documental exige dados de origem.
 - Benchmark, PDF, metas compartilhadas ou recursos de colaboração: opcionais, não escopo automaticamente aprovado.
 
 ## Ordem e aceitação de release
 
-Ordem proposta: 5.0A → 5.1 → primeiro CSV de 5.2 → relatórios 5.3 → simulador 5.4 → metas 5.5 → 5.6 quando dados/fonte existirem. Simulador pode ser antecipado em protótipo sem persistência porque depende apenas de premissas explícitas, não de 5.6.
+Ordem recomendada: estabilizar 5.1 e a interface atual; depois planejar relatórios 5.3, simulador 5.4 ou metas 5.5, escolhendo uma etapa para aprovação. A importação 5.2 está retirada. A 5.6 segue condicional aos dados/fontes previstos em 4.4.
 
 Release v5.0.0 só após as fases escolhidas para o release terem critérios aprovados, testes e documentação. Uma fase bloqueada por fonte não pode ser apresentada como implementada. A lista exata de escopo v5 permanece decisão do proprietário.
 
@@ -110,7 +101,7 @@ Release v5.0.0 só após as fases escolhidas para o release terem critérios apr
 
 - Backend financial cases com Decimal, arredondamento e datas.
 - API auth/owner_id/RLS; nenhum acesso cruzado.
-- CSV valid/invalid/duplicate, preview/cancel, no unexpected writes.
+- Cadastro manual, autorização, idempotência, isolamento por proprietário e comportamento vazio.
 - Simulação determinística e cenários extremos.
 - Metas sem patrimônio base e mudança de identidade.
 - Export sanitization, privacidade, filtros e encoding.

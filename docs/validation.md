@@ -1,14 +1,14 @@
 # Validação do Investment Dashboard
 
-## v5.0.0 — Fase 5.1, validação local
+## v5.0.0 — eventos manuais, Histórico e composição
 
-- Eventos manuais de aporte/retirada, dividendos/JCP e observações societárias integrados ao histórico e aos indicadores existentes; revisões `REPLACE`/`VOID` append-only.
-- Backend completo: **373 aprovados, 1 ignorado**; um aviso conhecido de depreciação do `TestClient`/httpx.
-- Frontend completo: **180 aprovados** em 19 arquivos; build de produção aprovado.
-- PostgreSQL descartável: **1 aprovado**; migration 009 e cadeia 001–009, RLS/FORCE RLS, isolamento A/B, grants mínimos, constraints e round-trip backup/restore aprovados.
-- `npm audit --audit-level=low` e `pip-audit -r backend/requirements.lock.txt`: **0 vulnerabilidades conhecidas**; `git diff --check` aprovado.
-- A migration 009 foi executada somente em containers efêmeros de teste. Não houve conexão a banco persistente/de produção, backfill ou alteração de dados existentes.
-- 5.2 aguarda uma instituição escolhida e fixture CSV anonimizada. 5.3–5.6 ainda não implementadas; 5.6 permanece condicional a avaliações e fonte histórica adequadas.
+- Importação CSV removida da interface, `PrivateRepository` e API; `POST /api/financial-events/import` retorna 404. Cadastro manual de operações/eventos, filtros, Histórico e correções seguem disponíveis.
+- Backend completo: **374 aprovados, 1 ignorado**; um aviso conhecido de depreciação do `TestClient`/httpx.
+- Frontend completo: **180 aprovados** em 19 arquivos; build de produção aprovado. Testes cobrem filtros do Histórico, cadastro manual ainda presente, ausência do importador e renderização dos dois gráficos.
+- PostgreSQL descartável: **1 aprovado**; cadeia 001–009, RLS/FORCE RLS, isolamento A/B, grants, constraints e round-trip backup/restore aprovados.
+- O proprietário informa que a migration 009 foi aplicada ao Supabase de produção e que as duas tabelas de eventos existem. Esta validação local não acessou nem alterou o banco de produção.
+- Os donuts de ações e renda fixa ocupam colunas iguais; em telas estreitas são empilhados. Cálculos e endpoints do dashboard não foram alterados.
+- 5.2A foi retirada e 5.2B suspensa. 5.3–5.5 ainda não implementadas; 5.6 permanece condicional a avaliações e fonte histórica adequadas.
 - Referência: [documentação da Fase 5.1](phase-5.1-cash-flow-and-income-events.md) e [handoff v5](v5-development-handoff.md).
 
 ## Fase 3.0.4 — revisão final local

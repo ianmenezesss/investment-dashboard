@@ -22,6 +22,9 @@ afterEach(async () => { await act(async () => root.unmount()); client.clear(); h
 
 test('renders unified chronologically filtered history and BR formatting without manufacturing CDB fields', async () => {
   await render({ movements: async () => movements })
+  expect(host.querySelector('.financial-event-entry')).not.toBeNull()
+  expect(host.textContent).toContain('Registrar aporte, provento ou evento observado')
+  expect(host.textContent).not.toContain('Importar eventos de CSV')
   expect(movements.map(row => row.id)).toEqual(['equity:1', 'cdb:1', 'equity:2', 'cdb:2'])
   const rendered = (host.textContent ?? '').replace(/\u00a0/g, ' ')
   expect(rendered).toContain('R$ 20,50')

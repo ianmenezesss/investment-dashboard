@@ -1,6 +1,6 @@
-# Fase 5.2 — Importação CSV revisável
+# Fase 5.2 — Importação CSV revisável (registro histórico)
 
-**Status local em 29/10/2026:** 5.2A implementada e validada na branch `feat/v5-development`. 5.2B (adaptadores bancários) permanece pendente até haver amostras anonimizadas ou contratos de layout verificados. Não há declaração de suporte a Nubank, Inter ou qualquer outra instituição.
+**Status:** retirada do produto por decisão do proprietário em 29/10/2026. O conteúdo abaixo descreve a implementação anterior apenas para histórico; a interface, o cliente e o endpoint de importação foram removidos. Nenhum dado, tabela ou migration foi excluído ou revertido. A Fase 5.2B está suspensa.
 
 ## 5.2A — Importação genérica de eventos 5.1
 
