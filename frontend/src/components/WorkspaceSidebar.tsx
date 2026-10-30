@@ -1,4 +1,4 @@
-import { ChartNoAxesCombined, ChevronRight, Flag, FlaskConical, History, Landmark, LayoutDashboard, PanelLeftClose, PanelLeftOpen, ShieldCheck } from 'lucide-react'
+import { ChartNoAxesCombined, ChevronRight, Flag, FlaskConical, History, Landmark, LayoutDashboard, Menu, ShieldCheck } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 export const workspaceNavItems = [
@@ -32,7 +32,7 @@ export function WorkspaceSidebar({ demo, routeTo, collapsed = false, onToggleCol
         <span className="brand-word">investment</span><span className="brand-dot">.</span>
       </NavLink>
       {!mobile && onToggleCollapsed && <button type="button" className="sidebar-collapse-toggle" aria-label={collapsed ? 'Expandir navegação' : 'Recolher navegação'} aria-controls="desktop-primary-navigation" aria-expanded={!collapsed} title={collapsed ? 'Expandir navegação' : 'Recolher navegação'} onClick={onToggleCollapsed}>
-        {collapsed ? <PanelLeftOpen size={17}/> : <PanelLeftClose size={17}/>}
+        <Menu size={19} aria-hidden="true"/>
       </button>}
     </div>
     <div className="workspace" aria-label="Meu patrimônio, carteira pessoal"><div className="avatar" aria-hidden="true">{avatarInitial}</div><div>Meu patrimônio<small>Carteira pessoal</small></div><ChevronRight size={16} aria-hidden="true"/></div>

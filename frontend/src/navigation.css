@@ -1,11 +1,12 @@
 .shell{--sidebar-width:260px}
-.shell.sidebar-is-collapsed{--sidebar-width:88px}
+.shell.sidebar-is-collapsed{--sidebar-width:96px}
 .shell main{width:calc(100% - var(--sidebar-width));margin-left:var(--sidebar-width);min-width:0;transition:width .22s ease,margin-left .22s ease}
 .sidebar{width:var(--sidebar-width);padding:22px 18px 16px;overflow-y:auto;overflow-x:hidden;transition:width .22s ease,padding .22s ease}
 .sidebar-header{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:42px}
 .sidebar-header .brand{min-width:0;gap:7px;font-size:22px;letter-spacing:-.8px}
+.sidebar-header .brand{flex:1}
 .sidebar-header .brand-word{white-space:nowrap}
-.sidebar-collapse-toggle{display:grid;place-items:center;flex:none;width:34px;height:34px;border:1px solid #2a3941;border-radius:9px;background:#131d24;color:#9aacae;transition:background .16s ease,color .16s ease,border-color .16s ease}
+.sidebar-collapse-toggle{display:grid;place-items:center;flex:none;width:38px;height:38px;border:1px solid #2a3941;border-radius:10px;background:#131d24;color:#9aacae;transition:background .16s ease,color .16s ease,border-color .16s ease}
 .sidebar-collapse-toggle:hover,.mobile-menu-trigger:hover,.mobile-nav-close:hover{background:#1b302d;color:#8aebc2;border-color:#376050}
 .workspace{margin:27px 0 27px}
 .nav-caption{margin-bottom:10px}
@@ -18,15 +19,16 @@
 .profile{margin-top:12px;padding:15px 4px 3px;gap:10px;border-top:1px solid #27343c}
 .profile-copy{flex:1}
 .sidebar-is-collapsed .sidebar{padding-inline:12px}
-.sidebar-collapsed .sidebar-header{flex-direction:column;justify-content:center;gap:16px;padding:3px 0 2px}
-.sidebar-collapsed .sidebar-header .brand{justify-content:center;gap:0;width:46px;height:42px}
+.sidebar-collapsed .sidebar-header{width:100%;align-items:center;flex-direction:column;justify-content:center;gap:14px;padding:3px 0 2px}
+.sidebar-collapsed .sidebar-header>*{align-self:center;margin-inline:auto}
+.sidebar-collapsed .sidebar-header .brand{display:grid;place-items:center;flex:none;justify-content:center;gap:0;width:48px;height:48px;margin-inline:auto}
 .sidebar-collapsed .sidebar-header .brand-word,.sidebar-collapsed .sidebar-header .brand-dot,.sidebar-collapsed .nav-caption,.sidebar-collapsed .workspace>div:not(.avatar),.sidebar-collapsed .workspace>svg,.sidebar-collapsed .sidebar-bottom,.sidebar-collapsed .profile-copy,.sidebar-collapsed .profile .status-dot,.sidebar-collapsed .nav-label,.sidebar-collapsed .nav-planned{display:none}
-.sidebar-collapsed .sidebar-collapse-toggle{width:38px;height:38px}
-.sidebar-collapsed .workspace{justify-content:center;margin:24px 0 22px;padding:11px 0;border-color:transparent;background:transparent}
-.sidebar-collapsed .sidebar nav{align-items:center;gap:8px}
-.sidebar-collapsed .sidebar nav a{justify-content:center;width:46px;height:46px;min-height:46px;padding:0;border-radius:12px}
-.sidebar-collapsed .profile{justify-content:center;margin-top:auto;padding:16px 0 2px}
-.sidebar-collapsed main{min-width:0}
+.sidebar-collapsed .sidebar-collapse-toggle{margin-inline:auto}
+.sidebar-collapsed .workspace{display:grid;place-items:center;width:100%;margin:24px 0 22px;padding:11px 0;border-color:transparent;background:transparent}
+.sidebar-collapsed nav{display:grid;width:100%;grid-template-columns:minmax(0,1fr);justify-items:center;gap:8px;padding-inline:0}
+.sidebar-collapsed nav a{display:grid;place-items:center;width:48px;height:48px;min-height:48px;margin-inline:auto;padding:0;border-radius:12px;justify-self:center}
+.sidebar-collapsed nav a svg{display:block;width:19px;height:19px;justify-self:center;align-self:center}
+.sidebar-collapsed .profile{display:grid;width:100%;grid-template-columns:minmax(0,1fr);justify-items:center;justify-content:center;margin-top:auto;padding:16px 0 2px}
 .profile-copy{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mobile-header-brand{display:none;align-items:center;gap:7px;color:#e8edf0;font-size:19px;font-weight:650;letter-spacing:-.7px}
 .mobile-header-brand .brand-icon{display:flex;color:#7cf0c0}
@@ -49,7 +51,7 @@
 .mobile-nav-content .profile-copy{display:block}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @keyframes nav-drawer-in{from{opacity:.85;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
-@media(max-width:1200px) and (min-width:801px){.shell{--sidebar-width:236px}.shell.sidebar-is-collapsed{--sidebar-width:84px}}
+@media(max-width:1200px) and (min-width:801px){.shell{--sidebar-width:236px}.shell.sidebar-is-collapsed{--sidebar-width:88px}}
 @media(max-width:800px){.shell{--sidebar-width:0}.sidebar{display:none}.shell main,.shell.sidebar-is-collapsed main{width:100%;margin-left:0;padding-inline:18px}.mobile-menu-trigger{display:inline-flex;flex:none}.mobile-header-brand{display:flex;margin-right:auto}.shell main>header{height:62px;padding-left:0;gap:12px}.shell main>header>.breadcrumb,.shell main>header>.local-badge{display:none}.mobile-nav-content .sidebar{display:flex}}
 @media(max-width:420px){.shell main,.shell.sidebar-is-collapsed main{padding-inline:14px}.mobile-header-brand{font-size:18px}.mobile-menu-trigger{width:38px;height:38px}}
 @media(prefers-reduced-motion:reduce){.sidebar,.sidebar nav a,.sidebar-collapse-toggle,.mobile-menu-trigger,.mobile-nav-content{animation:none!important;transition:none!important}}
