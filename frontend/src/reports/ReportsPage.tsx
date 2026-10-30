@@ -20,7 +20,8 @@ export function ReportsPage({ repository, identity }: { repository: PrivateRepos
   const [assetSearch, setAssetSearch] = useState('')
   const query = useQuery({ queryKey: ['reports-movements', identity], queryFn: ({ signal }) => repository.movements(signal), retry: false })
   const compositionQuery = useQuery({ queryKey: ['reports-composition', identity], queryFn: ({ signal }) => repository.composition(signal), retry: false })
-  const rows = useMemo(() => contributionRows(query.data ?? [], start, end), [query.data, start, end])
+  const reportMovements = useMemo(() => filterReportMovements(query.data ?? [], start, end, movementClass, assetSearch), [query.data, start, end, movementClass, assetSearch])
+  const rows = useMemo(() => contributionRows(reportMovements, start, end), [reportMovements, start, end])
   const monthly = useMemo(() => aggregateContributions(rows, 'month'), [rows])
   const yearly = useMemo(() => aggregateContributions(rows, 'year'), [rows])
   const chartRows = bucket === 'month' ? monthly : yearly
@@ -28,7 +29,6 @@ export function ReportsPage({ repository, identity }: { repository: PrivateRepos
   const fixed = rows.filter(row => row.operation === 'APPLICATION').reduce((sum, row) => sum.plus(row.financial_value ?? '0'), new Decimal(0))
   const total = equities.plus(fixed)
   const generatedAt = new Date().toLocaleString('pt-BR')
-  const reportMovements = useMemo(() => filterReportMovements(query.data ?? [], start, end, movementClass, assetSearch), [query.data, start, end, movementClass, assetSearch])
   const totals = useMemo(() => movementTotals(reportMovements), [reportMovements])
   return <section className="reports-page" aria-label="Relatórios financeiros">
     <article className="panel reports-panel">
@@ -60,7 +60,7 @@ export function ReportsPage({ repository, identity }: { repository: PrivateRepos
         {reportMovements.length ? <div className="table-scroll reports-table"><table><thead><tr><th>Data</th><th>Categoria</th><th>Ativo/contrato</th><th>Operação</th><th>Valor</th><th>Taxas</th><th>Caixa recebido</th><th>Bruto / tributos</th><th>Origem / descrição</th></tr></thead><tbody>{reportMovements.map(row => <tr key={`${row.id}:${row.revision ?? 0}`}><td>{new Date(`${row.date}T12:00:00`).toLocaleDateString('pt-BR')}</td><td>{row.investment_class}</td><td>{row.asset}</td><td>{row.operation}{row.revision ? ` · rev. ${row.revision}` : ''}</td><td>{row.financial_value === null ? '—' : decimalMoney(new Decimal(row.financial_value))}</td><td>{row.fees === null ? '—' : decimalMoney(new Decimal(row.fees))}</td><td>{row.cash_received === null ? '—' : decimalMoney(new Decimal(row.cash_received))}</td><td>{row.gross_amount == null ? '—' : `${decimalMoney(new Decimal(row.gross_amount))}${row.tax_withheld == null ? '' : ` · tributos ${decimalMoney(new Decimal(row.tax_withheld))}`}`}</td><td>{[row.source, row.description].filter(Boolean).join(' · ') || '—'}</td></tr>)}</tbody></table></div> : <div className="reports-state"><h3>Nenhuma movimentação no filtro</h3><p>Altere as datas, categoria ou ativo.</p></div>}
       </>}
     </article>
-    <p className="reports-print-meta">Período aplicado: {start || 'início não definido'} a {end || 'fim não definido'} · Gerado em {generatedAt}</p>
+    <p className="reports-print-meta">Período: {start || 'início não definido'} a {end || 'fim não definido'} · Agrupamento: {bucket === 'month' ? 'mês' : 'ano'} · Categoria: {movementClass === 'all' ? 'todas' : movementClass} · Ativo: {assetSearch.trim() || 'todos'} · Gerado em {generatedAt}</p>
     <p className="reports-disclaimer">Relatório privado baseado nos movimentos efetivos desta carteira. Aportes não são lucro, rentabilidade, saldo em caixa nem avaliação a mercado. Datas usam os registros disponíveis; períodos sem lançamentos não aparecem.</p>
   </section>
 }
