@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Decimal from 'decimal.js'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Download } from 'lucide-react'
 import type { PrivateRepository } from '../repositories/PrivateRepository'
 import { aggregateContributions, contributionRows, decimalMoney } from './contributions'
 import { filterReportMovements, movementTotals, sharePercent } from './movementReport'
@@ -26,11 +27,12 @@ export function ReportsPage({ repository, identity }: { repository: PrivateRepos
   const equities = rows.filter(row => row.operation === 'BUY').reduce((sum, row) => sum.plus(row.financial_value ?? '0').plus(row.fees ?? '0'), new Decimal(0))
   const fixed = rows.filter(row => row.operation === 'APPLICATION').reduce((sum, row) => sum.plus(row.financial_value ?? '0'), new Decimal(0))
   const total = equities.plus(fixed)
+  const generatedAt = new Date().toLocaleString('pt-BR')
   const reportMovements = useMemo(() => filterReportMovements(query.data ?? [], start, end, movementClass, assetSearch), [query.data, start, end, movementClass, assetSearch])
   const totals = useMemo(() => movementTotals(reportMovements), [reportMovements])
   return <section className="reports-page" aria-label="Relatórios financeiros">
     <article className="panel reports-panel">
-      <div className="panel-heading"><div><h2>Relatório de aportes</h2><p>Compras de ações incluem taxas; renda fixa considera principal aplicado. Valores registrados, sem rentabilidade ou valor de mercado.</p></div></div>
+      <div className="panel-heading"><div><h2>Relatório de aportes</h2><p>Compras de ações incluem taxas; renda fixa considera principal aplicado. Valores registrados, sem rentabilidade ou valor de mercado.</p></div><button type="button" className="reports-print-button" onClick={() => window.print()}><Download size={15}/> Exportar PDF</button></div>
       <div className="reports-filters">
         <label>De<input type="date" aria-label="Data inicial do relatório" value={start} max={end || undefined} onChange={event => setStart(event.target.value)}/></label>
         <label>Até<input type="date" aria-label="Data final do relatório" value={end} min={start || undefined} max={today()} onChange={event => setEnd(event.target.value)}/></label>
@@ -58,6 +60,7 @@ export function ReportsPage({ repository, identity }: { repository: PrivateRepos
         {reportMovements.length ? <div className="table-scroll reports-table"><table><thead><tr><th>Data</th><th>Categoria</th><th>Ativo/contrato</th><th>Operação</th><th>Valor</th><th>Taxas</th><th>Caixa recebido</th><th>Bruto / tributos</th><th>Origem / descrição</th></tr></thead><tbody>{reportMovements.map(row => <tr key={`${row.id}:${row.revision ?? 0}`}><td>{new Date(`${row.date}T12:00:00`).toLocaleDateString('pt-BR')}</td><td>{row.investment_class}</td><td>{row.asset}</td><td>{row.operation}{row.revision ? ` · rev. ${row.revision}` : ''}</td><td>{row.financial_value === null ? '—' : decimalMoney(new Decimal(row.financial_value))}</td><td>{row.fees === null ? '—' : decimalMoney(new Decimal(row.fees))}</td><td>{row.cash_received === null ? '—' : decimalMoney(new Decimal(row.cash_received))}</td><td>{row.gross_amount == null ? '—' : `${decimalMoney(new Decimal(row.gross_amount))}${row.tax_withheld == null ? '' : ` · tributos ${decimalMoney(new Decimal(row.tax_withheld))}`}`}</td><td>{[row.source, row.description].filter(Boolean).join(' · ') || '—'}</td></tr>)}</tbody></table></div> : <div className="reports-state"><h3>Nenhuma movimentação no filtro</h3><p>Altere as datas, categoria ou ativo.</p></div>}
       </>}
     </article>
+    <p className="reports-print-meta">Período aplicado: {start || 'início não definido'} a {end || 'fim não definido'} · Gerado em {generatedAt}</p>
     <p className="reports-disclaimer">Relatório privado baseado nos movimentos efetivos desta carteira. Aportes não são lucro, rentabilidade, saldo em caixa nem avaliação a mercado. Datas usam os registros disponíveis; períodos sem lançamentos não aparecem.</p>
   </section>
 }
