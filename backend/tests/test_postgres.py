@@ -1,5 +1,6 @@
 """Opt-in: exige banco PostgreSQL dedicado, vazio e descartável."""
 import os
+from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
@@ -189,6 +190,43 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
             app.dependency_overrides[authenticate] = lambda: Principal(a)
             assert [row["id"] for row in client.get("/api/financial-events").json()] == [event_a.json()["id"]]
             assert Decimal(client.get("/api/dashboard/financial-events/summary").json()["contributions"]) == Decimal("130.00000003")
+
+            # CSV batch uses the same owner/RLS boundary and is atomic/idempotent.
+            batch_key = "ffffffff-ffff-4fff-8fff-ffffffffffff"
+            batch_rows = {"rows": [
+                {"row_number": 2, "event": {"kind": "CONTRIBUTION", "event_date": "2026-01-07", "cash_amount": "42.125", "source": "CSV PostgreSQL fixture"}},
+                {"row_number": 3, "event": {"kind": "CONTRIBUTION", "event_date": "2026-01-07", "cash_amount": "42.125", "source": "CSV PostgreSQL fixture"}},
+            ]}
+            batch_a = client.post("/api/financial-events/import", headers={"Idempotency-Key": batch_key}, json=batch_rows)
+            assert batch_a.status_code == 201, batch_a.text
+            assert (batch_a.json()["imported_count"], batch_a.json()["duplicate_count"]) == (1, 1)
+            replay_a = client.post("/api/financial-events/import", headers={"Idempotency-Key": batch_key}, json=batch_rows)
+            assert replay_a.status_code == 200
+            assert (replay_a.json()["imported_count"], replay_a.json()["duplicate_count"]) == (0, 2)
+            assert Decimal(client.get("/api/dashboard/financial-events/summary").json()["contributions"]) == Decimal("172.12500003")
+
+            concurrent_body = {"rows": [{"row_number": 2, "event": {
+                "kind": "CONTRIBUTION", "event_date": "2026-01-08", "cash_amount": "19.50", "source": "Concurrent CSV fixture",
+            }}]}
+            def concurrent_import(key):
+                return client.post("/api/financial-events/import", headers={"Idempotency-Key": key}, json=concurrent_body)
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                responses = list(pool.map(concurrent_import, (
+                    "13131313-1313-4313-8313-131313131313", "14141414-1414-4414-8414-141414141414",
+                )))
+            assert all(result.status_code in (200, 201) for result in responses)
+            assert sorted(result.json()["imported_count"] for result in responses) == [0, 1]
+            assert len(client.get("/api/financial-events").json()) == 3
+
+            # A matching financial fact in another owner remains independent.
+            app.dependency_overrides[authenticate] = lambda: Principal(b)
+            batch_b = client.post("/api/financial-events/import", headers={"Idempotency-Key": "12121212-1212-4212-8212-121212121212"}, json={
+                "rows": [{"row_number": 2, "event": {"kind": "CONTRIBUTION", "event_date": "2026-01-07", "cash_amount": "42.125", "source": "CSV PostgreSQL fixture"}}],
+            })
+            assert batch_b.status_code == 201, batch_b.text
+            assert batch_b.json()["imported_count"] == 1
+            app.dependency_overrides[authenticate] = lambda: Principal(a)
+            assert len(client.get("/api/financial-events").json()) == 3
             with runtime_engine.begin() as connection:
                 assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.financial_events','UPDATE')"))
                 assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.financial_events','DELETE')"))

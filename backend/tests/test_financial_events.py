@@ -82,6 +82,86 @@ def test_events_are_manually_recorded_idempotent_and_owner_scoped(event_client):
     assert Decimal(client.get("/api/dashboard/financial-events/summary").json()["contributions"]) == 0
 
 
+def test_csv_import_is_atomic_and_skips_internal_external_and_replayed_duplicates(event_client):
+    client, _ = event_client
+    external = create(client, "JCP", cash_amount="4.25", event_date="2025-01-09")
+    assert external.status_code == 201
+    key = uuid4()
+    rows = [
+        {"row_number": 2, "event": payload("CONTRIBUTION", cash_amount="100.12345678")},
+        {"row_number": 3, "event": payload("CONTRIBUTION", cash_amount="100.12345678")},
+        {"row_number": 4, "event": payload("JCP", cash_amount="4.25", event_date="2025-01-09")},
+    ]
+    first = client.post("/api/financial-events/import", headers={"Idempotency-Key": str(key)}, json={"rows": rows})
+    assert first.status_code == 201, first.text
+    assert first.json()["imported_count"] == 1
+    assert first.json()["duplicate_count"] == 2
+    assert len(client.get("/api/financial-events").json()) == 2
+
+    replay = client.post("/api/financial-events/import", headers={"Idempotency-Key": str(key)}, json={"rows": rows})
+    assert replay.status_code == 200
+    assert replay.json()["imported_count"] == 0
+    assert replay.json()["duplicate_count"] == 3
+    assert len(client.get("/api/financial-events").json()) == 2
+
+
+def test_csv_import_rejects_invalid_batch_without_writes(event_client):
+    client, _ = event_client
+    rows = [
+        {"row_number": 2, "event": payload("CONTRIBUTION")},
+        {"row_number": 3, "event": payload("CONTRIBUTION", event_date="2999-01-01")},
+    ]
+    response = client.post("/api/financial-events/import", headers={"Idempotency-Key": str(uuid4())}, json={"rows": rows})
+    assert response.status_code == 422
+    assert client.get("/api/financial-events").json() == []
+
+    malformed = client.post("/api/financial-events/import", headers={"Idempotency-Key": str(uuid4())}, json={
+        "rows": [{"row_number": 2, "event": payload("CONTRIBUTION", cash_amount="0")}],
+    })
+    assert malformed.status_code == 422
+    assert client.get("/api/financial-events").json() == []
+
+
+def test_csv_import_requires_auth_and_is_scoped_to_the_authenticated_owner(event_client):
+    client, selected = event_client
+    key = uuid4()
+    body = {"rows": [{"row_number": 2, "event": payload("CONTRIBUTION", cash_amount="75.25")}]}
+    first = client.post("/api/financial-events/import", headers={"Idempotency-Key": str(key)}, json=body)
+    assert first.status_code == 201
+    selected["id"] = B
+    second = client.post("/api/financial-events/import", headers={"Idempotency-Key": str(key)}, json=body)
+    assert second.status_code == 201
+    assert len(client.get("/api/financial-events").json()) == 1
+    selected["id"] = A
+    assert len(client.get("/api/financial-events").json()) == 1
+
+
+def test_csv_import_rolls_back_every_row_after_mid_batch_failure(event_client, monkeypatch):
+    import app.financial_events as events
+
+    client, _ = event_client
+    original = events.append_event
+    calls = 0
+
+    def fail_second(db, owner, request_id, data):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise ValueError("simulated database conflict")
+        return original(db, owner, request_id, data)
+
+    monkeypatch.setattr(events, "append_event", fail_second)
+    response = client.post("/api/financial-events/import", headers={"Idempotency-Key": str(uuid4())}, json={
+        "rows": [
+            {"row_number": 2, "event": payload("CONTRIBUTION", cash_amount="10")},
+            {"row_number": 3, "event": payload("WITHDRAWAL", cash_amount="5")},
+        ],
+    })
+    assert response.status_code == 409
+    assert "nenhuma linha foi gravada" in response.json()["detail"]
+    assert client.get("/api/financial-events").json() == []
+
+
 def test_replace_and_void_are_append_only_and_change_only_effective_view(event_client):
     client, selected = event_client
     contribution = create(client, key=uuid4())
@@ -168,3 +248,7 @@ def test_summary_periods_filter_by_observed_event_date(event_client):
 def test_private_endpoints_require_authentication():
     response = TestClient(app).get("/api/financial-events")
     assert response.status_code == 401
+    import_response = TestClient(app).post("/api/financial-events/import", headers={"Idempotency-Key": str(uuid4())}, json={"rows": [
+        {"row_number": 1, "event": payload("CONTRIBUTION")},
+    ]})
+    assert import_response.status_code == 401

@@ -1,6 +1,6 @@
 # Handoff de desenvolvimento — Investment Dashboard v5.0.0
 
-**Atualizado em:** 29/10/2026. v5.0A concluída e Fase 5.1 implementada/validada localmente em `feat/v5-development`. Não autoriza push, merge, publicação, deploy ou migration persistente.
+**Atualizado em:** 29/10/2026. v5.0A, Fase 5.1 e 5.2A genérica implementadas e validadas localmente em `feat/v5-development`. Adaptadores 5.2B aguardam amostras verificadas. Não autoriza push, merge, publicação, deploy ou migration persistente.
 
 ## Estado de partida
 
@@ -12,7 +12,7 @@
 - `/simulador` e `/metas` continuam placeholders; permanecem identificados como funcionalidades planejadas da Fase 5.
 - Fase 5.1: eventos manuais privados de aporte/retirada externa, dividendos/JCP e observação societária; histórico unificado e totais de caixa/proventos; `REPLACE`/`VOID` append-only e auditáveis. Especificação: [Fase 5.1](phase-5.1-cash-flow-and-income-events.md).
 - Migration local nova `009_financial_events.py`. Foi testada somente em PostgreSQL descartável; nenhum banco persistente ou de produção recebeu a migration.
-- As fases 5.2–5.6 não foram iniciadas. A 5.2 aguarda a instituição e fixture CSV anonimizada; a 5.6 continua condicionada aos dados/fonte previstos em 4.4.
+- 5.2A importa eventos financeiros 5.1 de CSV genérico com prévia, mapeamento e lote transacional; validação local: 377 testes backend, 182 frontend, build e PostgreSQL descartável. Veja [documentação 5.2](phase-5.2-csv-import.md). Adaptadores 5.2B aguardam fixture anonimizada e definição verificada do layout ([preparação](phase-5.2b-adapter-readiness.md)). 5.3–5.5 ainda não foram iniciadas; 5.6 continua condicionada aos dados/fonte previstos em 4.4.
 - Estado de validação local e ressalvas operacionais estão em [revisão final da v4](phase-4.0-final-review.md).
 
 ## Arquitetura e decisões reutilizáveis
@@ -23,12 +23,12 @@
 - Movimentos efetivos de CDB vêm de `effective_movements()` e preservam `REPLACE`/`VOID`. Não reconstruir um segundo ledger nem tratar resgate de principal como rendimento.
 - A avaliação por cotação pontual usa `QuoteService`, valida preço/moeda/frescura e informa cobertura. Histórico de preço é serviço separado e não deve afetar cotação atual.
 - `owner_id`, autenticação, RLS, papel runtime restrito, `no-store` e isolamento demo/privado são requisitos de arquitetura, não melhorias opcionais.
-- Não há dividendos/JCP, depósitos/saques externos, saldo de caixa nem snapshots históricos completos. Não calcular TWR/XIRR ou retorno total sem esses dados.
+- A 5.1 registra dividendos/JCP e depósitos/saques externos; ainda não há saldo de caixa conciliado nem snapshots históricos completos. Não calcular TWR/XIRR ou retorno total sem dados e avaliações adequados.
 
 ## Prioridades propostas
 
 1. **5.1 — Eventos e fluxo de caixa:** concluída localmente; critérios, contrato, limitações e testes estão em [documentação da Fase 5.1](phase-5.1-cash-flow-and-income-events.md).
-2. **5.2 — CSV revisável:** próximo bloqueio de produto; selecionar uma instituição e obter fixture anonimizada/descrição de colunas antes de desenvolver o parser.
+2. **5.2A — CSV genérico:** importação transacional de eventos 5.1 implementada e validada localmente. **5.2B — Adaptadores:** bloqueados até obter fixture anonimizada e contrato de campos de uma instituição.
 3. **5.3 — Relatórios:** filtros e exportação coerentes com o proprietário, sem confundir export JSON de operações existente com relatórios completos.
 4. **5.4 — Simulador:** pode ser protótipo local sem persistência se premissas forem editáveis e cada saída for rotulada cenário hipotético, nunca previsão. O placeholder atual deve continuar honesto até aprovação do escopo.
 5. **5.5 — Metas:** determinar primeiro a base “patrimônio atual”; permitir entrada manual confirmada ou indisponibilidade quando essa base não puder ser consolidada.

@@ -24,6 +24,11 @@ export class PrivateRepository {
   createFinancialEvent(input: FinancialEventInput, key: string, signal?: AbortSignal) {
     return request<FinancialEventRecord>('financial-events', this.token, { method: 'POST', body: JSON.stringify(input), signal, headers: { 'Idempotency-Key': key } })
   }
+  importFinancialEvents(rows: Array<{ row_number: number; event: FinancialEventInput }>, key: string, signal?: AbortSignal) {
+    return request<{ imported_count: number; duplicate_count: number }>('financial-events/import', this.token, {
+      method: 'POST', body: JSON.stringify({ rows }), signal, headers: { 'Idempotency-Key': key },
+    })
+  }
   reviseFinancialEvent(id: number, input: { kind: 'REPLACE' | 'VOID'; expected_revision: number; reason: string; replacement?: FinancialEventInput }, key: string, signal?: AbortSignal) {
     return request(`financial-events/${id}/revisions`, this.token, { method: 'POST', body: JSON.stringify(input), signal, headers: { 'Idempotency-Key': key } })
   }

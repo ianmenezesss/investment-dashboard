@@ -4,7 +4,7 @@ from calendar import monthrange
 from datetime import date, datetime, timezone
 from decimal import Decimal, localcontext
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
@@ -118,6 +118,23 @@ class EventRevisionInput(BaseModel):
         return self
 
 
+class CsvImportRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    row_number: int = Field(ge=1)
+    event: EventInput
+
+
+class CsvImportInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rows: list[CsvImportRow] = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def unique_rows(self):
+        if len({item.row_number for item in self.rows}) != len(self.rows):
+            raise ValueError("Número de linha duplicado no lote")
+        return self
+
+
 def _today() -> date:
     return datetime.now(LOCAL_TZ).date()
 
@@ -163,6 +180,18 @@ def _serialize_event(row):
 
 def _event_values(data: EventInput):
     return data.model_dump()
+
+
+def _import_fingerprint(event):
+    """Conservative duplicate key: same observed financial facts, regardless of source label."""
+    def canonical(value):
+        if isinstance(value, Decimal):
+            return format(value.normalize(), "f")
+        return value.isoformat() if isinstance(value, date) else value
+    base = tuple(canonical(event.get(key)) for key in ("kind", "event_date", "ticker", "cash_amount"))
+    # The generic CSV contract imports only net cash. Gross/tax data may already exist
+    # on a manually entered dividend and must not make that same receipt look new.
+    return base + ((canonical(event.get("description")),) if event.get("kind") == "CORPORATE_ACTION" else ())
 
 
 def append_event(db: Session, owner_id, request_id: UUID, data: EventInput):
@@ -266,6 +295,43 @@ def create_financial_event(data: EventInput, response: Response,
     except (ValueError, IntegrityError) as error:
         db.rollback()
         raise HTTPException(409, "Conflito no lançamento; atualize o histórico e tente novamente") from error
+
+
+@router.post("/api/financial-events/import", status_code=201, dependencies=[Depends(authenticate)])
+def import_financial_events(data: CsvImportInput, response: Response,
+    idempotency_key: UUID = Header(alias="Idempotency-Key"), db: Session = Depends(private_db)):
+    """Validate and append a CSV batch atomically; rows already present are reported and skipped."""
+    today = _today()
+    if any(item.event.event_date > today for item in data.rows):
+        raise HTTPException(422, "A importação contém data futura")
+
+    owner = db.info.get("owner_id")
+    imported, duplicates = [], []
+    try:
+        seen_in_batch = set()
+        for item in data.rows:
+            event = item.event
+            values = _event_values(event)
+            fingerprint = _import_fingerprint(values)
+            # Serialize matching imports in PostgreSQL so concurrent uploads cannot both pass the check.
+            if db.bind.dialect.name == "postgresql":
+                lock_key = f"financial-event-import:{owner}:{fingerprint!r}"
+                db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"), {"key": lock_key})
+            current = {_import_fingerprint(row) for row in effective_events(db, owner)}
+            if fingerprint in current or fingerprint in seen_in_batch:
+                duplicates.append({"row_number": item.row_number})
+                continue
+            request_id = uuid5(idempotency_key, f"{owner}:{item.row_number}")
+            row = append_event(db, owner, request_id, event)
+            imported.append(_serialize_event(_raw_event(row)))
+            seen_in_batch.add(fingerprint)
+        db.commit()
+        response.status_code = 201 if imported else 200
+        return {"imported": imported, "duplicates": duplicates,
+            "imported_count": len(imported), "duplicate_count": len(duplicates)}
+    except (ValueError, IntegrityError) as error:
+        db.rollback()
+        raise HTTPException(409, "Conflito na importação; nenhuma linha foi gravada. Atualize o histórico e revise o arquivo") from error
 
 
 @router.get("/api/financial-events/{event_id}/revisions", dependencies=[Depends(authenticate)])
