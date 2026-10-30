@@ -1,6 +1,6 @@
 # Handoff de desenvolvimento — Investment Dashboard v5.0.0
 
-**Atualizado em:** 29/10/2026. Este documento transfere contexto técnico após a implementação local da Fase 5.0A; não autoriza publicação nem inicia as etapas seguintes.
+**Atualizado em:** 29/10/2026. v5.0A concluída e Fase 5.1 implementada/validada localmente em `feat/v5-development`. Não autoriza push, merge, publicação, deploy ou migration persistente.
 
 ## Estado de partida
 
@@ -10,6 +10,9 @@
 - 4.3A entrega `GET /api/dashboard/performance` e resumo atual em `PortfolioInsights`, usando o ledger/serviços financeiros existentes. Sem migration.
 - 4.4 está corretamente bloqueada, sem série de patrimônio inventada, enquanto faltam fluxos externos, eventos/proventos e avaliações históricas compatíveis.
 - `/simulador` e `/metas` continuam placeholders; permanecem identificados como funcionalidades planejadas da Fase 5.
+- Fase 5.1: eventos manuais privados de aporte/retirada externa, dividendos/JCP e observação societária; histórico unificado e totais de caixa/proventos; `REPLACE`/`VOID` append-only e auditáveis. Especificação: [Fase 5.1](phase-5.1-cash-flow-and-income-events.md).
+- Migration local nova `009_financial_events.py`. Foi testada somente em PostgreSQL descartável; nenhum banco persistente ou de produção recebeu a migration.
+- As fases 5.2–5.6 não foram iniciadas. A 5.2 aguarda a instituição e fixture CSV anonimizada; a 5.6 continua condicionada aos dados/fonte previstos em 4.4.
 - Estado de validação local e ressalvas operacionais estão em [revisão final da v4](phase-4.0-final-review.md).
 
 ## Arquitetura e decisões reutilizáveis
@@ -24,8 +27,8 @@
 
 ## Prioridades propostas
 
-1. **5.1 — Eventos e fluxo de caixa:** iniciar por definição semântica e evidência para depósitos/saques externos, dividendos/JCP, reinvestimento e eventos societários. Separar transferências internas; preservar trilha, idempotência, proprietário e correções auditáveis. Esta é dependência para medir retorno total.
-2. **5.2 — CSV revisável:** um formato por vez, processamento local/privado, preview e deduplicação, cancelamento sem escrita e confirmação explícita.
+1. **5.1 — Eventos e fluxo de caixa:** concluída localmente; critérios, contrato, limitações e testes estão em [documentação da Fase 5.1](phase-5.1-cash-flow-and-income-events.md).
+2. **5.2 — CSV revisável:** próximo bloqueio de produto; selecionar uma instituição e obter fixture anonimizada/descrição de colunas antes de desenvolver o parser.
 3. **5.3 — Relatórios:** filtros e exportação coerentes com o proprietário, sem confundir export JSON de operações existente com relatórios completos.
 4. **5.4 — Simulador:** pode ser protótipo local sem persistência se premissas forem editáveis e cada saída for rotulada cenário hipotético, nunca previsão. O placeholder atual deve continuar honesto até aprovação do escopo.
 5. **5.5 — Metas:** determinar primeiro a base “patrimônio atual”; permitir entrada manual confirmada ou indisponibilidade quando essa base não puder ser consolidada.
@@ -35,7 +38,7 @@ O plano aprovado em [`phase-5-master-plan.md`](phase-5-master-plan.md) continua 
 
 ## Migrations e estratégia de testes
 
-- 5.1 provavelmente exige novos tipos/tabelas e migration; primeiro desenhar compatibilidade com ledger existente, chaves de idempotência, datas econômicas/registro, `owner_id`, RLS e política de revisão.
+- 5.1 criou migration 009 com tabelas append-only, chaves idempotentes, datas observadas, `owner_id`, RLS/FORCE RLS, revisões e grants mínimos. Não existe backfill; não aplicar migration fora de banco descartável sem procedimento e autorização específicos.
 - Não converter operações antigas em depósitos/proventos sem evidência. Não atribuir `owner_id` retroativamente sem processo autorizado e backup.
 - Testar fórmulas com `Decimal`, datas e casos extremos antes da interface; cobrir vendas parciais/reinvestimento, taxas, eventos corrigidos/anulados e ausência de fonte.
 - Para cada endpoint novo, testar auth, acesso cruzado, RLS, `no-store`, erros e dados vazios. Exercitar migrations/restore apenas com runner PostgreSQL descartável.

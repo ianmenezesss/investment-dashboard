@@ -27,6 +27,7 @@ export function PortfolioInsights({ repository, identity }: { repository: Privat
   const [period, setPeriod] = useState('Tudo')
   const flows = useQuery({ queryKey: ['capital-flows', identity, period], queryFn: ({ signal }) => repository.capitalFlows(period, signal), retry: false })
   const performance = useQuery({ queryKey: ['financial-performance', identity], queryFn: ({ signal }) => repository.performance(signal), retry: false })
+  const eventSummary = useQuery({ queryKey: ['financial-event-summary', identity, period], queryFn: ({ signal }) => repository.financialEventSummary(period, signal), retry: false, enabled: typeof repository.financialEventSummary === 'function' })
   const chartData = (flows.data?.points ?? []).filter(point => point.cumulative_contributions !== undefined && point.cumulative_withdrawals !== undefined).map(point => ({ date: point.date,
     inflows: Number(point.cumulative_contributions), inflows_exact: point.cumulative_contributions,
     outflows: Number(point.cumulative_withdrawals), outflows_exact: point.cumulative_withdrawals,
@@ -61,6 +62,19 @@ export function PortfolioInsights({ repository, identity }: { repository: Privat
       {performance.isLoading ? <p role="status" className="portfolio-coverage">Carregando totais históricos…</p> : performance.isError ? <p role="alert" className="portfolio-coverage">Não foi possível carregar os totais históricos.</p> : lifetimeFlows && <div className="portfolio-lifetime-totals"><div><span>Compras de ações + aplicações acumuladas</span><strong>{money(lifetimeFlows.recorded_contributions)}</strong></div><div><span>Vendas após taxas + resgates de principal</span><strong>{money(lifetimeFlows.recorded_withdrawals)}</strong></div><div><span>Fluxo líquido acumulado · não é lucro ou rentabilidade</span><strong>{money(lifetimeFlows.net_recorded_flow)}</strong></div></div>}
       {flows.data && <><div className="portfolio-flow-totals"><span>Compras de ações no período · inclui taxas <strong>{money(flows.data.equity_purchases)}</strong></span><span>Aplicações CDB · principal <strong>{money(flows.data.cdb_applications)}</strong></span><span>Vendas de ações · após taxas registradas <strong>{money(flows.data.equity_sale_proceeds)}</strong></span><span>Resgates CDB · principal <strong>{money(flows.data.cdb_redemptions)}</strong></span></div><div className="chart-footer">Cobertura {flows.data.coverage_start ? `desde ${new Date(`${flows.data.coverage_start}T12:00:00`).toLocaleDateString('pt-BR')}` : 'indisponível'}{flows.data.coverage === 'partial' && ' · parcial para o período selecionado'} <span>Valores registrados; patrimônio a mercado e rentabilidade de carteira indisponíveis</span></div></>}
     </article>
+    {typeof repository.financialEventSummary === 'function' && <article className="panel financial-event-insights">
+      <div className="panel-heading"><div><h3>Caixa externo e proventos registrados</h3><p>Período {period} · valores informados manualmente · não são rentabilidade</p></div></div>
+      {eventSummary.isPending ? <p role="status" className="portfolio-coverage">Carregando eventos financeiros…</p> : eventSummary.isError ? <p role="alert" className="portfolio-coverage">Não foi possível carregar os eventos financeiros.</p> : eventSummary.data && <>
+        <div className="portfolio-lifetime-totals financial-event-totals">
+          <div><span>Aportes externos</span><strong>{money(eventSummary.data.contributions)}</strong></div>
+          <div><span>Retiradas externas</span><strong>{money(eventSummary.data.withdrawals)}</strong></div>
+          <div><span>Fluxo líquido externo</span><strong>{money(eventSummary.data.net_external_cash_flow)}</strong></div>
+          <div><span>Dividendos recebidos informados</span><strong>{money(eventSummary.data.dividends_received)}</strong></div>
+          <div><span>JCP recebido informado</span><strong>{money(eventSummary.data.jcp_received)}</strong></div>
+        </div>
+        <p className="portfolio-coverage">Proventos são separados de aportes. Se reinvestidos, a compra permanece como operação distinta; o sistema não soma proventos como novo dinheiro externo.</p>
+      </>}
+    </article>}
     <article className="panel composition-panel">
       <div className="panel-heading"><div><h3>Composição atual disponível</h3><p>Valores por base registrada · data-base {composition?.as_of ? new Date(`${composition.as_of}T12:00:00`).toLocaleDateString('pt-BR') : '—'}</p></div><span className="tag">{composition?.coverage === 'partial' ? 'Cobertura parcial' : 'Privado'}</span></div>
       {performance.isLoading ? <p role="status" className="empty compact">Carregando composição…</p> : performance.isError ? <p role="alert" className="empty compact">Não foi possível carregar a composição da carteira.</p> : composition && <>

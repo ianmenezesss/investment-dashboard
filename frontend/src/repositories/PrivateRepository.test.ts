@@ -29,6 +29,25 @@ test('comparação privada envia tickers e período como parâmetros repetidos a
   expect(http).toHaveBeenCalledWith('dashboard/equities/compare?tickers=ITUB4&tickers=BBAS3&period=6M', 'comparison-token', { signal: undefined })
 })
 
+test('registros financeiros usam endpoints privados e chave idempotente', async () => {
+  http.mockResolvedValueOnce([]).mockResolvedValueOnce({ event_count: 1 }).mockResolvedValueOnce({ id: 4 }).mockResolvedValueOnce({ revision: 1 }).mockResolvedValueOnce([])
+  const repo = new PrivateRepository('financial-events-token')
+  const key = '0a99f00b-276f-49b4-9675-f0ccfa8439a1'
+  const input = { kind: 'CONTRIBUTION' as const, event_date: '2025-01-01', cash_amount: '250.00', source: 'Extrato' }
+  await repo.financialEvents()
+  await repo.financialEventSummary('Tudo')
+  await repo.createFinancialEvent(input, key)
+  await repo.reviseFinancialEvent(4, { kind: 'REPLACE', expected_revision: 0, reason: 'Correção', replacement: input }, key)
+  await repo.financialEventRevisions(4)
+  expect(http.mock.calls.slice(-5)).toEqual([
+    ['financial-events', 'financial-events-token', { signal: undefined }],
+    ['dashboard/financial-events/summary?period=Tudo', 'financial-events-token', { signal: undefined }],
+    ['financial-events', 'financial-events-token', expect.objectContaining({ method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify(input) })],
+    ['financial-events/4/revisions', 'financial-events-token', expect.objectContaining({ method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ kind: 'REPLACE', expected_revision: 0, reason: 'Correção', replacement: input }) })],
+    ['financial-events/4/revisions', 'financial-events-token', { signal: undefined }],
+  ])
+})
+
 test('API privada expõe preview, revisão e histórico com a chave idempotente no header', async () => {
   http.mockResolvedValueOnce({ kind: 'REPLACE' }).mockResolvedValueOnce({ id: 8 }).mockResolvedValueOnce([])
   const repo = new PrivateRepository('private-token')

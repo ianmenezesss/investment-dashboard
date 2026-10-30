@@ -22,6 +22,7 @@ MIGRATION_TABLES = {
     "006": {"operations", "fixed_income_investments", "fixed_income_lots", "fixed_income_movements", "fixed_income_observations", "fixed_income_investment_archives", "fixed_income_application_revisions"},
     "007": {"operations", "fixed_income_investments", "fixed_income_lots", "fixed_income_movements", "fixed_income_observations", "fixed_income_investment_archives", "fixed_income_application_revisions"},
     "008": {"operations", "fixed_income_investments", "fixed_income_lots", "fixed_income_movements", "fixed_income_observations", "fixed_income_investment_archives", "fixed_income_application_revisions"},
+    "009": {"operations", "fixed_income_investments", "fixed_income_lots", "fixed_income_movements", "fixed_income_observations", "fixed_income_investment_archives", "fixed_income_application_revisions", "financial_events", "financial_event_revisions"},
 }
 PROJECT_TABLES = set().union(*MIGRATION_TABLES.values())
 
@@ -188,7 +189,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-os
             raise RuntimeError(f"Esperava uma única versão Alembic; linhas encontradas={len(version_rows)}")
         version = json.loads(version_rows[0])
         revision = str(version.get("version_num", ""))
-        table_names = exec_psql("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND (table_name IN ('operations','alembic_version') OR table_name LIKE 'fixed_income_%') ORDER BY table_name", name).splitlines()
+        table_names = exec_psql("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND (table_name IN ('operations','alembic_version') OR table_name LIKE 'fixed_income_%' OR table_name LIKE 'financial_event%') ORDER BY table_name", name).splitlines()
         restored_project_tables = set(table_names) & PROJECT_TABLES
         expected = validate_archive_schema(revision, archive_tables, restored_project_tables)
         counts = {}
@@ -201,17 +202,17 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-os
         missing_data_tables = sorted(archive_data - set(counts))
         if missing_data_tables:
             raise RuntimeError("Entradas TABLE DATA não recuperadas como tabelas consultáveis: " + ", ".join(missing_data_tables))
-        constraints = int(exec_psql("SELECT count(*) FROM pg_constraint c JOIN pg_class r ON r.oid=c.conrelid WHERE r.relnamespace='public'::regnamespace AND r.relname LIKE 'fixed_income_%' AND c.convalidated", name))
-        unvalidated = int(exec_psql("SELECT count(*) FROM pg_constraint c JOIN pg_class r ON r.oid=c.conrelid WHERE r.relnamespace='public'::regnamespace AND r.relname LIKE 'fixed_income_%' AND NOT c.convalidated", name))
+        constraints = int(exec_psql("SELECT count(*) FROM pg_constraint c JOIN pg_class r ON r.oid=c.conrelid WHERE r.relnamespace='public'::regnamespace AND (r.relname LIKE 'fixed_income_%' OR r.relname LIKE 'financial_event%') AND c.convalidated", name))
+        unvalidated = int(exec_psql("SELECT count(*) FROM pg_constraint c JOIN pg_class r ON r.oid=c.conrelid WHERE r.relnamespace='public'::regnamespace AND (r.relname LIKE 'fixed_income_%' OR r.relname LIKE 'financial_event%') AND NOT c.convalidated", name))
         if constraints == 0:
-            raise RuntimeError("Nenhuma constraint validada encontrada nas tabelas fixed_income_")
+            raise RuntimeError("Nenhuma constraint validada encontrada nas tabelas financeiras")
         if unvalidated:
             raise RuntimeError(f"Encontradas {unvalidated} constraints não validadas em tabelas fixed_income_")
-        rls = exec_psql("SELECT relname || '=' || relrowsecurity || '/' || relforcerowsecurity FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind IN ('r','p') AND (relname='operations' OR relname LIKE 'fixed_income_%') ORDER BY relname", name).splitlines()
-        policies = int(exec_psql("SELECT count(*) FROM pg_policy p JOIN pg_class r ON r.oid=p.polrelid WHERE r.relnamespace='public'::regnamespace AND (r.relname='operations' OR r.relname LIKE 'fixed_income_%')", name))
+        rls = exec_psql("SELECT relname || '=' || relrowsecurity || '/' || relforcerowsecurity FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind IN ('r','p') AND (relname='operations' OR relname LIKE 'fixed_income_%' OR relname LIKE 'financial_event%') ORDER BY relname", name).splitlines()
+        policies = int(exec_psql("SELECT count(*) FROM pg_policy p JOIN pg_class r ON r.oid=p.polrelid WHERE r.relnamespace='public'::regnamespace AND (r.relname='operations' OR r.relname LIKE 'fixed_income_%' OR r.relname LIKE 'financial_event%')", name))
         rls_state = dict(value.split("=", 1) for value in rls)
         expected_rls_tables = ({"operations"} if revision >= "002" else set()) | {
-            table for table in expected if table.startswith("fixed_income_")
+            table for table in expected if table.startswith(("fixed_income_", "financial_event"))
         }
         missing_rls = sorted(expected_rls_tables - rls_state.keys())
         unsafe_rls = sorted(table for table in expected_rls_tables if rls_state.get(table) != "true/true")
@@ -223,7 +224,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-os
         schema_ok = True
         lines.append("Alembic=" + json.dumps(version, sort_keys=True))
         lines.append(f"Schema esperado pela migration {revision}=" + json.dumps(sorted(expected)))
-        lines.append(f"Compatibilidade com head 008={'PASS' if revision == '008' else 'NOT_CURRENT'}")
+        lines.append(f"Compatibilidade com head 009={'PASS' if revision == '009' else 'NOT_CURRENT'}")
         lines.append("Public project table row counts=" + json.dumps(counts, sort_keys=True))
         lines.append("Restored TABLE DATA entry row counts=" + json.dumps({table: counts[table] for table in sorted(archive_data)}, sort_keys=True))
         lines.append("TABLE_DATA_RECOVERY=PASS (pg_restore exit-on-error; all indexed data tables queryable)")

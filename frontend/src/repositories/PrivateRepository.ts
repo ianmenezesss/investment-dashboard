@@ -3,7 +3,12 @@ import type { OperationInput } from '../demo/finance'
 import type { Cdb, CdbInput, CdbDetail, CdbMovement, ApplicationInput, RedemptionInput, ReturnsInput, CdbReturns, CdbApplicationRevision, CdbApplicationRevisionInput, CdbApplicationRevisionPreview } from '../fixed-income/types'
 import type { ObservedPosition, ObservedPositionInput } from '../fixed-income/types'
 
-export type UnifiedMovement = { id: string; date: string; investment_class: 'AÇÕES' | 'CDB'; asset: string; operation: 'BUY' | 'SELL' | 'APPLICATION' | 'REDEMPTION'; quantity: string | null; unit_price: string | null; financial_value: string; fees: string | null; cash_received: string | null }
+export type FinancialEventKind = 'CONTRIBUTION' | 'WITHDRAWAL' | 'DIVIDEND' | 'JCP' | 'CORPORATE_ACTION'
+export type FinancialEventInput = { kind: FinancialEventKind; event_date: string; ticker?: string | null; cash_amount?: string | null; gross_amount?: string | null; tax_withheld?: string | null; source: string; description?: string | null }
+export type FinancialEventRecord = FinancialEventInput & { id: number; ticker: string | null; cash_amount: string | null; gross_amount: string | null; tax_withheld: string | null; description: string | null; revision: number }
+export type FinancialEventRevision = { id: number; event_id: number; revision: number; kind: 'REPLACE' | 'VOID'; reason: string; replacement_kind: FinancialEventKind | null; replacement_date: string | null; replacement_ticker: string | null; replacement_cash_amount: string | null; replacement_gross_amount: string | null; replacement_tax_withheld: string | null; replacement_source: string | null; replacement_description: string | null; created_at: string }
+export type FinancialEventSummary = { period_start: string | null; period_end: string; coverage: 'available' | 'empty'; contributions: string; withdrawals: string; net_external_cash_flow: string; dividends_received: string; jcp_received: string; income_total_received: string; event_count: number }
+export type UnifiedMovement = { id: string; date: string; investment_class: 'AÇÕES' | 'CDB' | 'FLUXO DE CAIXA' | 'PROVENTOS' | 'EVENTO SOCIETÁRIO'; asset: string; operation: 'BUY' | 'SELL' | 'APPLICATION' | 'REDEMPTION' | FinancialEventKind; quantity: string | null; unit_price: string | null; financial_value: string | null; fees: string | null; cash_received: string | null; gross_amount?: string | null; tax_withheld?: string | null; source?: string | null; description?: string | null; revision?: number }
 
 // Nunca recebe Storage ou dados da demonstração.
 export class PrivateRepository {
@@ -14,6 +19,15 @@ export class PrivateRepository {
   capitalFlows(period: string, signal?: AbortSignal) { return request<CapitalFlows>(`dashboard/capital-flows?period=${period}`, this.token, { signal }) }
   composition(signal?: AbortSignal) { return request<PortfolioComposition>('dashboard/composition', this.token, { signal }) }
   movements(signal?: AbortSignal) { return request<UnifiedMovement[]>('dashboard/movements', this.token, { signal }) }
+  financialEvents(signal?: AbortSignal) { return request<FinancialEventRecord[]>('financial-events', this.token, { signal }) }
+  financialEventSummary(period = 'Tudo', signal?: AbortSignal) { return request<FinancialEventSummary>(`dashboard/financial-events/summary?period=${period}`, this.token, { signal }) }
+  createFinancialEvent(input: FinancialEventInput, key: string, signal?: AbortSignal) {
+    return request<FinancialEventRecord>('financial-events', this.token, { method: 'POST', body: JSON.stringify(input), signal, headers: { 'Idempotency-Key': key } })
+  }
+  reviseFinancialEvent(id: number, input: { kind: 'REPLACE' | 'VOID'; expected_revision: number; reason: string; replacement?: FinancialEventInput }, key: string, signal?: AbortSignal) {
+    return request(`financial-events/${id}/revisions`, this.token, { method: 'POST', body: JSON.stringify(input), signal, headers: { 'Idempotency-Key': key } })
+  }
+  financialEventRevisions(id: number, signal?: AbortSignal) { return request<FinancialEventRevision[]>(`financial-events/${id}/revisions`, this.token, { signal }) }
   equityHistory(period: string, signal?: AbortSignal) { return request<import('../api').EquityHistory>(`dashboard/equity-history?period=${period}`, this.token, { signal }) }
   equityPriceHistory(ticker: string, period: import('../api').IndividualEquityPriceHistory['period'], signal?: AbortSignal) {
     return request<import('../api').IndividualEquityPriceHistory>(`dashboard/equities/${encodeURIComponent(ticker)}/price-history?period=${period}`, this.token, { signal })

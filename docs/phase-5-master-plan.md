@@ -1,6 +1,6 @@
 # Plano mestre — v5.0.0
 
-**Status:** Planejado. Os placeholders de Simulador e Metas no app apontam para a Fase 5; as propostas neste documento não significam que o código exista ou que a implementação esteja autorizada.
+**Status em 29/10/2026:** desenvolvimento local na branch `feat/v5-development`. A 5.0A está concluída; a 5.1 foi implementada e validada localmente. As fases 5.2–5.6 ainda não estão implementadas nesta branch. Este status não autoriza publicação.
 
 ## Relação com o planejamento original
 
@@ -20,7 +20,7 @@ A arquitetura original reservava uma fase para planejamento: simulador com premi
 
 ### 5.0A — Navegação responsiva e identidade dinâmica
 
-**Prioridade:** etapa inicial de experiência de uso; planejada e não autorizada para implementação.
+**Estado:** concluída na branch dedicada da v5.0A; registrada no handoff existente.
 
 - Em desktop, menu expandido com rótulos e recolhido com ícones, tooltips e nomes acessíveis; preferência local opcional.
 - Em mobile, drawer sobreposto com Escape, fechamento ao navegar, foco contido/devolvido e fundo inerte enquanto aberto.
@@ -32,20 +32,22 @@ A arquitetura original reservava uma fase para planejamento: simulador com premi
 
 ### 5.1 — Caixa, proventos e eventos financeiros
 
-**Prioridade:** alta para medição completa; proposta nova no detalhe de implementação, alinhada às lacunas antigas.
+**Prioridade:** alta para medição completa. **Estado:** implementada localmente; especificação em [plano 5.1](phase-5.1-cash-flow-and-income-events.md). A migration 009 ainda não foi aplicada a banco persistente.
 
 - Definir depósitos e saques externos, distinguindo compra/venda e aplicação/resgate.
-- Estudar proventos de ações (dividendos/JCP), reinvestimento e eventos corporativos com fonte declarada e correção auditável.
+- Proventos de ações (dividendos/JCP), reinvestimento e observações de eventos corporativos usam origem declarada e revisão auditável. Observações corporativas não alteram posição ou custo.
 - Permitir lançamentos manuais observados; não criar eventos históricos retroativos.
 - Evitar dupla contagem de transferências entre classes.
 - Contrato append-only, idempotência, owner_id e RLS.
 - **Visível:** histórico classificado e novos totais de caixa/proventos.
-- **Migration:** provável para novas entidades/tipos; não alterar o ledger atual sem compatibilidade de leitura/revisões.
-- **Aceite:** reconciliação financeira conhecida, períodos e taxas, REPLACE/VOID compatíveis, isolamento por usuário, importação não executa sem confirmação.
+- **Migration:** 009 cria entidades append-only, RLS/FORCE RLS, triggers e grants mínimos; sem backfill de operações antigas.
+- **Aceite validado:** valores `Decimal`, períodos, idempotência, REPLACE/VOID, isolamento de proprietário, histórico unificado e testes de PostgreSQL descartável. Tarifas de transferência e eventos societários quantitativos seguem fora do escopo.
 
 ### 5.2 — Importação CSV revisável
 
 **Prioridade:** alta para preservar histórico sem digitação repetida; item já planejado em roadmap anterior.
+
+**Bloqueio de início:** escolher a primeira instituição/corretora e fornecer uma fixture CSV anonimizada ou uma descrição precisa das colunas e exemplos fictícios. Até essa definição, não há importador específico a implementar.
 
 - Começar com um layout de instituição/corretora por vez.
 - Upload local e processamento seguro; não enviar CSV a terceiros.

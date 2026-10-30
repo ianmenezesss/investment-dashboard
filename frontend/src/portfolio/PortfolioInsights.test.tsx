@@ -114,6 +114,26 @@ test('requests fresh filtered flows and marks selected temporal period', async (
   expect(host.querySelector('button[aria-pressed="true"]')?.textContent).toBe('1M')
 })
 
+test('separates external cash flows from received dividends and JCP', async () => {
+  const repository = {
+    capitalFlows: async () => flow,
+    performance: async () => performance,
+    financialEventSummary: vi.fn(async () => ({ period_start: null, period_end: '2025-03-01', coverage: 'available' as const,
+      contributions: '100.00', withdrawals: '25.00', net_external_cash_flow: '75.00', dividends_received: '8.00',
+      jcp_received: '2.50', income_total_received: '10.50', event_count: 4 })),
+  }
+  await render(repository)
+  expect(repository.financialEventSummary).toHaveBeenCalledWith('Tudo', expect.anything())
+  expect(host.textContent).toContain('Caixa externo e proventos registrados')
+  expect(host.textContent).toContain('Aportes externos')
+  expect(host.textContent).toContain('Retiradas externas')
+  expect(host.textContent).toContain('Fluxo líquido externo')
+  expect(host.textContent).toContain('Dividendos recebidos informados')
+  expect(host.textContent).toContain('Proventos são separados de aportes')
+  expect((host.textContent ?? '').replace(/\u00a0/g, ' ')).toContain('R$ 75,00')
+  expect((host.textContent ?? '').replace(/\u00a0/g, ' ')).toContain('R$ 8,00')
+})
+
 test('formats small flow ticks in BRL and keeps compact tick labels distinct', () => {
   const normalize = (value: string) => value.replace(/\u00a0/g, ' ')
   expect(normalize(formatFlowAxisTick(50))).toBe('R$ 50')

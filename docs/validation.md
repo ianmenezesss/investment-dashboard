@@ -1,5 +1,16 @@
 # Validação do Investment Dashboard
 
+## v5.0.0 — Fase 5.1, validação local
+
+- Eventos manuais de aporte/retirada, dividendos/JCP e observações societárias integrados ao histórico e aos indicadores existentes; revisões `REPLACE`/`VOID` append-only.
+- Backend completo: **373 aprovados, 1 ignorado**; um aviso conhecido de depreciação do `TestClient`/httpx.
+- Frontend completo: **180 aprovados** em 19 arquivos; build de produção aprovado.
+- PostgreSQL descartável: **1 aprovado**; migration 009 e cadeia 001–009, RLS/FORCE RLS, isolamento A/B, grants mínimos, constraints e round-trip backup/restore aprovados.
+- `npm audit --audit-level=low` e `pip-audit -r backend/requirements.lock.txt`: **0 vulnerabilidades conhecidas**; `git diff --check` aprovado.
+- A migration 009 foi executada somente em containers efêmeros de teste. Não houve conexão a banco persistente/de produção, backfill ou alteração de dados existentes.
+- 5.2 aguarda uma instituição escolhida e fixture CSV anonimizada. 5.3–5.6 ainda não implementadas; 5.6 permanece condicional a avaliações e fonte histórica adequadas.
+- Referência: [documentação da Fase 5.1](phase-5.1-cash-flow-and-income-events.md) e [handoff v5](v5-development-handoff.md).
+
 ## Fase 3.0.4 — revisão final local
 
 - Histórico unificado, fluxos acumulados e composição foram integrados às áreas privadas

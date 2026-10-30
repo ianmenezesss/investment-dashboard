@@ -1,4 +1,4 @@
-"""Executa integração 001–008 e ensaio pg_dump/restore em containers efêmeros."""
+"""Executa integração 001–009 e ensaio pg_dump/restore em containers efêmeros."""
 import os
 from pathlib import Path
 import re
@@ -177,7 +177,7 @@ def main():
         if result.returncode:
             return result.returncode
 
-        print("INTEGRACAO_POSTGRESQL_001_008=PASSOU")
+        print("INTEGRACAO_POSTGRESQL_001_009=PASSOU")
         print("Criando backup lógico fictício e iniciando servidor de restore independente...")
         dump = subprocess.run([docker, "exec", "-e", f"PGPASSWORD={password}", name, "pg_dump", "-h", "127.0.0.1", "-p", "5432",
                                "-U", "postgres", "-Fc", source_db], capture_output=True)
@@ -205,13 +205,14 @@ CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service
         restore_port = published_loopback_port(restore_name)
         restore_url = f"postgresql+psycopg://postgres:{password}@127.0.0.1:{restore_port}/{restore_db}"
         # Compare row counts, Alembic, catalog security flags and two-owner visibility.
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
         from verify_backup_restore import snapshot
         source_snapshot = snapshot(source_url)
         restored_snapshot = snapshot(restore_url)
         if source_snapshot != restored_snapshot:
             raise RuntimeError("Snapshot de contagens, RLS/grants ou isolamento divergiu após restore")
         print(f"BACKUP_RESTORE=PASSOU; bytes={len(dump.stdout)}; sha256={__import__('hashlib').sha256(dump.stdout).hexdigest()}")
-        print("RESTORE_HEAD=008; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
+        print("RESTORE_HEAD=009; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
         return 0
     finally:
         # Only containers created by this invocation are stopped; no volumes are mounted or removed.
