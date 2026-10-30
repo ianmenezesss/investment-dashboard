@@ -49,21 +49,22 @@ A arquitetura original reservava uma fase para planejamento: simulador com premi
 
 ### 5.3 — Relatórios e exportação
 
-**Prioridade:** média; relatórios constam no planejamento original. Exportação JSON de operações já existe, mas não equivale a relatórios.
-- Filtros temporais, operações, posições e fluxos com rótulos e bases explicitadas.
-- CSV de saída e resumo imprimível podem ser avaliados; PDF não é obrigatório.
-- Seguir mesmo escopo owner_id, sem revelar registros de outra carteira.
-- **Migration:** não necessariamente para exportar dados existentes; snapshots/relatórios persistidos não são propostos.
-- **Aceite:** comparar saídas às consultas, moeda/data-base/coverage claras, privacidade e escaping seguro de CSV.
+**Estado:** implementada no frontend privado.
+- 5.3A: aportes por mês/ano, período ajustável, gráfico e separação de ações (taxas incluídas) e principal aplicado em renda fixa.
+- 5.3B: composição por classe/ativo e tabelas filtráveis de movimentos/eventos com compras, vendas, resgates, aportes e proventos discriminados.
+- 5.3C: impressão do relatório filtrado com data de geração; o navegador permite salvar o diálogo de impressão como PDF.
+- Reutiliza `/api/dashboard/movements` e `/api/dashboard/composition`, preservando a autenticação e o filtro por proprietário dos endpoints existentes.
+- **Migration:** nenhuma. Sem persistência de relatórios, novos serviços ou bibliotecas.
+- Valores movimentados/aportados não são apresentados como lucro, rentabilidade ou valor a mercado.
 
 ### 5.4 — Simulador
 
-**Prioridade:** média; placeholder de navegação atual e escopo original.
-- Cenários com aportes periódicos, prazo, taxa hipotética e reinvestimento.
-- Mostrar premissas, frequência, convenção e resultados em cenários alternativos.
-- Não puxar estimativa histórica para inferir retorno futuro; entrada manual deve ser identificada.
-- **Migration:** nenhuma se temporário/local; necessária se cenários forem salvos no servidor por usuário.
-- **Aceite:** valores extremos, Decimal, intervalos, aporte inicial/periódico, interrupção e ausência de promessas. UI deve chamar simulação de hipótese.
+**Estado:** implementada como simulador local e não persistente.
+- Três cenários editáveis (conservador, moderado e otimista), valor inicial, aporte mensal, prazo, aporte no início/fim e inflação opcional.
+- Conversão de taxa anual efetiva em taxa mensal equivalente; precisão interna Decimal; apresentação nominal e real separadas.
+- Fórmulas e premissas explícitas; não lê carteira, não consulta previsão ou fonte de mercado e não promete retornos.
+- **Migration:** nenhuma. O estado da simulação existe apenas na tela e não é salvo.
+- **Aceite validado por testes:** taxa zero/negativa, aporte zero, capital inicial zero, prazos, timing, inflação, cenários e entradas inválidas.
 
 ### 5.5 — Metas
 
@@ -93,7 +94,7 @@ O refinamento da demonstração pública offline, descrito historicamente como u
 
 ## Ordem e aceitação de release
 
-Ordem recomendada: estabilizar 5.1 e a interface atual; depois planejar relatórios 5.3, simulador 5.4 ou metas 5.5, escolhendo uma etapa para aprovação. A importação 5.2 está retirada. A 5.6 segue condicional aos dados/fontes previstos em 4.4.
+Ordem recomendada a partir deste estado: revisar e aprovar as entregas locais 5.3/5.4; depois planejar 5.5 Metas, definindo a base de patrimônio atual antes de prometer progresso. A importação 5.2 está retirada. A 5.6 segue condicional aos dados/fontes previstos em 4.4.
 
 Release v5.0.0 só após as fases escolhidas para o release terem critérios aprovados, testes e documentação. Uma fase bloqueada por fonte não pode ser apresentada como implementada. A lista exata de escopo v5 permanece decisão do proprietário.
 

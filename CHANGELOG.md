@@ -1,9 +1,11 @@
 # Changelog
 
-## Em desenvolvimento — `feat/v5-development`
+## Em desenvolvimento — `feat/v5.3-reports`
 
 - Removida a importação CSV da interface, do cliente privado e da API; cadastro manual de operações/eventos e Histórico permanecem.
 - Os gráficos de composição de ações e renda fixa agora usam duas colunas equilibradas; em telas estreitas, são empilhados. Valores e cálculos não mudaram.
+- Fases 5.3A–C: relatórios privados de aportes, composição e movimentações, com filtros, indicadores e opção de impressão para PDF.
+- Fase 5.4: simulador local com três cenários hipotéticos, juros compostos e ajuste opcional pela inflação; sem persistência ou acesso à carteira.
 - Nenhuma tabela, dado financeiro ou migration foi removido/revertido; nenhuma alteração foi feita no banco de produção.
 
 ## v4.0.0 — publicada (29/10/2026)

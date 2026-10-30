@@ -23,7 +23,7 @@ type WorkspaceSidebarProps = {
 }
 
 export function WorkspaceSidebar({ demo, routeTo, collapsed = false, onToggleCollapsed, onNavigate, mobile = false, displayName, avatarInitial }: WorkspaceSidebarProps) {
-  const items = workspaceNavItems.filter(item => !demo || ['/', '/acoes', '/historico'].includes(item.to))
+  const items = workspaceNavItems.filter(item => !demo || ['/', '/acoes', '/historico', '/simulador'].includes(item.to))
   const sidebarClass = ['sidebar', collapsed && !mobile && 'sidebar-collapsed', mobile && 'mobile-sidebar'].filter(Boolean).join(' ')
 
   return <aside className={sidebarClass} aria-label="Navegação da carteira">
@@ -41,7 +41,7 @@ export function WorkspaceSidebar({ demo, routeTo, collapsed = false, onToggleCol
     <nav id={mobile ? undefined : 'desktop-primary-navigation'} aria-label="Navegação principal">
       {items.map(item => {
         const Icon = item.icon
-        const planned = ['/simulador', '/metas'].includes(item.to)
+        const planned = item.to === '/metas'
         return <NavLink end to={routeTo(item.to)} key={item.to} aria-label={`${item.label}${planned ? ' (Em breve)' : ''}`} title={item.label} onClick={onNavigate}>
           <Icon size={19} aria-hidden="true"/><span className="nav-label">{item.label}</span>{planned && <span className="nav-planned">Em breve</span>}
         </NavLink>

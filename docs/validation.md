@@ -1,5 +1,14 @@
 # Validação do Investment Dashboard
 
+## Fases 5.3 e 5.4 — 30/10/2026
+
+- Frontend completo: **196 testes aprovados em 24 arquivos**. `npm run build` passou.
+- Backend completo: **374 aprovados, 1 ignorado** em 87,58 s. O teste ignorado é a integração PostgreSQL opcional, pois `TEST_DATABASE_URL` não estava configurada. Aviso existente: depreciação de `TestClient`/httpx.
+- Cobertura específica de relatórios: filtros, agrupamento mensal/anual, Decimal, movimentos, composições, chamada de impressão PDF e build.
+- Cobertura específica de simulação: taxa zero/negativa, aporte inicial/periódico, prazo, timing no início/fim do mês, inflação, cenários, entradas inválidas e interface local.
+- Não foram adicionadas APIs/backend, dependências, migrations ou persistência para as fases 5.3/5.4. A integração PostgreSQL e produção não foram acessadas nesta etapa.
+- Relatórios buscam dados apenas via endpoints privados já existentes. Simulador é efêmero e não acessa operações/eventos reais.
+
 ## v5.0.0 — eventos manuais, Histórico e composição
 
 - Importação CSV removida da interface, `PrivateRepository` e API; `POST /api/financial-events/import` retorna 404. Cadastro manual de operações/eventos, filtros, Histórico e correções seguem disponíveis.

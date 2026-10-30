@@ -1,6 +1,6 @@
 # Roadmap mestre — Investment Dashboard
 
-Atualizado em 29/10/2026. Este documento é a fonte principal de verdade do planejamento. Ele registra o estado observado no repositório e decisões expressas pelo proprietário; não autoriza compra, ativação de provedor, migration persistente, push, merge, release ou deploy.
+Atualizado em 30/10/2026. Este documento é a fonte principal de verdade do planejamento. Ele registra o estado observado no repositório e decisões expressas pelo proprietário; não autoriza compra, ativação de provedor, migration persistente, push, merge, release ou deploy.
 
 ## Estados usados
 
@@ -36,7 +36,7 @@ Atualizado em 29/10/2026. Este documento é a fonte principal de verdade do plan
 | Release v4.0.0 | **Publicada; verificações operacionais reportadas como concluídas** | Proprietário confirmou `/api/operations`, `/api/dashboard/valuation`, `/api/dashboard/performance`, `/api/dashboard/equity-history`, histórico individual e comparação respondendo HTTP 200 em produção. Históricos sem provedor seguem indisponíveis de forma explícita. |
 | v4.4 — Rentabilidade temporal completa | **Bloqueado / condicional** | Depende de fluxo externo classificado, eventos pertinentes e avaliações históricas comparáveis. |
 | 5.0A — Navegação responsiva e identidade dinâmica | **Concluído localmente** | Menu mobile acessível, sidebar desktop recolhível, identidade visual derivada da sessão e testes; sem alteração de backend/migration. Revisão visual final do proprietário permanece antes de publicação. |
-| v5.0.0 | **Em desenvolvimento local** | 5.0A e 5.1 implementadas; importação 5.2A retirada por decisão do proprietário e adaptadores 5.2B suspensos. 5.3–5.6 permanecem planejadas ou condicionais; Simulador e Metas continuam placeholders. |
+| v5.0.0 | **Em desenvolvimento local** | 5.0A, 5.1, 5.3 (relatórios) e 5.4 (simulador local) implementadas; importação 5.2A retirada e 5.2B suspensa. 5.5 permanece placeholder; 5.6 condicional. |
 | Investment Dashboard 2.0 | **Planejado, após estabilidade pessoal** | Expansão por convite, com isolamento rigoroso e operação sustentável sem despesa obrigatória. |
 
 Referências de implementação e evidência: [revisão da 3.0.4](phase-3.0.4-final-review.md), [fase 4.1](phase-4.1-individual-equity-history.md) e [fase 4.2](phase-4.2-asset-comparison.md).
@@ -87,7 +87,7 @@ Critérios e processo: [critérios de release pessoal](personal-dashboard-releas
 
 ## v5.0.0 — planejamento, dados e relatórios
 
-A **5.0A — Navegação responsiva e identidade dinâmica** está concluída, conforme [plano 5.0A](phase-5.0A-responsive-navigation-user-identity.md). A 5.1 está implementada. A importação 5.2A foi retirada e 5.2B está suspensa. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção e que as tabelas de eventos existem; esta atualização não acessou nem modificou esse banco. O app mantém placeholders de **Simulador** e **Metas**. As etapas seguintes continuam sujeitas aos critérios, dependências e decisões descritos no [plano mestre v5](phase-5-master-plan.md).
+A **5.0A — Navegação responsiva e identidade dinâmica**, a 5.1, os relatórios 5.3 e o simulador local 5.4 estão implementados. A importação 5.2A foi retirada e 5.2B está suspensa. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção e que as tabelas de eventos existem; esta atualização não acessou nem modificou esse banco. **Metas** permanece placeholder. A 5.4 não lê nem grava dados da carteira. As etapas seguintes continuam sujeitas aos critérios, dependências e decisões descritos no [plano mestre v5](phase-5-master-plan.md).
 
 | Fase proposta | Conteúdo | Prioridade / dependências |
 |---|---|---|
@@ -95,8 +95,8 @@ A **5.0A — Navegação responsiva e identidade dinâmica** está concluída, c
 | 5.1 — Eventos e fluxo de caixa | Aportes/retiradas externas, dividendos/JCP e observações societárias com origem declarada; revisão append-only. | Implementada. O proprietário informa migration 009 aplicada à produção; sem verificação independente nesta alteração. Detalhes em [plano 5.1](phase-5.1-cash-flow-and-income-events.md). |
 | 5.2 — Importação CSV | Entrada CSV de eventos financeiros. | Retirada por decisão do proprietário; cadastro manual e Histórico preservados. Sem remoção de dados/tabelas e sem downgrade da 009. |
 | 5.2B — Adaptadores bancários | Parsers para layouts de instituições. | Suspensa com a retirada da importação; requer nova decisão antes de retomar. |
-| 5.3 — Relatórios e exportação | Relatório de operações/posições e exportações consistentes com o filtro e o proprietário. | Exportação JSON atual não equivale a relatórios completos. |
-| 5.4 — Simulador | Aportes hipotéticos, taxas, prazo e reinvestimento como cenários editáveis. | Escopo original e placeholder; não requer histórico real se as hipóteses forem explícitas. |
+| 5.3 — Relatórios e exportação | Aportes por mês/ano, composição por categoria/ativo, movimentos e eventos filtráveis e impressão para PDF. | Implementada no frontend privado com endpoints existentes; sem migration. PDF usa impressão nativa do navegador. |
+| 5.4 — Simulador | Aporte inicial/periódico, prazo, três taxas editáveis, convenção de aporte e inflação opcional. | Implementado localmente e sem persistência; não acessa carteira nem APIs externas. |
 | 5.5 — Metas | Patrimônio-alvo, prazo, progresso e projeção com base claramente identificada. | Escopo original e placeholder; depende da definição da base do progresso. |
 | 5.6 — Histórico de carteira e benchmarks | TWR/MWR e comparação com benchmarks somente após entradas e avaliações suficientes. | Condicional, possivelmente com persistência nova; fornecedor continua sujeito à regra gratuita. |
 
