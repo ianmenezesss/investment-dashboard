@@ -25,9 +25,9 @@
 .sidebar-collapsed .sidebar-header .brand-word,.sidebar-collapsed .sidebar-header .brand-dot,.sidebar-collapsed .nav-caption,.sidebar-collapsed .workspace>div:not(.avatar),.sidebar-collapsed .workspace>svg,.sidebar-collapsed .sidebar-bottom,.sidebar-collapsed .profile-copy,.sidebar-collapsed .profile .status-dot,.sidebar-collapsed .nav-label,.sidebar-collapsed .nav-planned{display:none}
 .sidebar-collapsed .sidebar-collapse-toggle{margin-inline:auto}
 .sidebar-collapsed .workspace{display:grid;place-items:center;width:100%;margin:24px 0 22px;padding:11px 0;border-color:transparent;background:transparent}
-.sidebar-collapsed .sidebar nav{display:grid;width:100%;grid-template-columns:minmax(0,1fr);justify-items:center;gap:8px;padding-inline:0}
-.sidebar-collapsed .sidebar nav a{display:grid;place-items:center;width:48px;height:48px;min-height:48px;margin-inline:auto;padding:0;border-radius:12px;justify-self:center}
-.sidebar-collapsed .sidebar nav a svg{display:block;width:19px;height:19px;justify-self:center;align-self:center}
+.sidebar-collapsed nav{display:grid;width:100%;grid-template-columns:minmax(0,1fr);justify-items:center;gap:8px;padding-inline:0}
+.sidebar-collapsed nav a{display:grid;place-items:center;width:48px;height:48px;min-height:48px;margin-inline:auto;padding:0;border-radius:12px;justify-self:center}
+.sidebar-collapsed nav a svg{display:block;width:19px;height:19px;justify-self:center;align-self:center}
 .sidebar-collapsed .profile{display:grid;width:100%;grid-template-columns:minmax(0,1fr);justify-items:center;justify-content:center;margin-top:auto;padding:16px 0 2px}
 .profile-copy{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mobile-header-brand{display:none;align-items:center;gap:7px;color:#e8edf0;font-size:19px;font-weight:650;letter-spacing:-.7px}
