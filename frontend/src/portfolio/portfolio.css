@@ -16,4 +16,6 @@
 .portfolio-composition-charts{grid-template-columns:minmax(0,1fr)}
 .portfolio-asset-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .portfolio-basis-chart{grid-column:1/-1}
+.composition-panel{grid-column:1/-1;grid-row:3}
+.financial-event-insights{grid-column:1/-1;grid-row:4}
 @media(max-width:600px){.portfolio-asset-charts{grid-template-columns:minmax(0,1fr)}}

@@ -5,6 +5,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieCh
 import type { PrivateRepository } from '../repositories/PrivateRepository'
 import type { CapitalFlows, FinancialPerformance, PortfolioComposition } from '../api'
 import { ChartNoAxesCombined } from 'lucide-react'
+import { FinancialHint } from '../components/FinancialHint'
 import { formatFlowAxisTick } from './format'
 import './portfolio.css'
 import './performance.css'
@@ -63,7 +64,7 @@ export function PortfolioInsights({ repository, identity }: { repository: Privat
       {flows.data && <><div className="portfolio-flow-totals"><span>Compras de ações no período · inclui taxas <strong>{money(flows.data.equity_purchases)}</strong></span><span>Aplicações CDB · principal <strong>{money(flows.data.cdb_applications)}</strong></span><span>Vendas de ações · após taxas registradas <strong>{money(flows.data.equity_sale_proceeds)}</strong></span><span>Resgates CDB · principal <strong>{money(flows.data.cdb_redemptions)}</strong></span></div><div className="chart-footer">Cobertura {flows.data.coverage_start ? `desde ${new Date(`${flows.data.coverage_start}T12:00:00`).toLocaleDateString('pt-BR')}` : 'indisponível'}{flows.data.coverage === 'partial' && ' · parcial para o período selecionado'} <span>Valores registrados; patrimônio a mercado e rentabilidade de carteira indisponíveis</span></div></>}
     </article>
     {typeof repository.financialEventSummary === 'function' && <article className="panel financial-event-insights">
-      <div className="panel-heading"><div><h3>Caixa externo e proventos registrados</h3><p>Período {period} · valores informados manualmente · não são rentabilidade</p></div></div>
+      <div className="panel-heading"><div><h3>Caixa externo e proventos registrados <FinancialHint label="caixa externo e proventos">Aportes e retiradas são informados manualmente. Dividendos e JCP são registrados separadamente; proventos reinvestidos não são somados novamente como aporte. Estes valores não representam rentabilidade da carteira.</FinancialHint></h3><p>Período {period} · valores informados manualmente · não são rentabilidade</p></div></div>
       {eventSummary.isPending ? <p role="status" className="portfolio-coverage">Carregando eventos financeiros…</p> : eventSummary.isError ? <p role="alert" className="portfolio-coverage">Não foi possível carregar os eventos financeiros.</p> : eventSummary.data && <>
         <div className="portfolio-lifetime-totals financial-event-totals">
           <div><span>Aportes externos</span><strong>{money(eventSummary.data.contributions)}</strong></div>

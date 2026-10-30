@@ -130,6 +130,7 @@ test('separates external cash flows from received dividends and JCP', async () =
   await render(repository)
   expect(repository.financialEventSummary).toHaveBeenCalledWith('Tudo', expect.anything())
   expect(host.textContent).toContain('Caixa externo e proventos registrados')
+  expect(host.querySelector('[aria-label="Entender: caixa externo e proventos"]')).not.toBeNull()
   expect(host.textContent).toContain('Aportes externos')
   expect(host.textContent).toContain('Retiradas externas')
   expect(host.textContent).toContain('Fluxo líquido externo')
