@@ -96,7 +96,7 @@ O scanner verifica regras de ignore, candidatos e, se existir, histórico Git. N
 
 ## Backup
 
-O botão **Exportar** salva um JSON dos registros da API (ou um arquivo claramente identificado de demonstração). Não há importação automática nesta fase. Para backup completo do PostgreSQL:
+O botão **Exportar** salva um JSON dos registros da API (ou um arquivo claramente identificado de demonstração). Eventos financeiros são registrados manualmente no Histórico; a importação CSV foi retirada do produto. Para backup completo do PostgreSQL:
 
 ```powershell
 docker compose exec db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/investment.dump'

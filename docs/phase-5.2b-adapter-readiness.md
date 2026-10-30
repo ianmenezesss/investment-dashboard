@@ -1,8 +1,8 @@
-# Fase 5.2B — Preparação para adaptadores bancários
+# Fase 5.2B — Preparação para adaptadores bancários (suspensa)
 
-**Estado local em 29/10/2026:** documentada; sem parser institucional e sem declaração de suporte a qualquer banco/corretora. A 5.2A genérica permanece a interface de entrada transacional para os eventos atualmente suportados.
+**Estado em 29/10/2026:** suspensa. A importação CSV 5.2A foi retirada do produto, portanto não existe interface de entrada transacional para adaptadores. Não criar parsers nem reintroduzir importação sem nova decisão do proprietário.
 
-## Contrato recomendado
+## Registro histórico (não executar enquanto suspensa)
 
 Cada adaptador futuro deve ser um parser puro, específico a uma instituição e versão de exportação. Deve converter linhas verificadas para um formato interno explícito, sem rede, credenciais, regras financeiras próprias ou persistência. A saída passa pela prévia, validação, deduplicação e endpoint transacional de [Fase 5.2A](phase-5.2-csv-import.md). Não criar abstração compartilhada adicional até existir ao menos um layout real aprovado.
 

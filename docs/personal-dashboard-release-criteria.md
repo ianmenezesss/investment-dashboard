@@ -27,7 +27,7 @@ Definir antes do início quais das fases 5.1–5.6 entram na release. Requisitos
 - fórmulas e semântica de cada evento documentadas e testadas;
 - simulações rotuladas como cenários hipotéticos;
 - metas só exibem progresso quando a base é conhecida;
-- importação sempre revisável antes de gravar;
+- cadastros manuais de operações e eventos autenticados, idempotentes quando aplicável e isolados por proprietário;
 - migrations aditivas testadas em banco descartável e compatíveis com rollback/procedimento seguro;
 - privacidade, auth, owner_id e RLS mantidos;
 - nenhum recurso bloqueado por fonte aparece ativo;

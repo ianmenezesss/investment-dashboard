@@ -1,6 +1,8 @@
 # Fase 5.1 — Fluxos externos, proventos e eventos observados
 
-**Estado:** implementada e validada localmente em `feat/v5-development`. A migration 009 foi aplicada somente aos bancos PostgreSQL descartáveis de teste; nenhum banco persistente ou de produção foi alterado.
+**Estado inicial:** implementada e validada localmente em `feat/v5-development`. Naquele momento a migration 009 tinha sido aplicada somente aos bancos PostgreSQL descartáveis de teste.
+
+**Atualização do proprietário em 29/10/2026:** migration 009 aplicada ao Supabase de produção; `financial_events` e `financial_event_revisions` existem. A importação CSV 5.2 foi retirada do produto; os cadastros manuais e os dados existentes permanecem. Este registro não representa verificação independente do banco.
 
 ## Escopo entregue
 
@@ -48,5 +50,5 @@ A migration 009 cria `financial_events` e `financial_event_revisions`, índices,
 
 - Não há saldo de caixa conciliado, registro de tarifas de transferência, eventos societários quantitativos nem fonte de preço histórico aprovada.
 - Nenhum evento antigo é fabricado ou importado automaticamente.
-- A Fase 5.2 precisa começar por um único formato autorizado e uma fixture CSV anonimizada. Não processar um extrato real até definir mapeamento e regras de deduplicação.
+- A importação CSV 5.2 foi retirada do produto em 29/10/2026; esta recomendação de planejamento foi encerrada. Os registros manuais da 5.1 continuam disponíveis.
 - A Fase 5.6 permanece condicional às avaliações patrimoniais datadas, fluxos completos e fonte gratuita/licenciada; esta fase não calcula TWR, MWR, lucro total ou benchmark.

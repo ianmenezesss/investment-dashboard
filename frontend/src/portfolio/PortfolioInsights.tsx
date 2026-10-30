@@ -81,8 +81,10 @@ export function PortfolioInsights({ repository, identity }: { repository: Privat
         {composition.missing_components.length > 0 && <p className="portfolio-coverage">Dados ausentes: {composition.missing_components.join('; ')}. Valores de mercado das ações indisponíveis.</p>}
         <div className="portfolio-applied-capital"><div><span>Capital aplicado contabilizado em posições abertas</span><strong>{money(appliedCapital)}</strong></div><ul><li><span>Ações · custo aberto com taxas</span><strong>{money(equityCapital)} · {equityShare == null ? '—' : `${equityShare.replace('.', ',')}%`}</strong></li><li><span>CDB · principal efetivo</span><strong>{money(fixedCapital)} · {fixedShare == null ? '—' : `${fixedShare.replace('.', ',')}%`}</strong></li></ul><p>Posições CDB informadas manualmente ficam separadas e não entram neste total. Ações são avaliadas pelo custo de aquisição, não por cotação atual.</p></div>
         <div className="portfolio-composition-charts">
-          <AssetDonut title="Ações · custo aberto" items={composition.equities} totalValue={composition.class_totals.equities_open_cost}/>
-          <AssetDonut title="Renda fixa · principal efetivo" items={composition.fixed_income} totalValue={composition.class_totals.fixed_income_open_principal}/>
+          <div className="portfolio-asset-charts" aria-label="Composição por classe de ativo">
+            <AssetDonut title="Ações · custo aberto" items={composition.equities} totalValue={composition.class_totals.equities_open_cost}/>
+            <AssetDonut title="Renda fixa · principal efetivo" items={composition.fixed_income} totalValue={composition.class_totals.fixed_income_open_principal}/>
+          </div>
           <div className="portfolio-basis-chart"><h4>Bases disponíveis · sem total agregado</h4><p>Posições declaradas permanecem em série separada.</p><div className="portfolio-basis-chart-canvas"><ResponsiveContainer width="100%" height="100%"><BarChart data={[
             { name: 'Ações · custo aberto', value: Number(composition.class_totals.equities_open_cost) },
             { name: 'RF · principal ledger', value: Number(composition.class_totals.fixed_income_open_principal) },

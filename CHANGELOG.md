@@ -1,5 +1,11 @@
 # Changelog
 
+## Em desenvolvimento — `feat/v5-development`
+
+- Removida a importação CSV da interface, do cliente privado e da API; cadastro manual de operações/eventos e Histórico permanecem.
+- Os gráficos de composição de ações e renda fixa agora usam duas colunas equilibradas; em telas estreitas, são empilhados. Valores e cálculos não mudaram.
+- Nenhuma tabela, dado financeiro ou migration foi removido/revertido; nenhuma alteração foi feita no banco de produção.
+
 ## v4.0.0 — publicada (29/10/2026)
 
 Publicação e verificações operacionais confirmadas pelo proprietário. Os endpoints privados de operações, valuation, performance e históricos respondem; sem provedor aprovado, os endpoints históricos respondem com estado de indisponibilidade conforme projetado. Esta entrada não registra SHA implantado nem revisão remota do banco, que não foram conferidos diretamente nesta atualização.

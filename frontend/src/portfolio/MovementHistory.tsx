@@ -4,7 +4,6 @@ import type { PrivateRepository, UnifiedMovement } from '../repositories/Private
 import { marketMoney, marketQuantity } from '../components/market-format'
 import { FinancialEventEntry } from './FinancialEventEntry'
 import { FinancialEventCorrection } from './FinancialEventCorrection'
-import { GenericCsvImport } from './GenericCsvImport'
 import './portfolio.css'
 
 const money = (value: string | null) => value === null ? '—' : marketMoney(value)
@@ -50,6 +49,5 @@ export function MovementHistory({ repository, identity }: { repository: PrivateR
     })}</tbody></table></div>}
     {!query.isPending && !query.isError && <div className="table-footer">{rows.length} movimentações encontradas</div>}
     <FinancialEventEntry repository={repository}/>
-    <GenericCsvImport repository={repository}/>
   </article>
 }

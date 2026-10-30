@@ -15,7 +15,7 @@ Atualizado em 29/10/2026. Este documento é a fonte principal de verdade do plan
 
 ## Decisões de produto registradas
 
-1. O produto deve funcionar **sem despesa obrigatória**, tanto para o proprietário como para a futura expansão restrita. Priorizar software aberto, planos gratuitos enquanto disponíveis, registros manuais e CSV. Serviço que exija pagamento nunca será requisito funcional.
+1. O produto deve funcionar **sem despesa obrigatória**, tanto para o proprietário como para a futura expansão restrita. Priorizar software aberto, planos gratuitos enquanto disponíveis e registros manuais. Serviço que exija pagamento nunca será requisito funcional.
 2. Planos gratuitos têm limites e podem mudar, suspender ou encerrar. Configurações devem ser reavaliadas antes de releases. Falha ou limite deve degradar para indisponibilidade explícita ou fluxo manual, sem ativar cobrança automática.
 3. Não há intenção atual de cobrança, assinatura, planos comerciais ou monetização.
 4. Não integrar APIs pagas, Open Finance pago, scraping ou fornecedor sem validação de cobertura, licença, privacidade e custo. Ideias condicionais permanecem documentadas como alternativas futuras.
@@ -36,7 +36,7 @@ Atualizado em 29/10/2026. Este documento é a fonte principal de verdade do plan
 | Release v4.0.0 | **Publicada; verificações operacionais reportadas como concluídas** | Proprietário confirmou `/api/operations`, `/api/dashboard/valuation`, `/api/dashboard/performance`, `/api/dashboard/equity-history`, histórico individual e comparação respondendo HTTP 200 em produção. Históricos sem provedor seguem indisponíveis de forma explícita. |
 | v4.4 — Rentabilidade temporal completa | **Bloqueado / condicional** | Depende de fluxo externo classificado, eventos pertinentes e avaliações históricas comparáveis. |
 | 5.0A — Navegação responsiva e identidade dinâmica | **Concluído localmente** | Menu mobile acessível, sidebar desktop recolhível, identidade visual derivada da sessão e testes; sem alteração de backend/migration. Revisão visual final do proprietário permanece antes de publicação. |
-| v5.0.0 | **Em desenvolvimento local** | 5.0A, 5.1 e 5.2A genérica implementadas e validadas localmente; adaptadores 5.2B aguardam fixtures verificadas. 5.3–5.6 permanecem planejadas ou condicionais; Simulador e Metas continuam placeholders. |
+| v5.0.0 | **Em desenvolvimento local** | 5.0A e 5.1 implementadas; importação 5.2A retirada por decisão do proprietário e adaptadores 5.2B suspensos. 5.3–5.6 permanecem planejadas ou condicionais; Simulador e Metas continuam placeholders. |
 | Investment Dashboard 2.0 | **Planejado, após estabilidade pessoal** | Expansão por convite, com isolamento rigoroso e operação sustentável sem despesa obrigatória. |
 
 Referências de implementação e evidência: [revisão da 3.0.4](phase-3.0.4-final-review.md), [fase 4.1](phase-4.1-individual-equity-history.md) e [fase 4.2](phase-4.2-asset-comparison.md).
@@ -46,8 +46,8 @@ Referências de implementação e evidência: [revisão da 3.0.4](phase-3.0.4-fi
 A arquitetura original agrupava em fases numeradas: fundação de ações; contas/corretoras, edição e proventos; renda fixa; medição com snapshots, caixa externo, benchmarks e TWR/XIRR; planejamento com simulador, metas e relatórios; e uso remoto seguro. A execução evoluiu em versões 1.x, 2.x, 3.x e 4.x diferentes da numeração inicial. Os documentos históricos não são reescritos para sugerir que a numeração atual existia desde o começo.
 
 - **Entregue em fases anteriores:** ledger de ações com custo médio; demo offline; Supabase Auth privado, autorização por proprietário e RLS; renda fixa CDB com principal, revisões REPLACE/VOID, observações manuais e estimativa CDI sob premissas; cotações pontuais; histórico unificado de operações; fluxos e composição por bases declaradas.
-- **Ainda não entregue ou incompleto:** contas/corretoras, edição transacional geral de operações, dividendos/JCP, eventos societários no livro financeiro, depósitos e saques externos, saldo de caixa, suporte IPCA no motor de rendimento, cotações manuais com fonte e timestamp como base de valuation, importação revisável, relatórios completos, metas e simulador.
-- **Pós-lançamento anteriormente proposto e preservado:** importação CSV, integração bancária, conciliação automatizada e reconstrução somente a partir de documentos existentes. Integração bancária permanece opcional e não pode exigir serviço pago.
+- **Ainda não entregue ou incompleto:** contas/corretoras, edição transacional geral de operações, saldo de caixa conciliado, suporte IPCA no motor de rendimento, cotações manuais com fonte e timestamp como base de valuation, relatórios completos, metas e simulador.
+- **Retirado ou suspenso:** importação CSV e adaptadores bancários estão fora do escopo atual. Integração bancária e conciliação automatizada não devem ser iniciadas sem nova decisão.
 - **Fase de medição original:** snapshots patrimoniais, fluxos externos separados de negociações e benchmarks oficiais. Continua dependente dos itens da 5.1 e da 4.4.
 - **Fase de uso remoto original:** parte da base técnica já existe, mas não substitui o planejamento de onboarding, operação, recuperação, privacidade e controles para convidados.
 
@@ -87,20 +87,20 @@ Critérios e processo: [critérios de release pessoal](personal-dashboard-releas
 
 ## v5.0.0 — planejamento, dados e relatórios
 
-A **5.0A — Navegação responsiva e identidade dinâmica** está concluída, conforme [plano 5.0A](phase-5.0A-responsive-navigation-user-identity.md). A 5.1 está implementada e validada localmente. A 5.2A entrega importação genérica transacional apenas dos eventos 5.1; adaptadores de instituições (5.2B) aguardam layouts anonimizados verificados. A Fase 5.0 do app mantém placeholders de **Simulador** e **Metas**. As etapas seguintes continuam condicionais aos critérios, dependências e decisões descritos no [plano mestre v5](phase-5-master-plan.md).
+A **5.0A — Navegação responsiva e identidade dinâmica** está concluída, conforme [plano 5.0A](phase-5.0A-responsive-navigation-user-identity.md). A 5.1 está implementada. A importação 5.2A foi retirada e 5.2B está suspensa. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção e que as tabelas de eventos existem; esta atualização não acessou nem modificou esse banco. O app mantém placeholders de **Simulador** e **Metas**. As etapas seguintes continuam sujeitas aos critérios, dependências e decisões descritos no [plano mestre v5](phase-5-master-plan.md).
 
 | Fase proposta | Conteúdo | Prioridade / dependências |
 |---|---|---|
 | 5.0A — Navegação e identidade | Sidebar responsiva/acessível; nome e avatar derivados da sessão autenticada; fronteira demo/privado mantida. | Concluída em branch específica; sem migration e sem custo obrigatório. |
-| 5.1 — Eventos e fluxo de caixa | Aportes/retiradas externas, dividendos/JCP e observações societárias com origem declarada; revisão append-only. | Implementada e validada localmente; migration 009 ainda não aplicada a banco persistente. Detalhes em [plano 5.1](phase-5.1-cash-flow-and-income-events.md). |
-| 5.2A — Importação genérica de eventos | Prévia, mapeamento manual, validação, detecção de duplicatas e lote transacional para eventos 5.1. | Implementada e validada localmente: 377 testes backend, 182 frontend, build e PostgreSQL descartável. Sem migration. Não importa operações de ativos. |
-| 5.2B — Adaptadores bancários | Parsers puros que convertem layouts comprovados para o formato interno 5.2A. | Preparação documentada; bloqueada até receber fixture anonimizada e semântica verificada. Nenhuma instituição é declarada compatível. |
+| 5.1 — Eventos e fluxo de caixa | Aportes/retiradas externas, dividendos/JCP e observações societárias com origem declarada; revisão append-only. | Implementada. O proprietário informa migration 009 aplicada à produção; sem verificação independente nesta alteração. Detalhes em [plano 5.1](phase-5.1-cash-flow-and-income-events.md). |
+| 5.2 — Importação CSV | Entrada CSV de eventos financeiros. | Retirada por decisão do proprietário; cadastro manual e Histórico preservados. Sem remoção de dados/tabelas e sem downgrade da 009. |
+| 5.2B — Adaptadores bancários | Parsers para layouts de instituições. | Suspensa com a retirada da importação; requer nova decisão antes de retomar. |
 | 5.3 — Relatórios e exportação | Relatório de operações/posições e exportações consistentes com o filtro e o proprietário. | Exportação JSON atual não equivale a relatórios completos. |
 | 5.4 — Simulador | Aportes hipotéticos, taxas, prazo e reinvestimento como cenários editáveis. | Escopo original e placeholder; não requer histórico real se as hipóteses forem explícitas. |
 | 5.5 — Metas | Patrimônio-alvo, prazo, progresso e projeção com base claramente identificada. | Escopo original e placeholder; depende da definição da base do progresso. |
 | 5.6 — Histórico de carteira e benchmarks | TWR/MWR e comparação com benchmarks somente após entradas e avaliações suficientes. | Condicional, possivelmente com persistência nova; fornecedor continua sujeito à regra gratuita. |
 
-**Opcionais preservados:** conexões bancárias/Open Finance, integração automática com corretores, suporte a outros formatos de importação, conciliação e fontes comerciais. São propostas condicionais; devem ter substituto manual/CSV gratuito e não podem ser requisitos do produto.
+**Opcionais preservados:** conexões bancárias/Open Finance, integração automática com corretores, conciliação e fontes comerciais. São propostas condicionais, exigem nova avaliação e não podem ser requisitos do produto.
 
 ## Conclusão do dashboard pessoal e transição
 
@@ -119,7 +119,6 @@ A expansão para convidados só deve começar após backup/restauração ensaiad
 | Comparação/histórico de ações real | Fonte diária gratuita, licença, cobertura B3 e base de preços validadas. |
 | Simulador | Premissas editáveis, fórmulas testadas e apresentação como cenário, não previsão. |
 | Metas | Definição de “patrimônio atual” e método de progresso; sem isso, explicar indisponibilidade. |
-| Importação segura | Formato mapeado, prévia, idempotência/dedupe e preservação de eventos originais. |
 | Multiusuário | Conta e convite, autorização, isolamento, suporte, privacidade, limites, backup e observabilidade. |
 
 ## Estimativas e prioridades
@@ -130,8 +129,8 @@ Premissa: uma pessoa desenvolvedora, dias de trabalho focado, dependências loca
 |---|---:|---:|---|
 | 4.3A | Alta para v4 | 5–8 dias | Corrigir precisão somente se testes mostrarem perda material. |
 | Verificação e release v4 | Alta | 2–4 dias | Confirmações manuais dos ambientes e rollback. |
-| 5.1 | Concluída localmente | — | Migration 009 testada somente em PostgreSQL descartável; sem backfill. |
-| Primeiro formato 5.2 | Aguardando insumo | 7–14 dias após definição | Requer instituição escolhida e fixture CSV anonimizada. |
+| 5.1 | Implementada | — | Proprietário informa migration 009 aplicada à produção; não verificada nesta alteração. Sem backfill. |
+| 5.2 | Retirada | — | Importação CSV removida; adaptadores suspensos. |
 | 5.3 | Média | 5–10 dias | Formatos e filtros. |
 | 5.4 e 5.5 | Média | 8–15 dias somadas | Persistir simulações/metas exigiria schema; apenas cenário temporário talvez não. |
 | 5.6 | Condicional | 10–20+ dias de desenvolvimento | Fonte permitida e série histórica; aprovação externa sem prazo. |

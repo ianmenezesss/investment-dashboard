@@ -6,7 +6,7 @@
 
 - Não ativar cobrança automática, plano pago, API premium ou serviço comercial sem decisão explícita.
 - Priorizar hospedagem/banco/Auth gratuitos quando os limites e termos forem adequados.
-- Preferir bibliotecas open source e operações manuais/CSV.
+- Preferir bibliotecas open source e operações financeiras manuais; a importação CSV foi retirada do produto.
 - Uma função que exceda uma quota deve parar com estado claro, limitar consulta ou oferecer processo manual; não contornar quota por scraping.
 - O produto essencial deve continuar acessível ou local mesmo que a integração opcional fique desabilitada.
 - Não há intenção de assinatura ou monetização.
@@ -21,7 +21,7 @@
 | Auth | Supabase Auth gratuito enquanto os limites e termos servirem. | Acesso privado local autorizado; não retirar autenticação de produção. |
 | Dados de mercado | Somente fonte gratuita, permitida, licenciável e com dados válidos. | Flag false, estado unavailable, cotação manual com origem/data se houver fluxo aprovado. |
 | Renda fixa | BCB/SGS público existente e cache/backoff, respeitando qualidade e calendário. | Estimar null/indisponível quando taxas não estiverem completas; registro manual. |
-| Importação | CSV local processado no navegador/API privada sem enviar a terceiros. | Digitação manual revisável. |
+| Registro financeiro | Cadastro manual autenticado, com proprietário e RLS. | O cadastro manual continua disponível; não há importador CSV. |
 | Dependências | Pacotes open source e lockfiles versionados. | Remover/disable optional feature se manutenção/risco superar benefício. |
 
 Os itens acima são preferências arquiteturais, não confirmação de preço atual, plano contratado ou configuração em Render/Vercel/Supabase. Limites e termos são variáveis no tempo e precisam de conferência em fonte oficial antes de habilitar.
