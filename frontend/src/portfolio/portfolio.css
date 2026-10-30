@@ -16,6 +16,9 @@
 .portfolio-composition-charts{grid-template-columns:minmax(0,1fr)}
 .portfolio-asset-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .portfolio-basis-chart{grid-column:1/-1}
-.composition-panel{grid-column:1/-1;grid-row:3}
-.financial-event-insights{grid-column:1/-1;grid-row:4}
+.portfolio-performance-result{grid-column:1/-1;grid-row:1}
+.portfolio-insights>.evolution{grid-column:1;grid-row:2}
+.composition-panel{grid-column:2;grid-row:2}
+.financial-event-insights{grid-column:1/-1;grid-row:3}
+@media(max-width:950px){.portfolio-performance-result,.portfolio-insights>.evolution,.composition-panel,.financial-event-insights{grid-column:1;grid-row:auto}}
 @media(max-width:600px){.portfolio-asset-charts{grid-template-columns:minmax(0,1fr)}}
