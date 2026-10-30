@@ -1,6 +1,6 @@
 # Handoff de desenvolvimento — Investment Dashboard v5.0.0
 
-**Atualizado em:** 29/10/2026. Branch `feat/v5-development`. 5.0A e 5.1 implementadas; 5.2A (importação CSV) retirada por decisão do proprietário e 5.2B suspensa. Esta etapa preserva cadastro manual, Histórico e dados existentes, ajusta os gráficos de composição e não altera o banco. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção; não houve verificação independente nesta etapa. O commit desta etapa não autoriza merge ou deploy.
+**Atualizado em:** 30/10/2026. Branch `feat/v5.3-reports`, baseada no HEAD atual `feat/v5-development`. Fases 5.0A, 5.1, 5.3A–C e 5.4 implementadas localmente. 5.2A (importação CSV) retirada por decisão do proprietário e 5.2B suspensa. Relatórios e simulador preservam o fluxo manual, Histórico e dados existentes; sem alteração no banco. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção; não houve verificação independente nesta etapa. Não houve push, merge ou deploy.
 
 ## Estado de partida
 
@@ -9,10 +9,14 @@
 - 4.1 e 4.2 têm contratos privados, interfaces e testes, mas dados históricos reais seguem indisponíveis: não há provedor aprovado e as flags ficam false.
 - 4.3A entrega `GET /api/dashboard/performance` e resumo atual em `PortfolioInsights`, usando o ledger/serviços financeiros existentes. Sem migration.
 - 4.4 está corretamente bloqueada, sem série de patrimônio inventada, enquanto faltam fluxos externos, eventos/proventos e avaliações históricas compatíveis.
-- `/simulador` e `/metas` continuam placeholders; permanecem identificados como funcionalidades planejadas da Fase 5.
+- `/simulador` é ferramenta local efêmera de hipóteses, sem API, persistência ou acesso à carteira; `/metas` permanece placeholder.
 - Fase 5.1: eventos manuais privados de aporte/retirada externa, dividendos/JCP e observação societária; histórico unificado e totais de caixa/proventos; `REPLACE`/`VOID` append-only e auditáveis. Especificação: [Fase 5.1](phase-5.1-cash-flow-and-income-events.md).
 - Migration `009_financial_events.py` cria as tabelas append-only de eventos. O proprietário informa que foi aplicada ao Supabase de produção e que as tabelas existem; a execução desta etapa não acessou nem alterou o banco. Não reverter 009 nem apagar tabelas/dados.
-- Importação CSV 5.2A removida da UI, do cliente e da API; o endpoint em lote não está disponível. O registro histórico está em [documentação 5.2](phase-5.2-csv-import.md). Adaptadores 5.2B suspensos. 5.3–5.5 ainda não foram iniciadas; 5.6 continua condicionada aos dados/fonte previstos em 4.4.
+- Importação CSV 5.2A removida da UI, do cliente e da API; o endpoint em lote não está disponível. O registro histórico está em [documentação 5.2](phase-5.2-csv-import.md). Adaptadores 5.2B suspensos.
+- 5.3A–C oferece aportes agrupados por mês/ano, distribuição por classe/ativo, tabela de movimentos/eventos com filtros e impressão do relatório filtrado para PDF via navegador. Reusa endpoints autenticados existentes, sem API ou migration nova.
+- 5.4 oferece cenários conservador/moderado/otimista com taxa editável, aporte inicial/mensal, prazo, timing início/fim do mês, inflação opcional e valores nominais/reais. Fórmula efetiva mensal, Decimal, sem dependência externa e sem persistência.
+- Validação atual: frontend **196 testes/24 arquivos** e build aprovados; backend **374 aprovados, 1 ignorado**. O ignorado é a integração PostgreSQL opcional sem `TEST_DATABASE_URL`; não houve teste persistente de banco nem acesso a produção. Detalhes em [validação](validation.md).
+- Demonstração pública continua sem acesso ao relatório privado; o simulador é independente e funciona sem serviços externos.
 - Nesta etapa: distribuição lado a lado dos dois gráficos de composição, com empilhamento em telas estreitas; sem alteração de dados ou cálculos.
 - Estado de validação local e ressalvas operacionais estão em [revisão final da v4](phase-4.0-final-review.md).
 
@@ -30,9 +34,9 @@
 
 1. **5.1 — Eventos e fluxo de caixa:** concluída localmente; critérios, contrato, limitações e testes estão em [documentação da Fase 5.1](phase-5.1-cash-flow-and-income-events.md).
 2. **5.2 — Importação:** retirada; adaptadores suspensos até nova decisão.
-3. **5.3 — Relatórios:** opção seguinte recomendada; definir escopo e filtros sem confundir export JSON existente com relatório completo.
-4. **5.4 — Simulador:** pode ser protótipo local sem persistência se premissas forem editáveis e cada saída for rotulada cenário hipotético, nunca previsão. O placeholder atual deve continuar honesto até aprovação do escopo.
-5. **5.5 — Metas:** determinar primeiro a base “patrimônio atual”; permitir entrada manual confirmada ou indisponibilidade quando essa base não puder ser consolidada.
+3. **5.3 — Relatórios:** implementada. Manter rótulos de cobertura, bases e período/filtros explícitos; PDF usa impressão nativa.
+4. **5.4 — Simulador:** implementada localmente; não conectar à carteira nem promover premissas a previsão. Testes cobrem casos extremos e cálculo real/nominal.
+5. **5.5 — Metas:** próxima proposta; determinar primeiro a base “patrimônio atual”; permitir entrada manual confirmada ou indisponibilidade quando essa base não puder ser consolidada.
 6. **5.6 — Rentabilidade histórica/benchmarks:** condicional a 4.4, eventos 5.1, snapshots/valores datados e fonte permitida. Não ativar por antecipação.
 
 O plano aprovado em [`phase-5-master-plan.md`](phase-5-master-plan.md) continua como fonte da sequência e escopo. O [`multiuser-expansion-plan.md`](multiuser-expansion-plan.md) é uma proposta separada e posterior à estabilidade pessoal; não o substituir por este handoff.
