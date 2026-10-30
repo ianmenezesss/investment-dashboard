@@ -62,3 +62,34 @@ test('shows explicit empty and error states', async () => {
   await render({ movements: async () => ({ unexpected: true } as unknown as UnifiedMovement[]) })
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('Não foi possível carregar o histórico')
 })
+
+test('includes observed cash and income events in class and asset filters', async () => {
+  const events: UnifiedMovement[] = [
+    { id: 'event:1', date: '2025-01-05', investment_class: 'FLUXO DE CAIXA', asset: 'Carteira', operation: 'CONTRIBUTION', quantity: null, unit_price: null, financial_value: '100.25', fees: null, cash_received: null, source: 'Extrato' },
+    { id: 'event:2', date: '2025-01-06', investment_class: 'PROVENTOS', asset: 'ITUB4', operation: 'DIVIDEND', quantity: null, unit_price: null, financial_value: '8.00', fees: null, cash_received: null, source: 'Informe', gross_amount: '8.00', tax_withheld: '0.00' },
+    { id: 'event:3', date: '2025-01-07', investment_class: 'EVENTO SOCIETÁRIO', asset: 'BBAS3', operation: 'CORPORATE_ACTION', quantity: null, unit_price: null, financial_value: null, fees: null, cash_received: null, source: 'Documento', description: 'Observação apenas' },
+  ]
+  await render({ movements: async () => events })
+  expect(host.textContent).toContain('Aporte externo')
+  expect(host.textContent).toContain('Dividendo')
+  expect(host.textContent).toContain('Documento')
+  await act(async () => {
+    const select = host.querySelector('[aria-label="Filtrar por classe"]') as HTMLSelectElement
+    select.value = 'PROVENTOS'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await act(async () => { await pause() })
+  expect(host.querySelectorAll('tbody tr')).toHaveLength(1)
+  expect(host.querySelector('tbody')?.textContent).toContain('ITUB4')
+  expect((host.querySelector('tbody')?.textContent ?? '').replace(/\u00a0/g, ' ')).toContain('R$ 8,00')
+})
+
+test('formats large financial decimals without converting the source string to binary floating point', async () => {
+  const precise: UnifiedMovement[] = [{
+    id: 'event:20', date: '2025-02-01', investment_class: 'FLUXO DE CAIXA', asset: 'Carteira', operation: 'CONTRIBUTION',
+    quantity: null, unit_price: null, financial_value: '123456789012.34567891', fees: null, cash_received: null,
+  }]
+  await render({ movements: async () => precise })
+  const rendered = (host.querySelector('tbody')?.textContent ?? '').replace(/\u00a0/g, ' ')
+  expect(rendered).toContain('R$ 123.456.789.012,35')
+})

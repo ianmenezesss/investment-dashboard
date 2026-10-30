@@ -4,6 +4,7 @@ from sqlalchemy import create_engine, text
 from app import models
 from app.fixed_income import models as fixed_income_models
 from app.fixed_income import observations
+from app import financial_events
 
 migration_engine = create_engine(settings.migration_database_url.get_secret_value(), hide_parameters=True, connect_args={"connect_timeout": 5}) if settings.migration_database_url.get_secret_value() else engine
 with migration_engine.connect() as connection:

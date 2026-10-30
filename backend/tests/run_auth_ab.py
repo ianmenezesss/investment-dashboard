@@ -124,8 +124,8 @@ def main():
             conn.execute("GRANT SELECT, INSERT, DELETE ON public.operations TO investment_runtime")
             conn.execute("GRANT USAGE ON SEQUENCE public.operations_id_seq TO investment_runtime")
             version = conn.execute("SELECT version_num FROM public.alembic_version").fetchone()[0]
-            if version != "008":
-                raise RuntimeError("Schema descartável não chegou à migration 008")
+            if version != "009":
+                raise RuntimeError("Schema descartável não chegou à migration 009")
         # Import only after the local runtime URL and genuine Auth settings are installed.
         os.environ.update({k: env[k] for k in ("ENVIRONMENT", "AUTH_MODE", "SUPABASE_URL",
                             "ALLOWED_USER_IDS", "MARKET_DATA_ENABLED", "CORS_ORIGIN")})
@@ -187,7 +187,7 @@ def main():
             if any(item["id"] == ia for item in client.get("/api/fixed-income/investments", headers=headers_b).json()):
                 raise RuntimeError("A listagem de B mostrou contrato de A")
             print("CROSS_OWNER_LISTS=PASS")
-        print("AUTH_AB_ISOLATION=PASS; postgres=disposable; alembic=008; auth=real_JWT")
+        print("AUTH_AB_ISOLATION=PASS; postgres=disposable; alembic=009; auth=real_JWT")
         return 0
     finally:
         if container_created:

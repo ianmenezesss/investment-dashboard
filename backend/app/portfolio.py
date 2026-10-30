@@ -14,6 +14,7 @@ from .auth import authenticate
 from .fixed_income.models import Investment, InvestmentArchive, Lot
 from .fixed_income.observations import PositionObservation
 from .fixed_income.projection import effective_movements
+from .financial_events import effective_events
 from .models import Operation
 
 router = APIRouter(prefix="/api/dashboard", tags=["portfolio"])
@@ -191,7 +192,7 @@ def portfolio_composition(db: Session = Depends(private_db)):
 
 @router.get("/movements", dependencies=[Depends(authenticate)])
 def unified_movements(db: Session = Depends(private_db)):
-    """Chronological view of recorded equity trades and effective CDB ledger rows."""
+    """Chronological view of effective trades, CDB movements and observed events."""
     owner = db.info.get("owner_id")
     operations = list(db.scalars(select(Operation).where(Operation.owner_id == owner).order_by(Operation.date, Operation.id)))
     projected = effective_movements(db)
@@ -215,4 +216,18 @@ def unified_movements(db: Session = Depends(private_db)):
         "unit_price": None, "financial_value": str(row.principal_amount),
         "fees": None, "cash_received": str(row.cash_received) if row.cash_received is not None else None,
     } for row in rows)
+    event_classes = {
+        "CONTRIBUTION": "FLUXO DE CAIXA", "WITHDRAWAL": "FLUXO DE CAIXA",
+        "DIVIDEND": "PROVENTOS", "JCP": "PROVENTOS", "CORPORATE_ACTION": "EVENTO SOCIETÁRIO",
+    }
+    for event in effective_events(db, owner):
+        result.append({
+            "id": f"event:{event['id']}", "date": event["event_date"].isoformat(),
+            "investment_class": event_classes[event["kind"]], "asset": event["ticker"] or "Carteira",
+            "operation": event["kind"], "quantity": None, "unit_price": None,
+            "financial_value": str(event["cash_amount"]) if event["cash_amount"] is not None else None,
+            "fees": None, "cash_received": None, "gross_amount": str(event["gross_amount"]) if event["gross_amount"] is not None else None,
+            "tax_withheld": str(event["tax_withheld"]) if event["tax_withheld"] is not None else None,
+            "source": event["source"], "description": event["description"], "revision": event["revision"],
+        })
     return sorted(result, key=lambda item: (item["date"], item["id"]))

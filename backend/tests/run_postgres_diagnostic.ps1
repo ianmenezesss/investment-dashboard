@@ -17,8 +17,8 @@ Start-Transcript -Path $log -Force | Out-Null
 try {
     Write-Host "Workspace: $backend"
     Write-Host "Log completo: $log"
-    Write-Host 'Integração 001–008; hashes das migrations e verificadores em execução:'
-    Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $backend 'migrations/versions/005_archive_empty_fixed_income.py'), (Join-Path $backend 'migrations/versions/006_application_revisions.py'), (Join-Path $backend 'migrations/versions/007_revision_runtime_api.py'), (Join-Path $backend 'migrations/versions/008_archive_runtime_grants.py'), (Join-Path $PSScriptRoot 'test_postgres.py'), (Join-Path $PSScriptRoot 'archive_empty_cdb_postgres.py'), (Join-Path $PSScriptRoot 'application_revisions_postgres.py') | Format-List Path, Hash
+    Write-Host 'Integração 001–009; hashes das migrations e verificadores em execução:'
+    Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $backend 'migrations/versions/005_archive_empty_fixed_income.py'), (Join-Path $backend 'migrations/versions/006_application_revisions.py'), (Join-Path $backend 'migrations/versions/007_revision_runtime_api.py'), (Join-Path $backend 'migrations/versions/008_archive_runtime_grants.py'), (Join-Path $backend 'migrations/versions/009_financial_events.py'), (Join-Path $PSScriptRoot 'test_postgres.py'), (Join-Path $PSScriptRoot 'archive_empty_cdb_postgres.py'), (Join-Path $PSScriptRoot 'application_revisions_postgres.py') | Format-List Path, Hash
     Write-Host 'Verificando Docker Engine e imagem local postgres:17-alpine (sem pull)...'
 
     docker info --format '{{.ServerVersion}}'

@@ -1,6 +1,6 @@
 # Plano mestre — v5.0.0
 
-**Status:** Planejado. Os placeholders de Simulador e Metas no app apontam para a Fase 5; as propostas neste documento não significam que o código exista ou que a implementação esteja autorizada.
+**Status em 29/10/2026:** desenvolvimento local na branch `feat/v5-development`. A 5.0A, 5.1 e 5.2A estão implementadas e validadas localmente; adaptadores bancários 5.2B aguardam amostras verificadas. Ver [documentação 5.2](phase-5.2-csv-import.md) e [preparação 5.2B](phase-5.2b-adapter-readiness.md). Este status não autoriza publicação.
 
 ## Relação com o planejamento original
 
@@ -20,7 +20,7 @@ A arquitetura original reservava uma fase para planejamento: simulador com premi
 
 ### 5.0A — Navegação responsiva e identidade dinâmica
 
-**Prioridade:** etapa inicial de experiência de uso; planejada e não autorizada para implementação.
+**Estado:** concluída na branch dedicada da v5.0A; registrada no handoff existente.
 
 - Em desktop, menu expandido com rótulos e recolhido com ícones, tooltips e nomes acessíveis; preferência local opcional.
 - Em mobile, drawer sobreposto com Escape, fechamento ao navegar, foco contido/devolvido e fundo inerte enquanto aberto.
@@ -32,27 +32,29 @@ A arquitetura original reservava uma fase para planejamento: simulador com premi
 
 ### 5.1 — Caixa, proventos e eventos financeiros
 
-**Prioridade:** alta para medição completa; proposta nova no detalhe de implementação, alinhada às lacunas antigas.
+**Prioridade:** alta para medição completa. **Estado:** implementada localmente; especificação em [plano 5.1](phase-5.1-cash-flow-and-income-events.md). A migration 009 ainda não foi aplicada a banco persistente.
 
 - Definir depósitos e saques externos, distinguindo compra/venda e aplicação/resgate.
-- Estudar proventos de ações (dividendos/JCP), reinvestimento e eventos corporativos com fonte declarada e correção auditável.
+- Proventos de ações (dividendos/JCP), reinvestimento e observações de eventos corporativos usam origem declarada e revisão auditável. Observações corporativas não alteram posição ou custo.
 - Permitir lançamentos manuais observados; não criar eventos históricos retroativos.
 - Evitar dupla contagem de transferências entre classes.
 - Contrato append-only, idempotência, owner_id e RLS.
 - **Visível:** histórico classificado e novos totais de caixa/proventos.
-- **Migration:** provável para novas entidades/tipos; não alterar o ledger atual sem compatibilidade de leitura/revisões.
-- **Aceite:** reconciliação financeira conhecida, períodos e taxas, REPLACE/VOID compatíveis, isolamento por usuário, importação não executa sem confirmação.
+- **Migration:** 009 cria entidades append-only, RLS/FORCE RLS, triggers e grants mínimos; sem backfill de operações antigas.
+- **Aceite validado:** valores `Decimal`, períodos, idempotência, REPLACE/VOID, isolamento de proprietário, histórico unificado e testes de PostgreSQL descartável. Tarifas de transferência e eventos societários quantitativos seguem fora do escopo.
 
 ### 5.2 — Importação CSV revisável
 
 **Prioridade:** alta para preservar histórico sem digitação repetida; item já planejado em roadmap anterior.
 
-- Começar com um layout de instituição/corretora por vez.
-- Upload local e processamento seguro; não enviar CSV a terceiros.
-- Prévia antes de persistir, validação de data/ticker/quantidade/preço/taxa, regras de moeda, detecção de duplicatas e relatório de rejeições.
-- Permitir mapear para eventos de 5.1; não interpretar campos desconhecidos como preço ou rendimento.
-- **Migration:** talvez para batches/idempotência/auditoria de importação; decidir por arquitetura. Evitar guardar arquivo bruto após processar sem necessidade.
-- **Aceite:** fixture anonimizada, reexecução idempotente, validação manual, cancelamento sem gravação, segurança de upload e testes por formato.
+**Estado:** 5.2A implementada para importação genérica dos eventos 5.1; adaptadores específicos continuam bloqueados por falta de fixture real anonimizada e semântica de campos verificada.
+
+- A 5.2A aceita somente data, tipo, valor em caixa e ticker para eventos 5.1; não importa trades, quantidades, preços, taxas, moedas ou eventos societários quantitativos.
+- Upload local, mapeamento manual, prévia, validação, cancelamento e confirmação explícita. O arquivo não é armazenado nem enviado a terceiros.
+- Endpoint privado em lote valida até 500 linhas, usa transação e rollback, idempotência de lote/linha, detecção de duplicatas e relatório de importadas/duplicadas; inválidas permanecem na prévia local.
+- Sem migration: as chaves usam o request ID idempotente já existente no ledger 5.1.
+- 5.2B: antes de qualquer adaptador, registrar fixture anonimizada, dicionário de campos, exemplos de estados/estornos, regras de sinal/data/moeda e identificadores estáveis. Não afirmar suporte bancário sem validação.
+- **Aceite técnico 5.2A:** testes de lote atômico, idempotência, duplicatas, validação, preview/cancel, autorização e isolamento; suíte completa e PostgreSQL descartável.
 
 ### 5.3 — Relatórios e exportação
 

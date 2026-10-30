@@ -1,8 +1,10 @@
 """Opt-in: exige banco PostgreSQL dedicado, vazio e descartável."""
 import os
+from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from alembic import command
 from alembic.config import Config
@@ -50,7 +52,7 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
           ('fixed_income_investments','fixed_income_lots','fixed_income_movements')}
     command.upgrade(Config("alembic.ini"), "head")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "008"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "009"
     with engine.connect() as connection:
         for table, rows in original.items():
             assert list(connection.execute(text(f'SELECT * FROM {table} ORDER BY id'))) == rows
@@ -153,6 +155,87 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
             assert history_b.status_code == 200
             assert {holding["ticker"] for point in history_b.json()["points"]
                     for holding in point["holdings"]} == {"PETR4"}
+
+            # New private cash/income events retain owner isolation and append-only writes.
+            app.dependency_overrides[authenticate] = lambda: Principal(a)
+            event_a = client.post("/api/financial-events", headers={"Idempotency-Key": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}, json={
+                "kind": "CONTRIBUTION", "event_date": "2026-01-03", "cash_amount": "125.25000001", "source": "Fixture PostgreSQL",
+            })
+            assert event_a.status_code == 201, event_a.text
+            app.dependency_overrides[authenticate] = lambda: Principal(b)
+            event_b = client.post("/api/financial-events", headers={"Idempotency-Key": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"}, json={
+                "kind": "DIVIDEND", "event_date": "2026-01-04", "ticker": "PETR4", "cash_amount": "8.75", "source": "Fixture PostgreSQL",
+            })
+            assert event_b.status_code == 201, event_b.text
+            app.dependency_overrides[authenticate] = lambda: Principal(a)
+            replace_a = client.post(f"/api/financial-events/{event_a.json()['id']}/revisions", headers={"Idempotency-Key": "cccccccc-cccc-4ccc-8ccc-cccccccccccc"}, json={
+                "kind": "REPLACE", "expected_revision": 0, "reason": "Valor conferido na fixture",
+                "replacement": {"kind": "CONTRIBUTION", "event_date": "2026-01-05", "cash_amount": "130.00000003", "source": "Fixture PostgreSQL revisada"},
+            })
+            assert replace_a.status_code == 201, replace_a.text
+            assert Decimal(client.get("/api/dashboard/financial-events/summary").json()["contributions"]) == Decimal("130.00000003")
+            app.dependency_overrides[authenticate] = lambda: Principal(b)
+            void_b = client.post(f"/api/financial-events/{event_b.json()['id']}/revisions", headers={"Idempotency-Key": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"}, json={
+                "kind": "VOID", "expected_revision": 0, "reason": "Fixture de duplicidade",
+            })
+            assert void_b.status_code == 201, void_b.text
+            assert client.get("/api/financial-events").json() == []
+            assert client.get(f"/api/financial-events/{event_a.json()['id']}/revisions").status_code == 404
+            with pytest.raises(IntegrityError):
+                with engine.begin() as connection:
+                    connection.execute(text("""INSERT INTO financial_events
+                      (owner_id,request_id,kind,event_date,cash_amount,source)
+                      VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                        'dddddddd-dddd-4ddd-8ddd-dddddddddddd','CONTRIBUTION','2026-01-06',NULL,'Invalid fixture')"""))
+            app.dependency_overrides[authenticate] = lambda: Principal(a)
+            assert [row["id"] for row in client.get("/api/financial-events").json()] == [event_a.json()["id"]]
+            assert Decimal(client.get("/api/dashboard/financial-events/summary").json()["contributions"]) == Decimal("130.00000003")
+
+            # CSV batch uses the same owner/RLS boundary and is atomic/idempotent.
+            batch_key = "ffffffff-ffff-4fff-8fff-ffffffffffff"
+            batch_rows = {"rows": [
+                {"row_number": 2, "event": {"kind": "CONTRIBUTION", "event_date": "2026-01-07", "cash_amount": "42.125", "source": "CSV PostgreSQL fixture"}},
+                {"row_number": 3, "event": {"kind": "CONTRIBUTION", "event_date": "2026-01-07", "cash_amount": "42.125", "source": "CSV PostgreSQL fixture"}},
+            ]}
+            batch_a = client.post("/api/financial-events/import", headers={"Idempotency-Key": batch_key}, json=batch_rows)
+            assert batch_a.status_code == 201, batch_a.text
+            assert (batch_a.json()["imported_count"], batch_a.json()["duplicate_count"]) == (1, 1)
+            replay_a = client.post("/api/financial-events/import", headers={"Idempotency-Key": batch_key}, json=batch_rows)
+            assert replay_a.status_code == 200
+            assert (replay_a.json()["imported_count"], replay_a.json()["duplicate_count"]) == (0, 2)
+            assert Decimal(client.get("/api/dashboard/financial-events/summary").json()["contributions"]) == Decimal("172.12500003")
+
+            concurrent_body = {"rows": [{"row_number": 2, "event": {
+                "kind": "CONTRIBUTION", "event_date": "2026-01-08", "cash_amount": "19.50", "source": "Concurrent CSV fixture",
+            }}]}
+            def concurrent_import(key):
+                return client.post("/api/financial-events/import", headers={"Idempotency-Key": key}, json=concurrent_body)
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                responses = list(pool.map(concurrent_import, (
+                    "13131313-1313-4313-8313-131313131313", "14141414-1414-4414-8414-141414141414",
+                )))
+            assert all(result.status_code in (200, 201) for result in responses)
+            assert sorted(result.json()["imported_count"] for result in responses) == [0, 1]
+            assert len(client.get("/api/financial-events").json()) == 3
+
+            # A matching financial fact in another owner remains independent.
+            app.dependency_overrides[authenticate] = lambda: Principal(b)
+            batch_b = client.post("/api/financial-events/import", headers={"Idempotency-Key": "12121212-1212-4212-8212-121212121212"}, json={
+                "rows": [{"row_number": 2, "event": {"kind": "CONTRIBUTION", "event_date": "2026-01-07", "cash_amount": "42.125", "source": "CSV PostgreSQL fixture"}}],
+            })
+            assert batch_b.status_code == 201, batch_b.text
+            assert batch_b.json()["imported_count"] == 1
+            app.dependency_overrides[authenticate] = lambda: Principal(a)
+            assert len(client.get("/api/financial-events").json()) == 3
+            with runtime_engine.begin() as connection:
+                assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.financial_events','UPDATE')"))
+                assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.financial_events','DELETE')"))
+                assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.financial_event_revisions','UPDATE')"))
+                assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.financial_event_revisions','DELETE')"))
+                connection.execute(text("SELECT set_config('app.user_id', '', true), set_config('app.auth_mode', 'supabase', true)"))
+                assert connection.scalar(text("SELECT count(*) FROM public.financial_events")) == 0
+            with engine.begin() as connection:
+                connection.execute(text("GRANT SELECT ON public.financial_events, public.financial_event_revisions TO investment_test_runtime"))
             runtime_engine.dispose()
     finally:
         app.dependency_overrides.clear()
