@@ -1,4 +1,4 @@
-import { ChartNoAxesCombined, ChevronRight, Flag, FlaskConical, History, Landmark, LayoutDashboard, Menu, ShieldCheck } from 'lucide-react'
+import { ChartNoAxesCombined, ChevronRight, Flag, FlaskConical, History, Landmark, LayoutDashboard, Menu, ShieldCheck, FileText } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 export const workspaceNavItems = [
@@ -6,6 +6,7 @@ export const workspaceNavItems = [
   { to: '/acoes', label: 'Ações', icon: ChartNoAxesCombined },
   { to: '/cdbs', label: 'Renda fixa', icon: Landmark },
   { to: '/historico', label: 'Histórico', icon: History },
+  { to: '/relatorios', label: 'Relatórios', icon: FileText },
   { to: '/simulador', label: 'Simulador', icon: FlaskConical },
   { to: '/metas', label: 'Metas', icon: Flag },
 ] as const
