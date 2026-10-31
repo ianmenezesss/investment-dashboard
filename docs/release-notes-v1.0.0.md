@@ -1,6 +1,6 @@
-# Investment Dashboard v1.0.0 — notas de lançamento (rascunho)
+# Investment Dashboard v1.0.0 — notas de lançamento
 
-> Rascunho local para revisão. A tag e a GitHub Release ainda não foram criadas.
+> Registro das notas da versão publicada. As validações abaixo descrevem a evidência registrada para o candidato v1.0.0; o hotfix v1.0.1 está no `CHANGELOG.md`. O status atual dos painéis Vercel/Render não foi revalidado nesta atualização.
 
 O Investment Dashboard v1.0.0 reúne acompanhamento manual de investimentos em ações e renda fixa em português, com uma demonstração pública baseada em dados fictícios e uma área privada autenticada.
 

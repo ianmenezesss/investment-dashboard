@@ -1,6 +1,13 @@
 # Validação do Investment Dashboard
 
-## Finalização v1.0.0 — 30/10/2026
+## Hotfix v1.0.1 — 31/10/2026
+
+- O runner `backend/tests/run_postgres.py` foi corrigido para resolver `scripts.backup_archive` a partir do caminho absoluto do backend, mesmo quando iniciado de outro diretório. O teste de regressão exercita CWD arbitrário para evitar dependência do shell/CWD e dá suporte à execução em Windows e Linux.
+- A suíte backend após a correção foi registrada com **383 aprovados e 1 ignorado**; o ignorado continua sendo a integração PostgreSQL opt-in na suíte geral. A integração completa usa o runner descartável e deve ser avaliada pelo status do workflow que a invoca; esse status não foi revalidado nesta atualização.
+- Nenhuma migration, aplicação, configuração ou dado de produção foi alterado. A correção está no commit `329ba67`; tag remota `v1.0.1` observada nesse mesmo commit, sem reescrita da tag `v1.0.0`.
+- Esta entrada substitui os estados Git anteriores descritos nos snapshots abaixo apenas para o estado atual do commit. As execuções e contagens das fases/releases antigas continuam como registros históricos.
+
+## Finalização v1.0.0 — snapshot da preparação em 30/10/2026
 
 - Git: após `git fetch origin`, `main` e `origin/main` permanecem em `1a7e4d8`. `chore/v1-release-readiness` deriva dessa base, sem divergência remota. A preparação local não foi integrada remotamente; não houve push, merge, tag, GitHub Release ou deploy.
 - Backup real existente: o arquivo fora do repositório mede **101085 bytes** e seu SHA-256 coincide com o valor registrado pelo proprietário. Nenhum novo backup foi criado. Não houve nova conexão à produção. A descriptografia/restauração deste artefato não foi executada porque a autorização específica para informar a frase localmente não foi dada; o ensaio com fixtures sintéticas segue aprovado.
@@ -13,7 +20,7 @@
 
 ## Snapshot inicial da preparação v1.0 — 30/10/2026 (histórico anterior ao backup real)
 
-## Preparação de lançamento v1.0 — 30/10/2026
+## Preparação de lançamento v1.0 — registro histórico de 30/10/2026
 
 - Git: `main` confirmada atualizada contra `origin/main` via fetch; ambas em `1a7e4d8` antes da branch `chore/v1-release-readiness`. Árvore iniciou limpa. Nenhuma alteração em produção.
 - Frontend atual: `npm test` — **217 testes em 28 arquivos aprovados**. `npm run build` — aprovado (TypeScript + Vite; 2.380 módulos transformados).

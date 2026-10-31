@@ -1,6 +1,12 @@
 # Changelog
 
-## v1.0.0 — candidata local; release ainda não publicada
+## v1.0.1 — correção do runner de integração PostgreSQL
+
+- Corrigida a resolução de imports do runner `backend/tests/run_postgres.py` em ambientes de CI Linux e execuções iniciadas fora do diretório `backend`, usando o caminho do próprio arquivo como referência.
+- Adicionado teste de regressão para execução a partir de diretório de trabalho arbitrário. Não altera endpoints, cálculos, schema, migrations ou dados.
+- Commit `329ba67` (`fix(ci): resolve backup imports in PostgreSQL runner`); tag remota `v1.0.1` foi observada nesse commit. A verificação mais recente do GitHub Actions e dos SHAs implantados não faz parte desta atualização documental.
+
+## v1.0.0 — publicada
 
 Investment Dashboard reúne controle manual de ações e renda fixa, eventos de caixa/proventos, composição, histórico, relatórios imprimíveis, simulador e metas financeiras locais. A demonstração pública é separada da área privada; a carteira privada usa Supabase Auth, API FastAPI e isolamento por proprietário/RLS.
 
@@ -11,27 +17,27 @@ Investment Dashboard reúne controle manual de ações e renda fixa, eventos de 
 - Simulador local com cenários e hipóteses editáveis; metas financeiras locais por identidade, sem sincronização entre dispositivos.
 - Demonstração com dados fictícios, documentação de segurança e um procedimento de backup manual único.
 
-### Validação desta preparação
+### Validação registrada para o candidato v1.0.0
 
 - Frontend: 217 testes aprovados em 28 arquivos; `npm run build` aprovado (TypeScript + Vite).
 - Dependências frontend: `npm audit` não reportou vulnerabilidades conhecidas.
-- Backend: 382 aprovados, 1 ignorado (integração PostgreSQL opt-in) em Python 3.12 descartável; aviso de depreciação `TestClient`/httpx.
+- Backend: 382 aprovados, 1 ignorado (integração PostgreSQL opt-in) em Python 3.12 descartável; aviso de depreciação `TestClient`/httpx. O hotfix posterior tem sua própria validação em `docs/validation.md`.
 - PostgreSQL 17 descartável: cadeia de migrations até 009 e round-trip sintético de backup/restauração com eventos, políticas/RLS, grants e isolamento aprovados.
 - Backup real: artefato fora do repositório, 101085 bytes; SHA-256 foi recalculado e coincidiu com o registro fornecido pelo proprietário. A restauração desse artefato ainda não foi ensaiada; exige autorização específica para fornecer a frase localmente.
-- Smoke público: Vercel `/`, `/login` e `/metas` responderam HTTP 200 com o shell SPA; Render `/health` respondeu HTTP 200. Não foram autenticadas contas nem confirmados os SHAs implantados.
+- Smoke público daquela preparação: Vercel `/`, `/login` e `/metas` responderam HTTP 200 com o shell SPA; Render `/health` respondeu HTTP 200. Não foram autenticadas contas nem confirmados os SHAs implantados naquela checagem.
 
 ### Limites conhecidos
 
 - A Fase 5.6, retorno histórico completo e benchmarks permanecem fora desta release; não há dados suficientes para calcular TWR/XIRR ou patrimônio histórico completo com confiança.
 - Preços e avaliações podem estar parciais ou indisponíveis; estimativas não são retorno garantido. Metas não são sincronizadas.
 - O backup único cobre o schema `public` exportável; não recupera Supabase Auth, arquivos binários do Storage, roles globais, configurações externas ou alterações posteriores ao dump.
-- A revisão visual desktop/celular, fluxos autenticados de produção e inspeção da CSP/rede da demo ainda requerem homologação manual. Não foi criado tag ou GitHub Release.
+- O proprietário confirmou manualmente login/logout, navegação, áreas principais, demo e layout desktop/celular. Isolamento manual entre duas contas, inspeção detalhada de Network/CSP e restore do arquivo real não foram marcados como concluídos; ver `docs/v1.0-release-readiness.md`.
 
 ## Auditoria inicial de preparação v1.0 — 30/10/2026 (registro histórico)
 
 - Auditoria local confirmou `main`/`origin/main` em `1a7e4d8`; páginas recentes publicadas na Vercel conforme relato do proprietário. Smoke GET: Render `/health` e frontend privado Vercel responderam HTTP 200; autenticação e painel não foram verificados.
 - Frontend: 217 testes em 28 arquivos e build passaram. Backend em Python 3.12/Docker: 374 aprovados, 1 ignorado; teste PostgreSQL 17 descartável com migrations até 009: 1 aprovado.
-- Naquele ponto, README, status de segurança, roadmap, handoff e checklist foram revisados; o backup real ainda não havia sido gerado. O status atual está registrado na entrada candidata v1.0.0 acima e em `docs/validation.md`.
+- Naquele ponto, README, status de segurança, roadmap, handoff e checklist foram revisados; o backup real ainda não havia sido gerado. A entrada é um snapshot histórico, anterior à geração autorizada do backup e às tags v1.0.x; o estado mais recente está no [plano mestre](docs/INVESTMENT_DASHBOARD_MASTER_PLAN.md) e em `docs/validation.md`.
 
 ## Fase 5.5 — integrada à `main`; publicação reportada pelo proprietário
 

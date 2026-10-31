@@ -1,5 +1,7 @@
 # Handoff de desenvolvimento — Investment Dashboard v5.0.0
 
+> **Handoff histórico de 30/10/2026.** O estado Git e a prontidão v1.0 descritos no parágrafo abaixo são snapshots anteriores ao hotfix `329ba67` e à tag remota observada `v1.0.1`. Para continuar o trabalho, use [INVESTMENT_DASHBOARD_MASTER_PLAN.md](INVESTMENT_DASHBOARD_MASTER_PLAN.md), que incorpora a história, o estado atual, os limites de validação e as próximas versões.
+
 **Atualizado em:** 30/10/2026. `main` e `origin/main` estão em `1a7e4d8` e incluem a PR #11 e os três commits da Fase 5.5 (`0cfea4a`, `0ad5194`, `cdd99aa`). A preparação v1.0 está na branch local `chore/v1-release-readiness`, derivada dessa base e ainda sem integração remota. O proprietário relata Histórico, Relatórios, Simulador e Metas publicados na Vercel. GETs públicos desta revisão confirmaram o shell SPA de `/`, `/login` e `/metas` e o health check Render, mas não autenticaram sessões nem identificaram o SHA implantado. O CSP permite conexões ao Supabase e Render; a demo offline não está comprovada nesta revisão. 5.2A (CSV) foi retirada e 5.2B suspensa. O backup manual único foi gerado e seu tamanho/hash conferidos localmente; o restore desse arquivo ainda não foi feito. A Fase 5.6 está fora da v1.0. Ver gates em [v1.0-release-readiness.md](v1.0-release-readiness.md).
 
 ## Estado de partida

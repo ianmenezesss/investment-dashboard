@@ -1,5 +1,7 @@
 # Arquitetura e plano
 
+> Este documento mantém as decisões fundacionais e a arquitetura original. Para o estado atual da v1, história completa e roadmap v1.1/v1.2/v2.0, consulte o [plano mestre](INVESTMENT_DASHBOARD_MASTER_PLAN.md).
+
 Atualização v4.0.0 / Fase 4.3A (29/10/2026): `GET /api/dashboard/performance` é um
 snapshot privado somente de leitura que combina o ledger de ações, fluxos e projeção
 efetiva CDB, composição e avaliação por cotações pontuais. Ele preserva `owner_id`,

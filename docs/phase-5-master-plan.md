@@ -1,5 +1,7 @@
 # Plano mestre — v5.0.0
 
+> **Registro histórico de planejamento.** O cabeçalho abaixo retrata a situação de 30/10/2026, anterior ao commit `329ba67` e às tags v1.0.x. Para estado atual, histórico integral e roadmap v1.1/v1.2/v2.0, consulte [INVESTMENT_DASHBOARD_MASTER_PLAN.md](INVESTMENT_DASHBOARD_MASTER_PLAN.md). Este documento preserva as decisões detalhadas da Fase 5; não é a fonte do estado atual.
+
 **Estado atualizado em 30/10/2026:** `main` e `origin/main` permanecem em `1a7e4d8`, com a Fase 5.5 integrada pela PR #11; esta branch de preparação deriva dessa base e não foi integrada remotamente. O proprietário relata a publicação das páginas recentes, mas a inspeção HTTP confirmou somente shells Vercel e health check Render, não o comportamento autenticado nem os SHAs implantados. 5.0A, 5.1, 5.3, 5.4 e 5.5A–C estão implementadas; 5.2A foi retirada e 5.2B está suspensa. A Fase 5.6 permanece fora da v1.0. O backup manual único foi gerado e seu hash/tamanho conferidos; restauração do arquivo real não foi executada. Esta atualização não acessou novamente nem alterou o banco de produção e não publica a release.
 
 ## Relação com o planejamento original
