@@ -1,5 +1,17 @@
 # Validação do Investment Dashboard
 
+## Preparação de lançamento v1.0 — 30/10/2026
+
+- Git: `main` confirmada atualizada contra `origin/main` via fetch; ambas em `1a7e4d8` antes da branch `chore/v1-release-readiness`. Árvore iniciou limpa. Nenhuma alteração em produção.
+- Frontend atual: `npm test` — **217 testes em 28 arquivos aprovados**. `npm run build` — aprovado (TypeScript + Vite; 2.380 módulos transformados).
+- Backend isolado: suíte completa em container oficial Python 3.12, repositório somente leitura — **374 aprovados, 1 ignorado** e aviso de depreciação `TestClient`/httpx. O ignorado é PostgreSQL opt-in.
+- PostgreSQL descartável: `tests/test_postgres.py` em PostgreSQL 17 de container com rede privada e volume de dados em `tmpfs` — **1 aprovado**, incluindo migrations até 009, persistência, permissões/RLS, eventos financeiros e isolamento. O container e a rede temporários foram removidos ao fim. Nenhuma conexão de produção foi usada.
+- O `.venv` existente continua sem funcionar: aponta para o stub Python da Microsoft Store. Nenhum Python global foi instalado ou alterado; os testes foram contornados com imagem Docker temporária. O daemon Docker local precisou ser acessado com permissão elevada.
+- Smoke tests somente GET: `/health` no domínio Render documentado respondeu **200** e `{"status":"ok"}`; `/`, `/login` e `/metas` no domínio Vercel privado documentado responderam **200** com o shell SPA; a raiz incluiu título da aplicação e CSP privada com origens específicas. Isso não valida o comportamento da rota após executar JavaScript ou autenticar. Não acessei endpoint financeiro nem Supabase; a CSP e a ausência de chamadas privadas na demo pública continuam dependendo da checagem manual.
+- Backup/restore: auditoria estática dos scripts/procedimentos confirma que o backup de produção é explícito, `pg_dump` read-only, TLS com verificação e grava artefatos em diretório privado; restore de validação usa container isolado sem rede e mount do dump somente leitura, omitindo owner/ACL e conferindo catálogo/estrutura. **O ensaio completo de backup/restore não foi executado nesta preparação**: o runner PowerShell requer Python Windows funcional e diretório controlado `E:\InvestmentDashboard\temp`. `test_postgres.py` cobre migrations/persistência/RLS, não substitui o restore completo. Retenção/agenda de backups gerenciados Supabase não foi verificada no painel.
+- Revisão de mensagens/cálculos: não encontrei erro financeiro comprovado para corrigir. Implementações distinguem custo, principal, fluxo e valuation; resultados realizados são antes de impostos, valuation é dependente de cobertura e não há retorno total histórico consolidado. O Histórico de ações existente é série parcial por ativo; não representa valuation histórico completo da carteira.
+- Mudanças desta etapa são documentais (README, auditoria de segurança, roadmap, handoff, validação e checklist). Nenhum backend, frontend funcional, schema ou migration foi alterado.
+
 ## Fase 5.5 — Metas financeiras — 30/10/2026
 
 - Frontend completo: **217 testes aprovados em 28 arquivos** (`npm test`). Abrange criação/edição/exclusão, validações, identidade local, isolamento da demo, formato local anterior 5.5A, progresso manual/investido, cobertura parcial/indisponível, taxas, metas concluídas/vencidas/sem prazo e limites de projeção.
