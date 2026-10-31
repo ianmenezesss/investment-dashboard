@@ -1,10 +1,13 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { GoalsPage } from './GoalsPage'
-import { goalsStorageKey } from './goalStorage'
+import { createGoal, goalsStorageKey } from './goalStorage'
 
-let host: HTMLDivElement, root: Root
+let host: HTMLDivElement, root: Root, client: QueryClient
+const repository = { performance: () => new Promise<never>(() => {}) } as never
+const renderPage = async (identity = 'owner-a', source = repository) => { await act(async () => root.render(<QueryClientProvider client={client}><GoalsPage identity={identity} repository={source}/></QueryClientProvider>)) }
 const setField = (name: string, value: string) => {
   const field = host.querySelector(`[name="${name}"]`) as HTMLInputElement
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, value)
@@ -12,11 +15,11 @@ const setField = (name: string, value: string) => {
 }
 const button = (label: string) => [...host.querySelectorAll('button')].find(item => item.textContent?.includes(label)) as HTMLButtonElement
 
-beforeEach(() => { localStorage.clear(); host = document.createElement('div'); document.body.append(host); root = createRoot(host) })
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); localStorage.clear() })
+beforeEach(() => { localStorage.clear(); host = document.createElement('div'); document.body.append(host); root = createRoot(host); client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }) })
+afterEach(async () => { await act(async () => root.unmount()); client.clear(); host.remove(); localStorage.clear() })
 
 test('creates a private local goal with manual reference and progress bar', async () => {
-  await act(async () => root.render(<GoalsPage identity="owner-a"/>))
+  await renderPage()
   await act(async () => { setField('name', 'Reserva'); setField('targetAmount', '10000'); setField('targetDate', '2030-12-31'); setField('initialReferenceAmount', '1250'); host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
   expect(host.textContent).toContain('Reserva')
   expect(host.textContent).toContain('R$ 1.250,00')
@@ -28,7 +31,7 @@ test('creates a private local goal with manual reference and progress bar', asyn
 })
 
 test('edits a goal without changing its progress and confirms deletion before removing it', async () => {
-  await act(async () => root.render(<GoalsPage identity="owner-a"/>))
+  await renderPage()
   await act(async () => { setField('name', 'Viagem'); setField('targetAmount', '12000'); setField('initialReferenceAmount', '500'); host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
   await act(async () => (host.querySelector('[aria-label="Editar meta Viagem"]') as HTMLButtonElement).click())
   await act(async () => { setField('name', 'Viagem longa'); setField('targetAmount', '20000'); host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
@@ -44,7 +47,32 @@ test('edits a goal without changing its progress and confirms deletion before re
 test('shows local storage failures and preserves existing records instead of reporting a successful save', async () => {
   const key = goalsStorageKey('owner-a')
   localStorage.setItem(key, '{corrupt')
-  await act(async () => root.render(<GoalsPage identity="owner-a"/>))
+  await renderPage()
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('preservados')
   expect(localStorage.getItem(key)).toBe('{corrupt')
+})
+
+test('uses open-position capital without adding external flows and allows manual confirmation when data is partial', async () => {
+  const goal = createGoal({ name: 'Objetivo', targetAmount: '1000', targetDate: null, initialReferenceAmount: '100' })
+  localStorage.setItem(goalsStorageKey('owner-a'), JSON.stringify([goal]))
+  const response = {
+    as_of: '2026-10-30', flows: { recorded_contributions: '99999.99' },
+    capital: { basis: 'equity_open_acquisition_cost_plus_effective_cdb_principal', open_positions_accounted: '500' },
+    fixed_income: { missing_positions: [] },
+    composition: { as_of: '2026-10-30', missing_fixed_income: [], declared_positions: [{ asset: 'CDB observado' }], missing_components: ['cotações de mercado para ações'] },
+  }
+  const load = vi.fn(async () => response)
+  await renderPage('owner-a', { performance: load } as never)
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+  expect(load).toHaveBeenCalledTimes(1)
+  expect(host.textContent).toContain('Base incompleta')
+  await act(async () => button('Acompanhar capital investido').click())
+  expect(host.textContent).toContain('50%')
+  expect(host.textContent).toContain('Capital investido · custo/principal aberto')
+  expect(host.textContent).toContain('Posição declarada excluída da base: CDB observado')
+  await act(async () => button('Usar progresso manual').click())
+  await act(async () => { setField('manualProgressAmount', '700'); host.querySelector('.goal-manual-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+  expect(host.textContent).toContain('70%')
+  expect(host.textContent).toContain('Patrimônio informado manualmente')
+  expect(JSON.parse(localStorage.getItem(goalsStorageKey('owner-a'))!)[0]).toMatchObject({ currentAmount: '700.00', manualProgressAmount: '700.00', progressSource: 'manual' })
 })

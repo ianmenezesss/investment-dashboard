@@ -6,6 +6,7 @@ export type Goal = {
   targetAmount: string
   targetDate: string | null
   initialReferenceAmount: string
+  manualProgressAmount: string
   currentAmount: string
   progressSource: 'manual' | 'invested'
   manualConfirmedAt: string | null
@@ -13,7 +14,7 @@ export type Goal = {
   updatedAt: string
 }
 
-export type GoalDraft = Omit<Goal, 'id' | 'currentAmount' | 'progressSource' | 'manualConfirmedAt' | 'createdAt' | 'updatedAt'>
+export type GoalDraft = Omit<Goal, 'id' | 'currentAmount' | 'manualProgressAmount' | 'progressSource' | 'manualConfirmedAt' | 'createdAt' | 'updatedAt'>
 export type GoalStorage = Pick<Storage, 'getItem' | 'setItem'>
 const KEY_PREFIX = 'investment-private-goals-v1:'
 const MAX_TARGET = new Decimal('1000000000000')
@@ -49,7 +50,7 @@ export function validateGoalDraft(input: GoalDraft): GoalDraft {
 export function createGoal(draft: GoalDraft, now = new Date()): Goal {
   const valid = validateGoalDraft(draft)
   return { ...valid, id: globalThis.crypto?.randomUUID?.() ?? `${now.getTime()}-${Math.random().toString(36).slice(2)}`,
-    currentAmount: valid.initialReferenceAmount, progressSource: 'manual', manualConfirmedAt: now.toISOString(),
+    manualProgressAmount: valid.initialReferenceAmount, currentAmount: valid.initialReferenceAmount, progressSource: 'manual', manualConfirmedAt: now.toISOString(),
     createdAt: now.toISOString(), updatedAt: now.toISOString() }
 }
 
@@ -66,7 +67,7 @@ export function validateStoredGoals(value: unknown): Goal[] {
     const valid = validateGoalDraft({ name: goal.name, targetAmount: goal.targetAmount, targetDate: goal.targetDate,
       initialReferenceAmount: goal.initialReferenceAmount })
     if (typeof goal.id !== 'string' || !goal.id || !['manual', 'invested'].includes(goal.progressSource) ||
-      typeof goal.currentAmount !== 'string' || typeof goal.createdAt !== 'string' || typeof goal.updatedAt !== 'string' ||
+      typeof goal.currentAmount !== 'string' || typeof goal.manualProgressAmount !== 'string' || typeof goal.createdAt !== 'string' || typeof goal.updatedAt !== 'string' ||
       (goal.manualConfirmedAt !== null && typeof goal.manualConfirmedAt !== 'string')) {
       throw new Error('Os dados locais das metas estão em formato incompatível. Eles foram preservados.')
     }
@@ -76,7 +77,8 @@ export function validateStoredGoals(value: unknown): Goal[] {
     }
     ids.add(goal.id)
     const currentAmount = amount(goal.currentAmount, 'Progresso atual', true)
-    return { ...goal, ...valid, currentAmount }
+    const manualProgressAmount = amount(goal.manualProgressAmount, 'Progresso manual salvo', true)
+    return { ...goal, ...valid, currentAmount, manualProgressAmount }
   })
 }
 

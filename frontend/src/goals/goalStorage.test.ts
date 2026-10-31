@@ -9,7 +9,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 test('validates and normalizes drafts and creates an initial manual reference', () => {
   expect(validateGoalDraft({ ...draft, name: '  Casa  ' })).toEqual({ ...draft, name: 'Casa', targetAmount: '100000.00', initialReferenceAmount: '1250.50' })
-  expect(createGoal(draft, now)).toMatchObject({ id: 'goal-id', currentAmount: '1250.50', initialReferenceAmount: '1250.50', progressSource: 'manual', manualConfirmedAt: now.toISOString(), createdAt: now.toISOString() })
+  expect(createGoal(draft, now)).toMatchObject({ id: 'goal-id', currentAmount: '1250.50', manualProgressAmount: '1250.50', initialReferenceAmount: '1250.50', progressSource: 'manual', manualConfirmedAt: now.toISOString(), createdAt: now.toISOString() })
 })
 
 test('rejects invalid names, nonpositive or out-of-range targets, invalid dates, and a target rounded below one cent', () => {
@@ -39,7 +39,7 @@ test('stores per identity, updates only goal metadata and can preserve independe
   expect(loadGoals('owner-a', storage)).toEqual([goal])
   expect(loadGoals('owner-b', storage)).toEqual([])
   const updated = updateGoal(goal, { ...draft, name: 'Casa nova', targetAmount: '150000' }, new Date('2026-11-01T12:00:00Z'))
-  expect(updated).toMatchObject({ currentAmount: '1250.50', initialReferenceAmount: '1250.50', name: 'Casa nova', targetAmount: '150000.00' })
+  expect(updated).toMatchObject({ currentAmount: '1250.50', manualProgressAmount: '1250.50', initialReferenceAmount: '1250.50', name: 'Casa nova', targetAmount: '150000.00' })
   expect(goalsStorageKey('owner/a')).not.toBe(goalsStorageKey('owner-a'))
 })
 
