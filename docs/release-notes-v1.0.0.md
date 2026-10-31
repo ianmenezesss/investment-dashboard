@@ -33,7 +33,8 @@ React 19, TypeScript, Vite, Tailwind, Radix UI, Recharts, TanStack Query, Supaba
 - `npm audit`: nenhuma vulnerabilidade conhecida reportada.
 - Pytest: 382 aprovados e 1 teste de integração PostgreSQL opt-in ignorado; aviso de depreciação `TestClient`/httpx.
 - PostgreSQL 17 descartável: migrations até 009 e round-trip sintético de backup/restauração com eventos, policies/RLS, grants e isolamento aprovados.
-- Smoke GET: as rotas SPA `/`, `/login` e `/metas` responderam 200; `/health` do backend respondeu 200. O login e os fluxos privados não foram testados nesta revisão.
+- Smoke GET: as rotas SPA `/`, `/login` e `/metas` responderam 200; `/health` do backend respondeu 200. Esses GETs não testam autenticação; os fluxos principais privados foram confirmados manualmente pelo proprietário, conforme o item abaixo.
+- O proprietário confirmou manualmente login, dashboard/navegação, Histórico, Relatórios, Simulador, Metas, logout, demonstração pública e layout geral em desktop/celular, sem erro observado. Esses relatos não equivalem a teste independente de isolamento entre contas, operações detalhadas ou Network/CSP.
 
 ## Limitações conhecidas
 
@@ -41,4 +42,4 @@ React 19, TypeScript, Vite, Tailwind, Radix UI, Recharts, TanStack Query, Supaba
 - Cotações e valuation podem estar parciais ou indisponíveis; cotações atuais não são usadas como preços históricos.
 - Metas locais não são transferidas entre dispositivos ou perfis do navegador.
 - Um único backup é apenas um ponto de recuperação. O restore do artefato real em PostgreSQL descartável ainda não foi ensaiado; Auth, Storage binário, roles globais, configurações externas e alterações posteriores ficam fora do dump `public`.
-- Revisão visual desktop/celular, isolamento autenticado em produção, CSP da demonstração e SHAs implantados ainda aguardam homologação manual.
+- Revisão geral desktop/celular e fluxos principais foram confirmados pelo proprietário. Isolamento com duas contas de produção, Network/CSP detalhado e SHAs implantados ainda não foram confirmados independentemente.

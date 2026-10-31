@@ -43,7 +43,7 @@ Atualizado em 30/10/2026. `main`/`origin/main` estão em `1a7e4d8` e incluem a F
 
 ### v1.0.0 — candidata local, release ainda não publicada
 
-Inclui demonstração offline com dados fictícios; área privada Supabase Auth; ações, renda fixa manual, eventos financeiros, Histórico, composição atual com cobertura declarada, relatórios imprimíveis, simulador hipotético e metas locais. Não inclui desempenho histórico completo/benchmarks nem sincronização de metas. O backup manual único foi gerado e teve seu tamanho e SHA-256 conferidos; restauração do artefato real em PostgreSQL descartável, revisão visual e homologação autenticada continuam gates no [checklist v1.0](v1.0-release-readiness.md).
+Inclui demonstração com dados fictícios; área privada Supabase Auth; ações, renda fixa manual, eventos financeiros, Histórico, composição atual com cobertura declarada, relatórios imprimíveis, simulador hipotético e metas locais. Não inclui desempenho histórico completo/benchmarks nem sincronização de metas. O proprietário confirmou o funcionamento geral do site e revisão visual desktop/celular. O backup manual único foi gerado e teve seu tamanho e SHA-256 conferidos; restauração do artefato real em PostgreSQL descartável, inspeção detalhada de Network/CSP e confirmação dos SHAs implantados permanecem pendências registradas no [checklist v1.0](v1.0-release-readiness.md).
 
 ### v1.1 — candidatos ainda não aprovados
 
