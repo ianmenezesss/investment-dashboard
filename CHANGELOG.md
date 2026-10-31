@@ -1,11 +1,17 @@
 # Changelog
 
-## Em desenvolvimento — `feat/v5.5-goals`
+## Preparação de lançamento v1.0 — 30/10/2026
+
+- Auditoria local confirmou `main`/`origin/main` em `1a7e4d8`; páginas recentes publicadas na Vercel conforme relato do proprietário. Smoke GET: Render `/health` e frontend privado Vercel responderam HTTP 200; autenticação e painel não foram verificados.
+- Frontend: 217 testes em 28 arquivos e build passaram. Backend em Python 3.12/Docker: 374 aprovados, 1 ignorado; teste PostgreSQL 17 descartável com migrations até 009: 1 aprovado.
+- Atualizados README, status de segurança, roadmap, handoff e checklist; sem alteração funcional, migration ou banco. Restore completo e retenção do Supabase continuam pendentes de validação.
+
+## Fase 5.5 — integrada à `main`; publicação reportada pelo proprietário
 
 - Criadas as metas financeiras locais em entregas 5.5A, 5.5B e 5.5C, com CRUD, acompanhamento manual ou por custo/principal investido, avisos de cobertura e planejamento hipotético de aportes.
 - Metas ficam no navegador privado e por identidade; não sincronizam entre dispositivos, não aparecem na demo e não alteram o banco. A projeção usa o motor do simulador, com taxas editáveis e limite de 600 meses.
-- Frontend: 217 testes aprovados em 28 arquivos. Backend não alterado; sua suíte não iniciou porque o Python referenciado pelo `.venv` está inacessível neste ambiente. Build final registrado em [validação](docs/validation.md).
-- Nenhum merge, push, deploy ou alteração de migration/banco de produção foi executado.
+- Frontend no commit da fase: 217 testes aprovados em 28 arquivos. Backend não alterado. A validação atual via container está descrita em [validação](docs/validation.md).
+- A fase foi integrada pela PR #11; esse registro não confirma o estado atual do painel de produção.
 
 ## Fases 5.3/5.4 — `feat/v5.3-reports` (integradas localmente)
 

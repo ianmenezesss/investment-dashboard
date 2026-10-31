@@ -1,4 +1,15 @@
-# Auditoria da Fase 1.5
+# Auditoria de segurança — registro histórico da Fase 1.5
+
+## Estado revisto para a preparação da v1.0 — 30/10/2026
+
+O registro abaixo descreve a auditoria inicial da Fase 1.5; suas afirmações sobre ausência de Git, Supabase não conectado e funcionalidades planejadas são históricas e não representam o estado atual do produto.
+
+- A `main` contém o fluxo privado Supabase Auth, a API FastAPI com autenticação e isolamento por proprietário/RLS, e a demonstração pública separada. O código e os testes locais foram revistos; nesta preparação, o GET público de `/health` do Render retornou HTTP 200 e a página Vercel privada documentada retornou HTTP 200 com CSP.
+- Não foram fornecidas credenciais de usuário e não foram executados testes de login, acesso cruzado, gravações reais, endpoints financeiros autenticados ou logout em produção. Os resultados HTTP acima não validam esses fluxos.
+- Não houve pentest, auditoria de configuração de painéis, leitura de dados do Supabase, nem verificação de configuração de backups/retention hospedada. Rate limiting distribuído, MFA e revogação imediata de JWT não estão comprovados nesta revisão.
+- A demo precisa permanecer com sua CSP pública sem conexões privadas. A CSP observada no domínio Vercel privado permite as origens configuradas de Auth/API; confirme a CSP do domínio público separadamente antes da v1.0.
+
+Esta seção atual é o resumo de segurança para lançamento. Os achados e comandos abaixo permanecem como registro histórico da fase inicial, não como evidência de validação da produção atual.
 
 Atualização 1.6.3: confirmações nativas foram substituídas por um modal com semântica alertdialog, confirmação explícita e foco inicial em Cancelar. Os mesmos endpoints e filtros continuam protegendo operações privadas. O conjunto fictício foi ampliado sem sobrescrever documentos válidos antigos: o schema v1 é lido sem gravação, e o novo seed só entra por instalação limpa ou restauração confirmada. Não foram alterados autenticação, credenciais, banco pessoal ou volumes.
 

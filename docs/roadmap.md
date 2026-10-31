@@ -1,6 +1,6 @@
 # Roadmap mestre — Investment Dashboard
 
-Atualizado em 30/10/2026. Este documento é a fonte principal de verdade do planejamento. Ele registra o estado observado no repositório e decisões expressas pelo proprietário; não autoriza compra, ativação de provedor, migration persistente, push, merge, release ou deploy.
+Atualizado em 30/10/2026. A `main` está no commit `1a7e4d8` e inclui a Fase 5.5, integrada na PR #11. O proprietário informa que Histórico, Relatórios, Simulador e Metas estão publicados na Vercel; essa publicação não foi verificada pelo painel nesta auditoria. O roadmap registra o estado observado no código e decisões do proprietário; não autoriza compra, migration persistente, push, merge, release ou deploy.
 
 ## Estados usados
 
@@ -35,8 +35,8 @@ Atualizado em 30/10/2026. Este documento é a fonte principal de verdade do plan
 | v4.3A — Resumo financeiro atual | **Concluído e publicado** | Endpoint privado de resumo, composição/fluxos existentes, resultado de ações com cobertura e precisão Decimal corrigida. Publicação e operação confirmadas pelo proprietário; este registro não representa leitura independente dos painéis hospedados. |
 | Release v4.0.0 | **Publicada; verificações operacionais reportadas como concluídas** | Proprietário confirmou `/api/operations`, `/api/dashboard/valuation`, `/api/dashboard/performance`, `/api/dashboard/equity-history`, histórico individual e comparação respondendo HTTP 200 em produção. Históricos sem provedor seguem indisponíveis de forma explícita. |
 | v4.4 — Rentabilidade temporal completa | **Bloqueado / condicional** | Depende de fluxo externo classificado, eventos pertinentes e avaliações históricas comparáveis. |
-| 5.0A — Navegação responsiva e identidade dinâmica | **Concluído localmente** | Menu mobile acessível, sidebar desktop recolhível, identidade visual derivada da sessão e testes; sem alteração de backend/migration. Revisão visual final do proprietário permanece antes de publicação. |
-| v5.0.0 | **Em desenvolvimento local** | 5.0A, 5.1, 5.3, 5.4 e 5.5A–C implementadas localmente; branch `feat/v5.5-goals` ainda não integrada/publicada. Importação 5.2A retirada e 5.2B suspensa. 5.6 condicional. |
+| 5.0A — Navegação responsiva e identidade dinâmica | **Concluído** | Menu mobile acessível, sidebar desktop recolhível, identidade visual derivada da sessão e testes; sem alteração de backend/migration. Revisão visual geral da v1.0 segue no checklist de aceitação. |
+| v5.0.0 | **Implementada; v1.0 em preparação** | `main` integra 5.0A, 5.1, 5.3, 5.4 e 5.5A–C. A publicação das páginas 5.3–5.5 é reportada pelo proprietário. 5.2A foi retirada e 5.2B suspensa. Fase 5.6 continua condicional e fora do escopo indispensável da v1.0 pessoal. |
 | Investment Dashboard 2.0 | **Planejado, após estabilidade pessoal** | Expansão por convite, com isolamento rigoroso e operação sustentável sem despesa obrigatória. |
 
 Referências de implementação e evidência: [revisão da 3.0.4](phase-3.0.4-final-review.md), [fase 4.1](phase-4.1-individual-equity-history.md) e [fase 4.2](phase-4.2-asset-comparison.md).
@@ -87,7 +87,7 @@ Critérios e processo: [critérios de release pessoal](personal-dashboard-releas
 
 ## v5.0.0 — planejamento, dados e relatórios
 
-A **5.0A — Navegação responsiva e identidade dinâmica**, a 5.1, os relatórios 5.3, o simulador local 5.4 e as metas locais 5.5A–C estão implementados. A importação 5.2A foi retirada e 5.2B está suspensa. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção e que as tabelas de eventos existem; esta atualização não acessou nem modificou esse banco. A 5.4 continua independente da carteira. As metas ficam no navegador privado, sem sincronização nem persistência em servidor. As etapas seguintes continuam sujeitas aos critérios, dependências e decisões descritos no [plano mestre v5](phase-5-master-plan.md).
+A 5.0A, 5.1, 5.3, 5.4 e 5.5A–C estão implementadas na `main`. A importação 5.2A foi retirada e 5.2B está suspensa. O proprietário informa que a migration 009 está aplicada e que as páginas recentes estão publicadas. Nesta preparação não houve consulta ou alteração ao Supabase. A 5.4 permanece independente da carteira; metas continuam no navegador e sem sincronização. O lançamento oficial depende dos gates operacionais de backup/restore, autenticação, isolamento e confirmação da configuração publicada, listados em [preparação da v1.0](v1.0-release-readiness.md).
 
 | Fase proposta | Conteúdo | Prioridade / dependências |
 |---|---|---|
@@ -134,7 +134,7 @@ Premissa: uma pessoa desenvolvedora, dias de trabalho focado, dependências loca
 | 5.2 | Retirada | — | Importação CSV removida; adaptadores suspensos. |
 | 5.3 | Média | 5–10 dias | Formatos e filtros. |
 | 5.4 | Concluída localmente | — | Simulador matemático sem persistência e independente da carteira. |
-| 5.5 | Concluída localmente | — | CRUD e planejamento sem migration; revisão e integração continuam manuais. |
+| 5.5 | Integrada à `main`; publicação reportada | — | CRUD e planejamento local, sem migration; teste funcional em produção deve fazer parte do smoke autenticado. |
 | 5.6 | Condicional | 10–20+ dias de desenvolvimento | Fonte permitida e série histórica; aprovação externa sem prazo. |
 | Estabilização pessoal | Alta antes de expansão | 5–10 dias distribuídos | Ensaio de recuperação e operação. |
 | Preparação e MVP 2.0 | Baixa até aprovação própria | 20–40+ dias | Custos, privacidade, onboarding e suporte não definidos. |

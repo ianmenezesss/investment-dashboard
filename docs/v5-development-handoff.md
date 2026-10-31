@@ -1,6 +1,6 @@
 # Handoff de desenvolvimento — Investment Dashboard v5.0.0
 
-**Atualizado em:** 30/10/2026. Branch de trabalho `feat/v5.5-goals`, criada da `main` e `origin/main` sincronizadas em `d80b69c`. Fases 5.0A, 5.1, 5.3A–C, 5.4 e 5.5A–C implementadas localmente. 5.2A (importação CSV) retirada por decisão do proprietário e 5.2B suspensa. A implementação 5.5 está em três commits separados, sem merge, push ou deploy. A migration 009 e o banco de produção não foram alterados nem acessados nesta etapa; o proprietário informa que 009 foi aplicada.
+**Atualizado em:** 30/10/2026. A `main` e `origin/main` estão no commit `1a7e4d8`, que integrou a PR #11 e os três commits da Fase 5.5 (`0cfea4a`, `0ad5194`, `cdd99aa`). 5.0A, 5.1, 5.3, 5.4 e 5.5A–C estão no código. O proprietário informa que Histórico, Relatórios, Simulador e Metas estão publicados na Vercel; isso não foi verificado no painel. 5.2A (CSV) foi retirada e 5.2B suspensa. A migration 009 e o banco não foram alterados nesta preparação; estado do banco não foi consultado. Ver gates de lançamento em [v1.0-release-readiness.md](v1.0-release-readiness.md).
 
 ## Estado de partida
 
@@ -15,7 +15,7 @@
 - Importação CSV 5.2A removida da UI, do cliente e da API; o endpoint em lote não está disponível. O registro histórico está em [documentação 5.2](phase-5.2-csv-import.md). Adaptadores 5.2B suspensos.
 - 5.3A–C oferece aportes agrupados por mês/ano, distribuição por classe/ativo, tabela de movimentos/eventos com filtros e impressão do relatório filtrado para PDF via navegador. Reusa endpoints autenticados existentes, sem API ou migration nova.
 - 5.4 oferece cenários conservador/moderado/otimista com taxa editável, aporte inicial/mensal, prazo, timing início/fim do mês, inflação opcional e valores nominais/reais. Fórmula efetiva mensal, Decimal, sem dependência externa e sem persistência.
-- Validação desta etapa: frontend completo **217 testes/28 arquivos aprovados**; build e detalhes em [validação](validation.md). A suíte backend não iniciou: o `.venv` aponta para um executável Python da Microsoft Store inacessível neste ambiente. O backend não foi modificado; a integração PostgreSQL e produção não foram acessadas.
+- Validação registrada: frontend **217 testes/28 arquivos aprovados** e build aprovado; nesta preparação, backend **374 aprovados/1 ignorado** em Python 3.12 isolado no Docker e PostgreSQL descartável **1 aprovado** (migrations 001–009). O `.venv` do Windows continua apontando para o stub da Microsoft Store; os testes foram executados em containers, sem alteração global. A produção não foi acessada além dos GET públicos de health e frontend.
 - Demonstração pública continua sem acesso ao relatório privado; o simulador é independente e funciona sem serviços externos.
 - Nesta etapa: distribuição lado a lado dos dois gráficos de composição, com empilhamento em telas estreitas; sem alteração de dados ou cálculos.
 - Estado de validação local e ressalvas operacionais estão em [revisão final da v4](phase-4.0-final-review.md).
@@ -36,10 +36,10 @@
 2. **5.2 — Importação:** retirada; adaptadores suspensos até nova decisão.
 3. **5.3 — Relatórios:** implementada. Manter rótulos de cobertura, bases e período/filtros explícitos; PDF usa impressão nativa.
 4. **5.4 — Simulador:** implementada localmente; não conectar à carteira nem promover premissas a previsão. Testes cobrem casos extremos e cálculo real/nominal.
-5. **5.5 — Metas:** implementada localmente em três entregas. Manual confirmado ou custo/principal de posições abertas com cobertura; capital investido não é patrimônio a mercado. Sem API nova ou migration. Revisar a branch antes de integrar.
+5. **5.5 — Metas:** integrada à `main` pela PR #11; publicação reportada pelo proprietário. Manual confirmado ou custo/principal de posições abertas com cobertura; capital investido não é patrimônio a mercado. Sem API nova ou migration. Metas permanecem locais ao navegador.
 6. **5.6 — Desempenho histórico/benchmarks:** próximo planejamento, ainda condicional a 4.4, eventos 5.1, avaliações datadas comparáveis, cobertura suficiente e fonte permitida. Não iniciar implementação automaticamente.
 
-O plano aprovado em [`phase-5-master-plan.md`](phase-5-master-plan.md) continua como fonte da sequência e escopo. O [`multiuser-expansion-plan.md`](multiuser-expansion-plan.md) é uma proposta separada e posterior à estabilidade pessoal; não o substituir por este handoff.
+O plano mestre está em [`phase-5-master-plan.md`](phase-5-master-plan.md). A [preparação da v1.0](v1.0-release-readiness.md) organiza as verificações operacionais pendentes. O [`multiuser-expansion-plan.md`](multiuser-expansion-plan.md) permanece proposta separada e posterior à estabilidade pessoal.
 
 ## Migrations e estratégia de testes
 

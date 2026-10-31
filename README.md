@@ -2,7 +2,7 @@
 
 Plataforma full stack para acompanhamento de investimentos em ações brasileiras. Reúne operações, posições por custo médio, resultados realizados e visualizações em uma interface responsiva em português, com valores em reais e persistência PostgreSQL.
 
-**Fase atual: 1.6.3 — refinamento de UX/UI.** Confirmações acessíveis substituem diálogos nativos, ações e banners têm hierarquia mais clara e a carteira inicial inclui 26 operações fictícias em seis ativos. Carteiras demonstrativas existentes são preservadas; use **Restaurar** e confirme para conhecer o novo conjunto. Autenticação, dados privados e isolamento da API foram preservados. Não foi executado push ou deploy nesta etapa.
+**Estado do produto: v1.0 em preparação de lançamento.** A `main` inclui autenticação Supabase, dashboard de carteira, ações, renda fixa, eventos financeiros, Histórico, relatórios, simulador e metas. A demonstração pública permanece offline e usa dados fictícios. Metas são salvas localmente por identidade no navegador e não sincronizam entre dispositivos. Consulte o [roadmap](docs/roadmap.md) e o [handoff](docs/v5-development-handoff.md) para limitações e critérios de lançamento; presença no código não comprova configuração ou saúde dos serviços hospedados.
 
 Tecnologias: React 19, TypeScript, Vite, Tailwind, componentes shadcn/Radix, Recharts, Lucide, React Router, TanStack Query; Python 3.12+, FastAPI, SQLAlchemy, Alembic, Pydantic, PostgreSQL 17, Pytest e PyJWT com criptografia.
 
@@ -15,6 +15,7 @@ Documentação:
 - [Auditoria de segurança e arquivos alterados](docs/security-audit.md).
 - [Configuração futura de Vercel, Render e Supabase](docs/deployment.md).
 - [Testes e limites da verificação](docs/validation.md).
+- [Checklist de aceitação para a v1.0](docs/v1.0-release-readiness.md).
 
 ## Fase 1
 
@@ -25,7 +26,7 @@ Documentação:
 - Persistência PostgreSQL, migrações Alembic, exportação JSON e token de acesso local.
 - Demonstração interativa opcional, com localStorage exclusivo para dados fictícios e separada dos registros reais.
 
-O patrimônio a mercado está indisponível até cadastrar cotações em uma fase posterior. Os valores da demonstração são fictícios, sem vínculo com preços reais. Compras de ativos não equivalem a aportes externos; o gráfico atual mostra fluxo de operações. CDBs, simulador, metas, proventos e benchmarks estão planejados; não foram implementados nesta fase.
+Os cálculos disponíveis distinguem custo, principal, fluxos, cotações atuais e valores de mercado com cobertura. Eles não equivalem automaticamente à rentabilidade total da carteira. Histórico consolidado, TWR/MWR e benchmarks permanecem condicionados à existência de avaliações históricas completas, fluxos confiáveis e fontes adequadas. A demo usa somente dados fictícios e não acessa a API privada.
 
 ## Requisitos
 
@@ -94,16 +95,20 @@ backend\.venv\Scripts\python.exe scripts/audit_publication.py
 
 O scanner verifica regras de ignore, candidatos e, se existir, histórico Git. Não substitui a revisão manual de arquivos staged nem a detecção de dados pessoais arbitrários.
 
-## Backup
+## Backup e recuperação
 
-O botão **Exportar** salva um JSON dos registros da API (ou um arquivo claramente identificado de demonstração). Eventos financeiros são registrados manualmente no Histórico; a importação CSV foi retirada do produto. Para backup completo do PostgreSQL:
+O botão **Exportar** salva um JSON dos registros cobertos pela API; não deve ser tratado como cópia completa do PostgreSQL, de configurações hospedadas ou das metas locais do navegador. As metas não sincronizadas precisam de estratégia própria se a preservação delas for importante.
+
+Os comandos a seguir se aplicam somente ao PostgreSQL local do Compose:
 
 ```powershell
 docker compose exec db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/investment.dump'
 docker compose cp db:/tmp/investment.dump ./investment.dump
 ```
 
-Guarde o backup fora do repositório. Para restaurar, use `pg_restore` em um banco separado e valide antes de substituir o original. O volume Docker preserva dados entre reinicializações. Não remova o volume com seus dados pessoais.
+Guarde o arquivo fora do repositório. Para ensaiar uma restauração, use outro banco descartável e valide antes de qualquer substituição. O volume Docker local persiste entre reinicializações; não o remova se contiver dados pessoais.
+
+Para produção, confirme no painel Supabase o mecanismo de backup, retenção e janela de recuperação contratados para o projeto. Faça um restore de ensaio para um projeto/banco separado e valide schema, RLS, grants e isolamento antes de considerar a recuperação testada. Esta documentação não confirma configuração, retenção ou restore real do projeto hospedado.
 
 ## Segurança e escopo
 
