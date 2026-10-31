@@ -103,6 +103,10 @@ export type FinancialPerformance = {
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
 }
+export async function askAssistant(message: string, token: string): Promise<string> {
+  const result = await request<{answer:string}>('assistant/chat', token, {method:'POST', body:JSON.stringify({message})})
+  return result.answer
+}
 export async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   if (PUBLIC_DEMO) throw new Error('A demonstração pública não acessa a API privada.')
   if (!token) throw new ApiError(401, 'Entre para acessar sua carteira.')

@@ -30,6 +30,7 @@ const DemoFlowChart = lazy(() => import('./portfolio/DemoFlowChart').then(module
 const ReportsPage = lazy(() => import('./reports/ReportsPage').then(module => ({ default: module.ReportsPage })))
 const SimulatorPage = lazy(() => import('./simulator/SimulatorPage').then(module => ({ default: module.SimulatorPage })))
 const GoalsPage = lazy(() => import('./goals/GoalsPage').then(module => ({ default: module.GoalsPage })))
+const AssistantChat = lazy(() => import('./components/AssistantChat').then(module => ({ default: module.AssistantChat })))
 
 const money = (v: string | number) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const number = (v: string | number) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 4 })
@@ -152,6 +153,7 @@ export default function App() {
   const displayName = demo ? 'Demonstração' : sessionDisplay.name
   const avatarInitial = demo ? 'D' : sessionDisplay.initial
   return <div className={`shell${sidebarCollapsed ? ' sidebar-is-collapsed' : ''}`} data-navigation-collapsed={sidebarCollapsed}>
+    {!demo && SUPABASE_AUTH && auth.session?.access_token && <AssistantChat token={auth.session.access_token}/>}
     <WorkspaceSidebar demo={demo} routeTo={routeTo} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed(value => !value)} displayName={displayName} avatarInitial={avatarInitial}/>
     <main><header><div className="mobile-header-brand"><span className="brand-icon"><ChartNoAxesCombined size={20}/></span>investment<span className="brand-dot">.</span></div><Dialog.Root open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}><Dialog.Trigger asChild><button type="button" className="mobile-menu-trigger" aria-label="Abrir menu de navegação" aria-controls="mobile-navigation-panel"><Menu size={20}/></button></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="mobile-nav-overlay" onClick={() => setMobileNavigationOpen(false)}/><Dialog.Content id="mobile-navigation-panel" className="mobile-nav-content"><Dialog.Title className="sr-only">Menu de navegação</Dialog.Title><button type="button" className="mobile-nav-close" aria-label="Fechar menu de navegação" onPointerDown={() => setMobileNavigationOpen(false)} onClick={() => setMobileNavigationOpen(false)}><X size={19}/></button><WorkspaceSidebar demo={demo} routeTo={routeTo} mobile onNavigate={() => setMobileNavigationOpen(false)} displayName={displayName} avatarInitial={avatarInitial}/></Dialog.Content></Dialog.Portal></Dialog.Root><div className="breadcrumb">Workspace <ChevronRight size={13}/> <span>{workspaceNavItems.find(n => n.to === page)?.label}</span></div><span className="local-badge"><span className="status-dot"/> {demo ? 'Modo Demonstração' : 'Ambiente pessoal'}</span></header>
 

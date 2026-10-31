@@ -1,6 +1,6 @@
 # Investment Dashboard — Master Plan v1 → v2
 
-**Documento central de continuidade.** Atualizado em 31/10/2026. O plano consolida o que o repositório e o histórico Git sustentam, separando implementação local, relatos do proprietário sobre produção e propostas futuras. Não autoriza desenvolvimento de v1.1, v1.2 ou v2.0, migration, acesso a dados de produção, publicação ou contratação de serviços.
+**Documento central de continuidade.** Atualizado em 31/10/2026. O plano consolida o que o repositório e o histórico Git sustentam, separando implementação local, relatos do proprietário sobre produção e propostas futuras. A v1.2 está implementada localmente conforme a seção F, mas este documento não autoriza migrações, acesso a dados de produção, publicação ou contratação de serviços. v1.1 e v2.0 permanecem propostas.
 
 ## Como interpretar este documento
 
@@ -103,7 +103,7 @@ As fases 2.0.x de renda fixa são nomenclatura técnica anterior à v2.0 multius
 | 5.4 — simulador | Cenários locais conservador/moderado/otimista, aportes, prazo, taxa e inflação opcional. | Hipóteses editáveis; taxa anual efetiva convertida em mensal; sem acesso à carteira nem persistência. | Testes de taxa zero/negativa, timing, inflação, valores inválidos e build. | Projeção não é previsão, recomendação ou garantia; não há vinculação automática a metas/portfolio. |
 | 5.5A–C — metas | CRUD local, estados ativa/concluída/vencida/sem prazo, progresso manual ou por custo/principal investido, plano de aportes por cenário. | Isolamento pela chave de identidade no navegador; base investida não é patrimônio de mercado; reusa endpoint performance e matemática do simulador. | `phase-5.5-goals.md`: cobertura de validação, isolamento, partial/unavailable e extremos; sem backend/migration. | Não sincroniza dispositivos; localStorage pode ser perdido; sem valor de mercado consolidado. |
 | 5.6 — histórica/benchmarks | Estudo para evolução patrimonial e rentabilidade real histórica. | Planejamento já existente; depende de séries completas e metodologia/benchmark compatíveis. | Não implementada; ver 4.4 e roadmap anterior. | Não usar cotação de hoje como passado; fica proposta condicional da v1.1. |
-| v1.0.0 / v1.0.1 | v1.0.0 agrupa funções principais; v1.0.1 corrige import no runner CI PostgreSQL para funcionar com execução fora do CWD do backend. | Manter tag `v1.0.0` imutável; correção é commit posterior `329ba67` e tag remota observada `v1.0.1`. | Evidência de release conforme Git e relato do proprietário; atual status do Actions/painéis não verificado nesta atualização. | Não confundir release/tag com conclusão das propostas 4.4, 5.6, v1.1, v1.2 ou v2.0. |
+| v1.0.0 / v1.0.1 | v1.0.0 agrupa funções principais; v1.0.1 corrige import no runner CI PostgreSQL para funcionar fora do CWD do backend. | Manter tag `v1.0.0` imutável; correção está no commit posterior `329ba67`, com tag remota `v1.0.1` observada. | Evidência de release conforme Git e relato do proprietário; status atual do Actions/painéis não verificado nesta atualização. | Releases da v1.0.x não comprovam publicação da implementação local v1.2 nem conclusão das propostas 4.4, 5.6, v1.1 ou v2.0. |
 
 Detalhes e logs históricos estão em [validação](validation.md), [segurança](security-audit.md), [documentação v5](phase-5-master-plan.md), [handoff v5](v5-development-handoff.md) e documentos individuais listados em cada linha. Esses artefatos podem ter cabeçalhos de status antigos; este resumo não os reescreve como evidência atual.
 
@@ -152,7 +152,7 @@ Registros existentes mostram a v1.0 com frontend 217 testes em 28 arquivos, buil
 | Persistência/sincronização de metas | LocalStorage por identidade, **não sincronizado**. | Foi escolha para evitar API/migration; dados dependem de dispositivo/perfil do browser. | Candidato opcional 1.1 se necessidade real superar custo e risco de migration. |
 | Backup operacional | Um único backup manual existente; **não há rotina automática ou restore real comprovado**. | Estratégia intencional de portfólio; Auth/Storage/configuração ficam de fora. | Antes de alterar esquema ou abrir v2, decidir backup/restore adequado e ensaiar em clone. |
 | Multiusuário por convite | Documentado, **não implementado**. | Requer onboarding controlado, tabelas/tokens/auditoria possíveis, RLS e processo operacional. | v2.0, após ameaça, privacidade e recuperação. |
-| Agente de IA | **Nova proposta aprovada para planejamento nesta solicitação; ainda não implementada**. | Requer política de dados, avaliação de qualidade, provedor/infra e limites. | v1.2 conforme seção F; não entregar ferramentas de escrita. |
+| Agente de IA | **Íris implementada e validada localmente; ainda não publicada**. | Groq Free opcional, conhecimento estático, sem dados da carteira; inspeção visual autenticada e configuração de produção pendentes. | v1.2 conforme seção F; não entregar ferramentas de escrita. |
 | MFA, rate limit, observabilidade/alerta, operação de incidentes | Parcial/pendente de validação ou capacidade na hospedagem atual. | Requer confirmar planos atuais, implantação, custo e requisitos de uso externo. | Reavaliar antes de convidar terceiros, não presumir como bloqueio de portfólio pessoal sem evidência de risco imediato. |
 | Precisão de metadado da API | `backend/app/main.py` mantém `FastAPI(version="0.1.5")`, enquanto pacote/release é v1.x. | Divergência observável de metadado OpenAPI; não altera cálculo/endpoints por si só. | P1 de higiene: corrigir em commit de código separado quando houver solicitação de correção, não nesta tarefa documental. |
 
@@ -188,58 +188,23 @@ O repositório possui: ledger de ações (data/quantidade/preço/taxas), eventos
 
 Antes de qualquer UI de performance: amostras de dados fictícios com cobertura completa e parcial; fluxos em fronteiras e intraperíodo; transferência interna; proventos/reinvestimento; CDB aberto/fechado; ajuste corporativo e preço bruto/ajustado; ausência/staleness; idempotência; consistência entre tela/API/ledger; Decimal e precisão; proprietário/RLS/cache; migrations/restore descartável. O gate para dados reais requer fonte, licença, método, cobertura, frequência de snapshots, custo e comportamento de indisponibilidade explicitados.
 
-## F. Planejamento v1.2 — agente de IA
+## F. v1.2 — assistente de educação financeira Íris
 
-**Status: ideia nova aprovada para entrar no roadmap; não implementada.** O objetivo é demonstrar aplicação de IA útil ao produto, não automatizar investimento.
+**Status: implementada e validada localmente; ainda não publicada.** A Íris usa Groq Free opcional com `qwen/qwen3.8-27b`; não há faturamento, fallback pago, recomendações de investimento, memória persistente nem acesso a dados da carteira.
 
-### Objetivos e limites
+### Escopo e arquitetura implementada
 
-1. **Educação financeira:** explicar renda fixa/variável, CDB, CDI, Selic, inflação, ações, proventos, juros compostos, risco e diversificação em linguagem acessível.
-2. **Assistente do produto:** responder como cadastrar compra, encontrar Histórico, usar simulador/metas, entender rendimentos, bases e mensagens de indisponibilidade com base no comportamento real e documentado do build ativo.
+- O chat React só é montado na área privada quando há sessão Supabase autenticada. A demonstração pública permanece independente e não chama o endpoint da assistente.
+- O frontend envia a pergunta ao `POST /api/assistant/chat` no FastAPI usando o fluxo autenticado existente. A autenticação e os limites são aplicados no backend.
+- A chave `GROQ_API_KEY` é lida somente pelo backend. O modelo recebe a pergunta e o arquivo estático `assistant_knowledge.md`; não recebe tokens de autenticação nem dados financeiros da carteira.
+- A conversa fica apenas no estado React da sessão. Não há persistência, ferramenta, RAG ou operação financeira. Se a IA ou a cota estiver indisponível, o restante do dashboard continua utilizável.
+- A Íris explica conceitos básicos e o funcionamento documentado do dashboard; não recomenda ativos, não prevê retornos nem afirma conhecer a carteira.
 
-O agente não será consultor personalizado, não recomendará compra/venda, não prometerá retorno e não inventará dados/funcionalidades. Primeira versão é leitura e explicação; sem mutações, ordens, cadastro, chamada livre de banco ou execução de compras/vendas.
+### Validação e pendências para publicação
 
-### Arquitetura recomendada
-
-```text
-React chat privado → FastAPI (JWT, allowlist, rate/budget limits)
-                  → orquestrador estreito e provider adapter
-                  → modelo sem credencial no frontend
-                  → resposta com fonte/estado e aviso de incerteza
-```
-
-- Começar com backend intermediário FastAPI para proteger a chave, aplicar limite por identidade, redactar logs, impor timeout, modelo/token ceiling e auditar custo sem armazenar pergunta financeira por padrão. Nenhuma `VITE_*` guarda secret.
-- Criar corpus pequeno, versionado e curado com documentação vigente: navegação, contrato real de API, definições financeiras, limitações, `README`, changelog e páginas de ajuda. Metadados incluem caminho/commit/versão e seção; respostas sobre o app retornam referências clicáveis internas.
-- Para esse corpus inicial, começar por recuperação determinística por tema/termos ou índice simples. RAG vetorial só se avaliação mostrar melhoria material em cobertura/qualidade e manutenção; não é requisito por moda. Nenhuma indexação de operações pessoais.
-- LLM recebe só a pergunta e trechos públicos do corpus. Nenhum endpoint financeiro ou dado pessoal entra no contexto no MVP. Se, no futuro, houver consulta estruturada, será por funções nomeadas, parâmetros validados e autorização de servidor, resposta agregada mínima, somente leitura e consentimento claro; jamais SQL arbitrário ou ferramenta escolhida pelo texto do modelo.
-- Se modelo ou limite cair, chat informa indisponibilidade e mantém restante do dashboard funcionando. Cotas por usuário, limite de tokens por chamada/sessão, timeout, retries limitados, limite diário, teto de custo e disable switch.
-- Usar esquema de saída validado (resposta, referências, tipo: educação/ajuda/limite) e checar links/citações no backend. “Guardrails” de prompt não substituem controle de acesso. Tratar mensagens, textos recuperados e saídas do modelo como conteúdo não confiável; escapar HTML e manter zero ferramentas privilegiadas. A orientação OWASP ressalta que filtros textuais não formam uma fronteira de segurança; autorização deve ser imposta fora do modelo.
-- Observabilidade sem conteúdo financeiro ou tokens: latência, erro por classe, modelo, contagem/tokens/custo agregado e versão do corpus; política de retenção curta e declarada para conteúdo se vier a ser necessário.
-
-### Etapas, dependências e critérios
-
-| Entrega | Escopo | Aceite | Complexidade |
-|---|---|---|---|
-| 1.2.1 — MVP do chat | UI React acessível, estado de conversa efêmero, POST autenticado à API, adapter de provedor, resposta sem contexto financeiro. | API key só backend; 401/403 e rate limits corretos; timeout/falha clara; chamadas não mudam ledger; demo não inicia nem expõe chat privado sem especificação própria. | M |
-| 1.2.2 — conhecimento financeiro | Perguntas educativas usando conteúdo curado e respostas com escopo, data e referência; explicar que não é recomendação individual. | Suite de perguntas/exemplos, factualidade, casos que deve recusar/explicar incerteza; sem promessa ou recomendação de ativo. | M |
-| 1.2.3 — conhecimento do dashboard | Recuperar documentação real de features e limites da versão implantada. | Perguntas de navegação/cálculo apontam seção/rota válida; teste adversarial para função inexistente e versão desatualizada; preferir resposta “não documentado”. | M |
-| 1.2.4 — qualidade/segurança/custo | Avaliação de respostas, prompt injection, privacidade, limites, logs, falhas de provedor e budget. | Testes automatizados/regressão, sem PII nos logs, limites comprovados, observabilidade agregada, fonte conhecida, política de dados/privacidade antes de liberar. | L |
-| 1.2.5 — opções futuras | Ferramentas estruturadas somente leitura, memória de conversa ou resposta contextualizada. | Cada recurso exige decisão independente, consentimento e threat model; dados mínimos; owner check; sem alterar registros; avaliar retenção/custo. | L; opcional |
-
-### Opções gratuitas e pagas, privacidade e custos
-
-Preços e termos mudam; conferência documental feita em 31/10/2026 e deve ser refeita antes de codificar. Não há provedor aprovado, cota de requisições aprovada nem custo mensal fixo calculável sem modelo, limites e uso observados.
-
-| Caminho | Custo/complexidade | Dados e adequação |
-|---|---|---|
-| Modelo aberto local (ex. Ollama em máquina controlada) | Sem tarifa por token/API quando executado em hardware próprio; custo de hardware/energia e operação; pode exigir GPU/memória, M/L para servir com disponibilidade. | Melhor fronteira se prompt fica local, mas manter serviço local em produção Vercel/Render não é automático; validar licença, qualidade, latência e segurança do modelo. “Gratuito” não equivale a custo operacional zero. |
-| Tier gratuito hosted (ex. Gemini API Free) | Pode iniciar a $0 sujeito a quota, modelo e região; sem SLA/capacidade garantidos; limites mudam. | A tabela oficial do Gemini diferencia Free/Paid e informa uso de conteúdo para melhoria no Free para modelos listados; não enviar perguntas com dados financeiros identificáveis nesse tier sem revisão explícita. |
-| API paga por tokens (OpenAI, Anthropic, Gemini paid, outros) | Sem infraestrutura de GPU própria; custo variável = tokens de entrada/saída × preço do modelo + ferramentas/armazenamento; adicionar limite rígido e orçamento. Nenhum pagamento obrigatório está aprovado. | Revisar termos, retenção e região por endpoint/plano. OpenAI declara que conteúdo de API não é usado para treino por padrão, mas há retenção operacional por endpoint/abuso; isso não é ausência de retenção. Usar dados financeiros privados requer decisão separada e minimização. |
-| Hospedagem/modelo cloud via intermediário (ex. Ollama Cloud) | Conta gratuita pode incluir uso inicial limitado; uso excedente pago conforme catálogo/planos atuais. | Ainda envia prompts a infraestrutura cloud; revisar regiões, subprocessadores e compromisso de logging/retenção antes de qualquer dado privado. |
-
-Fórmula de controle para análise antes de lançar: `custo_estimado = chamadas × (tokens_entrada/1.000.000 × preço_entrada + tokens_saida/1.000.000 × preço_saida) + ferramentas`. Registrar cenários de baixo/alto volume após telemetria não sensível; avisar teto e desligar serviço antes de cobrança acima do limite. No Free do Gemini a tabela atual indica uso de conteúdo para melhorar produtos em modelos/free tier; nas APIs OpenAI a documentação informa não treinamento por padrão, mas retenção depende do endpoint e controles. Ver fontes oficiais [OpenAI pricing](https://developers.openai.com/api/docs/pricing), [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data), [Gemini pricing e uso de dados](https://ai.google.dev/gemini-api/docs/pricing), [Anthropic API](https://www.anthropic.com/claude/api), [Ollama pricing/privacy](https://ollama.com/pricing) e [OWASP Prompt Injection Prevention](https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html). Estes links descrevem condições atuais publicadas; não constituem aprovação de fornecedor.
-
-**Recomendação:** primeiro protótipo local com corpus curado, perguntas fictícias e provider adapter substituível; avaliar local vs API paga sem tráfego de carteira. Antes de tornar público, aprovar privacidade/termos, limites e custo, e colocar avaliação de qualidade/segurança no CI. Não usar texto promocional “IA sem custo” como promessa.
+- Chamadas reais locais ao endpoint via Groq/Qwen retornaram HTTP 200; a última resposta sobre o uso do dashboard terminou com `finish_reason=stop` e estava completa.
+- As suítes automatizadas e o build de produção foram aprovados nas validações locais reportadas. A interface autenticada ainda não foi inspecionada visualmente em navegador; a cobertura visual disponível é por componentes/testes mockados.
+- Antes de publicar, configurar manualmente `GROQ_API_KEY` no Render, as variáveis Supabase/CORS no backend e as variáveis públicas de build do projeto Vercel privado. Aguardar aprovação do proprietário; esta validação não executou commit, push ou deploy.
 
 ## G. Planejamento v2.0 — onboarding controlado por convite
 
@@ -291,10 +256,8 @@ Complexidade é relativa (S pequena, M média, L grande) e não equivale a calen
 | v1.1.4 | TWR/MWR/XIRR | Planejado condicional | P1/P2 | Fluxos externos, boundaries/terminal values, cálculos reconciliáveis | L | Fórmulas reproduzíveis e resultados recusados quando insuficientes | 4.4/5.6 |
 | v1.1.5 | Benchmark | Planejado opcional | P2 | Fonte/licença, moeda/calendário/base compatíveis | M/L | Sem interpolação nem comparar séries incompatíveis | Roadmap 5.6 |
 | v1.1.x | Sincronizar metas e acabamento de relatórios | Proposto, opcional | P2 | Caso de uso, persistência/privacidade | M | Funciona sob owner/RLS e não mistura demo nem identidade | Nova sugestão; confirmar escopo |
-| v1.2.1 | MVP de chat privado e adapter de modelo | Proposto aprovado para planejamento, não implementado | P1 depois da v1.1 discovery/decisão de privacidade | Backend, provider decision, budget/quotas, policy | M | Chave no servidor, sem dados financeiros, leitura-only, limite de custo | Nova ideia aprovada nesta solicitação |
-| v1.2.2–.3 | Educação financeira e assistência do dashboard | Proposto | P1 | Corpus verificado, versão/ref, avaliação de factualidade | M | Não inventa rota/cálculo; referências e incerteza | Nova ideia |
-| v1.2.4 | Segurança, privacidade e qualidade IA | Proposto, obrigatório antes de público | P1 | Eval set, prompt-injection threat model, observabilidade sem payload | L | Adversarial tests, limites/custo/falha, sem PII em logs | Nova ideia |
-| v1.2.5 | Ferramentas read-only/memória/contexto financeiro | Adiado/opcional | P2 | Consentimento, tool whitelist, owner isolation, retenção | L | Decisão separada e teste de isolamento; padrão continua sem dados pessoais | Nova ideia, opcional |
+| v1.2.1–.4 | Chat privado Íris, conhecimento estático, limites, segurança e validação | Implementado e validado localmente; publicação pendente | P0 antes da publicação | Inspeção visual autenticada e configuração manual Render/Vercel | M | 393 testes backend aprovados (1 skip), 221 testes frontend, build aprovado e chamadas reais completas; demo sem chat e sem dados da carteira | Seção F e Etapa 5 |
+| v1.2.5 | Ferramentas, memória ou contexto financeiro | Fora do escopo da v1.2; adiados e sujeitos a aprovação separada | P2 | Consentimento, avaliação de ameaça, isolamento e retenção | L | Nenhum dado pessoal ou capacidade adicional sem decisão separada | Opcional, não implementado |
 | v2.0.1 | Modelo restrito de convites/abuso/privacidade | Planejado em documento anterior | P0 da expansão | Threat model, custo, suporte, política de dados | M | Plano de convite, remoção, custos, migration/restore aprovado | `multiuser-expansion-plan.md` |
 | v2.0.2–.3 | Criação/revogação/aceite/Provisionamento Supabase | Planejado | P1 | Auth/admin backend, signup geral fechado, tokens hashed | L | Convite único, expira, revoga, não enumera e não vaza | Documento anterior |
 | v2.0.4 | Isolamento A/B/N no sistema todo (incl. IA) | Planejado | P0 antes de convidados | owner/RLS/backend/cache/export/AI quotas | L | A, B e admin não atravessam fronteiras; testes reais e descartáveis | Documento anterior |
@@ -305,12 +268,12 @@ Complexidade é relativa (S pequena, M média, L grande) e não equivale a calen
 
 ### Estado para retomar
 
-- Checkout confirmado nesta tarefa: `main` em `329ba67`, árvore limpa antes das edições documentais; migrations locais 001→009 com um head `009_financial_events`.
+- Checkout desta preparação: `main` em `c9ee2e0`, com alterações locais da v1.2 e documentação, sem arquivos staged nem commit desta etapa; migrations locais 001→009 com um head `009_financial_events`.
 - Release v1.0.0 foi publicada segundo o proprietário; tag local existente aponta para `1d54a36`. Tag remota v1.0.1 no commit `329ba67` foi observada em consulta anterior; a reconsulta falhou por DNS. Não criar/mover tags ou release sem pedido.
 - Última correção técnica: import do runner PostgreSQL resolvido usando `Path(__file__).resolve().parents[1]` em `backend/tests/run_postgres.py`, eliminando dependência do CWD. A alteração está em `329ba67`; ela não altera a lógica financeira, schema ou DB.
 - Migration 009 existe e é head no código. Estado corrente do banco de produção não foi consultado; documentação do proprietário relata que foi aplicada. Não rodar migration ou query de produção sem autorização específica.
 - Backup único cifrado fora do repo; documento não inclui frase/hash/DSN. Restore real ainda não foi ensaiado; somente dados fictícios e banco descartável foram usados nos testes sintéticos registrados.
-- Próxima tarefa recomendada: primeiro decidir quais validações de prontidão operacional vale fechar; depois aprovar escopo e executar somente v1.1.1 (auditoria de dados/séries), sem implementar métricas de retorno ainda. A ideia v1.2 já entrou no roadmap, mas aguarda análise de privacidade, custo e prioridade. v2 é posterior à estabilidade e recuperação.
+- Próxima tarefa da v1.2: concluir a inspeção visual autenticada em navegador e configurar manualmente as variáveis de produção no Render e no projeto Vercel privado; depois aguardar aprovação do proprietário antes da publicação. v1.1 e v2.0 permanecem propostas futuras.
 
 ### Comandos locais
 
@@ -370,4 +333,4 @@ Os requisitos exatos estão em `backend/requirements.lock.txt`; comandos de inic
 
 ---
 
-**Resumo executivo:** a v1 é um produto pessoal funcional e publicada conforme relato/tag Git, com demo, acesso privado, operações, renda fixa, eventos, Histórico, relatórios, simulador e metas. A série de patrimônio/retorno histórico consolidado continua ausente por decisão de integridade financeira; o restore do backup real e algumas verificações operacionais não estão comprovados. A ordem recomendada é fechar somente validações relevantes da v1, conduzir descoberta de dados para v1.1, avaliar/autorizar uma primeira fase de agente educacional v1.2 sem contexto financeiro e tratar convites multiusuário como v2.0 após ameaça, privacidade e recuperação.
+**Resumo executivo:** a v1.0.1 foi publicada segundo relato/tag Git; o código da v1.2 adiciona a Íris, assistente educacional privada sem dados da carteira, e está validado localmente, mas ainda não foi publicado. Restam inspeção visual autenticada em navegador e configuração manual de produção, seguidas de aprovação do proprietário. A série histórica continua ausente por decisão de integridade financeira; v1.1 e convites multiusuário v2.0 permanecem propostas futuras.

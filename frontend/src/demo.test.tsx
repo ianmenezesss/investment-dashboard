@@ -34,6 +34,18 @@ test('demonstração pública bloqueia chamadas HTTP inclusive fora dos componen
   expect(fetchMock).not.toHaveBeenCalled()
 })
 
+test('chat do assistente não aparece na demonstração e nenhuma chamada ao endpoint de IA ocorre', async () => {
+  const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock)
+  const host = document.createElement('div'); document.body.append(host)
+  const root = createRoot(host), client = new QueryClient()
+  try {
+    await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+    expect(host.querySelector('[aria-label="Abrir conversa com Íris"]')).toBeNull()
+    expect(host.querySelector('#iris-chat-panel')).toBeNull()
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/assistant/chat'))).toBe(false)
+  } finally { await act(async () => root.unmount()); client.clear(); host.remove() }
+})
+
 test('visitante navega entre dashboard e histórico sem autenticação ou rede', async () => {
   const fetchMock = vi.fn().mockRejectedValue(new Error('API indisponível'))
   vi.stubGlobal('fetch', fetchMock)

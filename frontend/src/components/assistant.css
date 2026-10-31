@@ -1,0 +1,220 @@
+.iris-root {
+  position: fixed;
+  z-index: 35;
+  top: var(--iris-viewport-top, 0);
+  right: max(16px, env(safe-area-inset-right));
+  width: 0;
+  height: var(--iris-viewport-height, 100dvh);
+  pointer-events: none;
+}
+
+.iris-launcher {
+  position: absolute;
+  right: 0;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border: 1px solid #62bfa0;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #24483d, #172a2a 78%);
+  color: #a8f0d3;
+  box-shadow: 0 8px 28px #0008, inset 0 0 0 4px #ffffff08;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.iris-launcher:hover {
+  transform: translateY(-2px);
+  border-color: #9af0cc;
+  box-shadow: 0 12px 34px #0009, 0 0 22px #68e5b426;
+}
+
+.iris-launcher:focus-visible,
+.iris-panel button:focus-visible,
+.iris-panel input:focus-visible,
+.iris-panel:focus-visible {
+  outline: 2px solid #a5f2d2;
+  outline-offset: 3px;
+}
+
+.iris-launcher-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+
+.iris-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  display: flex;
+  width: min(400px, calc(100vw - 32px));
+  height: min(590px, max(260px, calc(var(--iris-viewport-height, 100dvh) - 112px - env(safe-area-inset-bottom))));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #33464b;
+  border-radius: 18px;
+  background: #10191f;
+  color: #e1ebe7;
+  box-shadow: 0 22px 70px #000b, 0 0 0 1px #ffffff08;
+  pointer-events: auto;
+  animation: iris-panel-in .18s ease-out both;
+}
+
+.iris-header {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #26363d;
+  background: linear-gradient(110deg, #172a29, #141e25 72%);
+}
+
+.iris-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #3c705d;
+  border-radius: 13px;
+  background: #203a33;
+  color: #9ce8c6;
+}
+
+.iris-heading { min-width: 0; flex: 1; }
+.iris-heading h2 { margin: 0; color: #e7f1ec; font-size: 15px; font-weight: 620; letter-spacing: .1px; }
+.iris-heading p { margin: 4px 0 0; color: #9cafa8; font-size: 11px; line-height: 1.35; }
+
+.iris-panel .iris-close {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #a7b7b4;
+  cursor: pointer;
+}
+
+.iris-panel .iris-close:hover { border-color: #35484d; background: #ffffff08; color: #e4efeb; }
+
+.iris-messages {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 13px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 16px;
+  scrollbar-color: #405650 transparent;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.iris-welcome { display: flex; flex-direction: column; gap: 16px; margin-block: auto; }
+.iris-greeting { margin: 0; border: 1px solid #2e4541; border-radius: 4px 15px 15px; background: #192923; color: #dce9e2; font-size: 13px; line-height: 1.65; padding: 14px; }
+.iris-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.iris-panel .iris-suggestions button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #34484a;
+  border-radius: 999px;
+  background: #152126;
+  color: #bdd3ca;
+  padding: 8px 11px;
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.35;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+
+.iris-panel .iris-suggestions button:hover:not(:disabled) { border-color: #5d9b81; background: #1b302a; color: #d9f3e7; }
+.iris-panel button:disabled { opacity: .55; cursor: wait; }
+
+.iris-message { max-width: 88%; border: 1px solid #2b3a40; border-radius: 14px; padding: 10px 12px; overflow-wrap: anywhere; }
+.iris-message--user { align-self: flex-end; border-color: #315644; border-radius: 14px 4px 14px 14px; background: #1d382c; }
+.iris-message--assistant { align-self: flex-start; border-radius: 4px 14px 14px; background: #19242a; }
+.iris-message--error { border-color: #754b4d; background: #302124; }
+.iris-message-label { display: block; margin-bottom: 5px; color: #a4d8bf; font-size: 10px; font-weight: 650; }
+.iris-message--error .iris-message-label { color: #ffc0bc; }
+.iris-message p { margin: 0; color: #e0e9e5; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+
+.iris-loading { display: flex; align-items: center; gap: 9px; align-self: flex-start; margin: 0; color: #b4c8bf; font-size: 11px; }
+.iris-loading span { width: 7px; height: 7px; border-radius: 50%; background: #78dfb3; box-shadow: 0 0 0 4px #78dfb31c; animation: iris-pulse 1.1s ease-in-out infinite; }
+
+.iris-composer {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 14px 8px;
+  border-top: 1px solid #27363d;
+  background: #111b21;
+}
+
+.iris-panel .iris-composer input {
+  width: 100%;
+  min-height: 46px;
+  flex: 1;
+  border: 1px solid #34464b;
+  border-radius: 12px;
+  background: #0d151a;
+  color: #e5efea;
+  padding: 11px 13px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.iris-panel .iris-composer input::placeholder { color: #82938f; opacity: 1; }
+.iris-panel .iris-composer input:focus-visible { border-color: #68b997; outline-offset: 1px; }
+
+.iris-panel .iris-composer button {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #4b8c70;
+  border-radius: 12px;
+  background: #244a39;
+  color: #c4f3dd;
+  cursor: pointer;
+}
+
+.iris-panel .iris-composer button:hover:not(:disabled) { border-color: #8cdbb3; background: #2d6247; }
+.iris-panel .iris-composer button:disabled { border-color: #35443f; background: #202c29; color: #768a80; opacity: 1; }
+.iris-disclaimer { margin: 0; padding: 0 14px 12px; background: #111b21; color: #899b94; text-align: center; font-size: 10px; line-height: 1.4; }
+.iris-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+
+@keyframes iris-panel-in { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes iris-pulse { 50% { opacity: .45; transform: scale(.82); } }
+
+@media (max-width: 560px) {
+  .iris-root { right: max(12px, env(safe-area-inset-right)); }
+  .iris-launcher { width: 56px; height: 56px; }
+  .iris-panel { width: min(400px, calc(100vw - 24px)); border-radius: 16px; }
+  .iris-messages { padding: 14px 12px; }
+  .iris-panel .iris-composer { padding-inline: 11px; }
+  .iris-panel .iris-composer input { font-size: 16px; }
+}
+
+@media (max-height: 520px) {
+  .iris-panel { bottom: calc(76px + env(safe-area-inset-bottom)); height: max(190px, calc(var(--iris-viewport-height, 100dvh) - 92px - env(safe-area-inset-bottom))); }
+  .iris-header { min-height: 62px; padding-block: 8px; }
+  .iris-mark { width: 38px; height: 38px; }
+  .iris-messages { padding-block: 10px; }
+  .iris-disclaimer { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iris-launcher, .iris-panel .iris-suggestions button { transition: none; }
+  .iris-panel { animation: none; }
+  .iris-loading span { animation: none; }
+}

@@ -37,6 +37,7 @@ from .equity_history import router as equity_history_router
 from .individual_equity_history import EquityPriceHistoryService, router as individual_equity_history_router
 from .equity_comparison import router as equity_comparison_router
 from .financial_events import router as financial_events_router
+from .assistant import router as assistant_router
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 from uuid import uuid4
@@ -81,6 +82,7 @@ app.include_router(equity_history_router)
 app.include_router(individual_equity_history_router)
 app.include_router(equity_comparison_router)
 app.include_router(financial_events_router)
+app.include_router(assistant_router)
 
 
 @app.exception_handler(RequestValidationError)

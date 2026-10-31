@@ -51,9 +51,9 @@ Inclui demonstração com dados fictícios; área privada Supabase Auth; ações
 
 Começar pela auditoria de dados e proveniência. A Fase 5.6 (snapshots, evolução patrimonial, fluxos, TWR/MWR e benchmarks) só avança se existirem valores históricos consistentes, fluxos externos completos e fonte permitida; sem esses dados, o resultado permanece indisponível. Melhorias de UX/metas são opcionais. A proposta e os critérios estão no [master plan](INVESTMENT_DASHBOARD_MASTER_PLAN.md); não há autorização para implementação automática.
 
-### v1.2 — agente de IA (proposta nova para planejamento)
+### v1.2 — Íris, assistente de educação financeira (implementada localmente; não publicada)
 
-Educação financeira e ajuda sobre as funcionalidades reais do produto. Não implementado. Priorizar chat read-only, sem dados financeiros privados, sem ferramentas de escrita e com provider adapter/backend, referências verificáveis, limite de custo e avaliação de prompt injection. Ver a análise de alternativas, privacidade e custo no [master plan](INVESTMENT_DASHBOARD_MASTER_PLAN.md).
+Chat privado com Groq Free opcional, modelo `qwen/qwen3.8-27b`, contexto estático, sem dados financeiros pessoais, ferramentas ou histórico permanente. A demonstração permanece sem IA. Chamadas reais locais ao endpoint autenticado e testes automatizados foram validados; sem chave/cota, a Íris fica indisponível e o dashboard continua funcionando. A inspeção visual autenticada em navegador e a configuração manual no Render/Vercel continuam pendentes. Nenhuma publicação foi feita.
 
 ### v2.0 — expansão controlada por convite (planejada)
 

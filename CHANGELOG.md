@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2 — Íris, assistente de educação financeira (implementação local)
+
+- Adicionada a Íris: chat educativo opcional na área privada autenticada, com chave somente no backend, conhecimento estático e sem acesso à carteira.
+- Demonstração pública sem assistente; indisponibilidade da chave/cota não bloqueia o dashboard.
+- Integração real local com Qwen via Groq e suítes automatizadas validadas; sem faturamento ou fallback pago.
+- Estado: não lançada. A inspeção visual autenticada em navegador e a configuração manual de produção continuam pendentes.
+
 ## v1.0.1 — correção do runner de integração PostgreSQL
 
 - Corrigida a resolução de imports do runner `backend/tests/run_postgres.py` em ambientes de CI Linux e execuções iniciadas fora do diretório `backend`, usando o caminho do próprio arquivo como referência.

@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     equity_history_enabled: bool = False
     individual_equity_history_enabled: bool = False
     brapi_token: SecretStr = SecretStr("")
+    groq_api_key: SecretStr = SecretStr("")
+    groq_model: str = "qwen/qwen3.8-27b"
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore", hide_input_in_errors=True)
 
     @model_validator(mode="after")

@@ -6,7 +6,7 @@ Uma plataforma web para registrar e acompanhar investimentos em ações e renda 
 
 **[Abrir a aplicação](https://investment-dashboard-pvd.vercel.app)** · **[Explorar a demonstração pública](https://investment-dashboard-pvd.vercel.app)** · **[Conhecer o plano do projeto](docs/INVESTMENT_DASHBOARD_MASTER_PLAN.md)**
 
-`v1.0.0` · hotfix `v1.0.1` · React · TypeScript · FastAPI · PostgreSQL
+`v1.0.1` publicada · `v1.2` em preparação local · React · TypeScript · FastAPI · PostgreSQL
 
 ---
 
@@ -37,6 +37,7 @@ O projeto nasceu para reunir registros de investimentos e tornar suas bases mais
 
 - **Demonstração pública:** usa dados fictícios e foi projetada para funcionar separada da API privada.
 - **Área privada:** autenticação Supabase e autorização no backend; os registros são isolados por proprietário.
+- **Íris:** assistente opcional de educação financeira, disponível somente na área privada autenticada. Usa conhecimento estático, não recebe dados da carteira e não recomenda investimentos.
 - **Privacidade:** a demonstração não usa a carteira privada. O produto não oferece cadastro público irrestrito.
 
 ## Prévia do produto
@@ -56,10 +57,10 @@ O backend concentra as regras financeiras e usa `Decimal` para cálculos monetá
 
 ## Próximas versões
 
-As etapas abaixo são **planejadas, não implementadas**:
+v1.1 e v2.0 seguem planejadas. A v1.2 está implementada localmente e aguarda aprovação para publicação:
 
 - **v1.1 — Desempenho histórico:** estudar snapshots e dados confiáveis para acompanhar a evolução patrimonial e, quando houver cobertura suficiente, avaliar rentabilidade e benchmarks.
-- **v1.2 — Assistente com IA:** explicar conceitos financeiros e orientar o uso das funcionalidades existentes, sem inventar recursos, enviar dados financeiros pessoais no MVP nem executar operações.
+- **v1.2 — Íris:** assistente educacional com Groq Free opcional; integração e testes locais validados. Ainda não publicada; a inspeção visual autenticada em navegador continua pendente.
 - **v2.0 — Acesso por convite:** avaliar expansão controlada para outras pessoas, preservando o isolamento entre carteiras.
 
 O escopo, as dependências e as limitações estão no [Master Plan v1 → v2](docs/INVESTMENT_DASHBOARD_MASTER_PLAN.md).
