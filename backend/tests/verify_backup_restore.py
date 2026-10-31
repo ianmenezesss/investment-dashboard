@@ -36,9 +36,11 @@ def snapshot(url: str) -> dict:
                 result["data_sha256"][table] = digest.hexdigest()
             if not result["counts"]["fixed_income_movements"] or not result["counts"]["fixed_income_investments"]:
                 raise AssertionError("Restore não contém fixtures fictícias de ledger")
+            if not result["counts"]["financial_events"] or not result["counts"]["financial_event_revisions"]:
+                raise AssertionError("Restore não contém fixtures fictícias de eventos financeiros/revisões")
             result["constraints"] = connection.scalar(text("""
                 SELECT count(*) FROM pg_constraint c JOIN pg_class r ON r.oid=c.conrelid
-                WHERE r.relnamespace='public'::regnamespace AND (r.relname LIKE 'fixed_income_%' OR r.relname LIKE 'financial_event%')
+                WHERE r.relnamespace='public'::regnamespace AND (r.relname='operations' OR r.relname LIKE 'fixed_income_%' OR r.relname LIKE 'financial_event%')
                   AND c.convalidated
             """))
             if not result["constraints"]:
@@ -47,12 +49,20 @@ def snapshot(url: str) -> dict:
                 row[0]: (row[1], row[2]) for row in connection.execute(text("""
                 SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class
                 WHERE relnamespace='public'::regnamespace AND relkind IN ('r','p')
-                  AND (relname LIKE 'fixed_income_%' OR relname LIKE 'financial_event%')
+                  AND (relname='operations' OR relname LIKE 'fixed_income_%' OR relname LIKE 'financial_event%')
                 ORDER BY relname
             """)).all()
             }
             if not result["rls"] or not all(flags == (True, True) for flags in result["rls"].values()):
                 raise AssertionError("RLS/FORCE RLS não foi preservado nas tabelas de renda fixa")
+            result["policies"] = connection.execute(text("""
+                SELECT tablename, policyname, permissive, roles::text, cmd, qual, with_check
+                FROM pg_policies WHERE schemaname='public'
+                ORDER BY tablename, policyname
+            """)).all()
+            policy_tables = {row[0] for row in result["policies"]}
+            if not set(result["rls"]).issubset(policy_tables):
+                raise AssertionError("Policies RLS ausentes em tabelas financeiras")
             result["append_only_triggers"] = sorted(connection.execute(text("""
                 SELECT c.relname || '.' || t.tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
                 WHERE NOT t.tgisinternal AND c.relname IN ('fixed_income_investment_archives','fixed_income_application_revisions','financial_events','financial_event_revisions')
@@ -117,10 +127,12 @@ def snapshot(url: str) -> dict:
                 archive_foreign = connection.scalar(text("SELECT count(*) FROM public.fixed_income_investment_archives WHERE owner_id <> CAST(:owner AS uuid)"), {"owner": owner})
                 financial_visible = connection.scalar(text("SELECT count(*) FROM public.financial_events"))
                 financial_foreign = connection.scalar(text("SELECT count(*) FROM public.financial_events WHERE owner_id <> CAST(:owner AS uuid)"), {"owner": owner})
+                revisions_visible = connection.scalar(text("SELECT count(*) FROM public.financial_event_revisions"))
                 revision_foreign = connection.scalar(text("SELECT count(*) FROM public.financial_event_revisions WHERE owner_id <> CAST(:owner AS uuid)"), {"owner": owner})
-                if not visible or foreign or archive_foreign or financial_foreign or revision_foreign:
+                if not visible or not financial_visible or not revisions_visible or foreign or archive_foreign or financial_foreign or revision_foreign:
                     raise AssertionError("Isolamento RLS por proprietário falhou no restore")
-                result["owner_visible"][owner] = (visible, foreign, archive_foreign, financial_visible, financial_foreign, revision_foreign)
+                result["owner_visible"][owner] = (visible, foreign, archive_foreign, financial_visible, financial_foreign,
+                                                   revisions_visible, revision_foreign)
         return result
     finally:
         engine.dispose()

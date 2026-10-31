@@ -1,5 +1,6 @@
 """Executa integração 001–009 e ensaio pg_dump/restore em containers efêmeros."""
 import os
+import io
 from pathlib import Path
 import re
 import secrets
@@ -100,6 +101,7 @@ def main():
     if os.name == "nt" and str(temp_root.resolve()).lower() != r"e:\investmentdashboard\temp":
         raise RuntimeError("O temporário deste ensaio deve ficar em E:\\InvestmentDashboard\\temp")
     backup_path = None
+    decrypted_dump = None
     network_created = False
     def run(*args):
         result = subprocess.run([docker, *args], capture_output=True, text=True)
@@ -184,9 +186,17 @@ def main():
         if dump.returncode:
             detail = (dump.stderr or b"Falha sem diagnostico").decode(errors="replace").replace(password, "[redacted]")[:2000]
             raise RuntimeError(f"pg_dump falhou: {detail}")
-        fd, backup_path = tempfile.mkstemp(prefix=f"investment-dashboard-{run_id}-", suffix=".dump", dir=temp_root)
+        from scripts.backup_archive import decrypt_stream, encrypt_stream
+        synthetic_passphrase = "Synthetic-only-passphrase-2026"
+        fd, backup_path = tempfile.mkstemp(prefix=f"investment-dashboard-{run_id}-", suffix=".idbackup", dir=temp_root)
         with os.fdopen(fd, "wb") as backup_file:
-            backup_file.write(dump.stdout)
+            encrypted_size, encrypted_hash = encrypt_stream(io.BytesIO(dump.stdout), backup_file, synthetic_passphrase)
+        decrypted = io.BytesIO()
+        with open(backup_path, "rb") as encrypted_file:
+            decrypted_size, decrypted_hash = decrypt_stream(encrypted_file, decrypted, synthetic_passphrase)
+        if decrypted.getvalue() != dump.stdout:
+            raise RuntimeError("Round-trip de criptografia divergiu do dump sintético original")
+        decrypted_dump = decrypted.getvalue()
         run(*container_run_args(restore_name, network, restore_db, password, run_id))
         wait_for_postgres(docker, restore_name, restore_db, password)
         roles_sql = """CREATE ROLE investment_runtime LOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
@@ -195,10 +205,9 @@ CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service
 """
         # Roles are cluster-global; create them in the guaranteed postgres maintenance DB.
         run_restore_role_setup(docker, restore_name, "postgres", roles_sql, password)
-        with open(backup_path, "rb") as backup_file:
-            restored = subprocess.run([docker, "exec", "-i", "-e", f"PGPASSWORD={password}", restore_name, "pg_restore", "--exit-on-error",
+        restored = subprocess.run([docker, "exec", "-i", "-e", f"PGPASSWORD={password}", restore_name, "pg_restore", "--exit-on-error",
                                        "-h", "127.0.0.1", "-p", "5432", "-U", "postgres", "-d", restore_db],
-                                      stdin=backup_file, capture_output=True)
+                                      input=decrypted_dump, capture_output=True)
         if restored.returncode:
             detail = (restored.stderr or b"Falha sem diagnostico").decode(errors="replace").replace(password, "[redacted]")[:2000]
             raise RuntimeError(f"pg_restore falhou: {detail}")
@@ -211,7 +220,8 @@ CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service
         restored_snapshot = snapshot(restore_url)
         if source_snapshot != restored_snapshot:
             raise RuntimeError("Snapshot de contagens, RLS/grants ou isolamento divergiu após restore")
-        print(f"BACKUP_RESTORE=PASSOU; bytes={len(dump.stdout)}; sha256={__import__('hashlib').sha256(dump.stdout).hexdigest()}")
+        print(f"BACKUP_RESTORE=PASSOU; encrypted_bytes={encrypted_size}; encrypted_sha256={encrypted_hash}; plaintext_sha256={decrypted_hash}")
+        print("BACKUP_ENCRYPTION=AES-256-GCM; AUTHENTICATED_DECRYPTION=PASS")
         print("RESTORE_HEAD=009; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
         return 0
     finally:

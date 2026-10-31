@@ -19,6 +19,8 @@ __pycache__/
 *.db-*
 *.sqlite*
 *.dump
+*.idbackup
+*.idbackup.*.partial
 *.sql
 *.backup
 *.bak
