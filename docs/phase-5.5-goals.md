@@ -1,6 +1,6 @@
 # Fase 5.5 — Metas financeiras
 
-**Estado em 30/10/2026:** implementada localmente na branch `feat/v5.5-goals`, criada a partir de `main`/`origin/main` em `d80b69c`. Os commits 5.5A, 5.5B e 5.5C são separados. Nenhum merge, push, deploy, chamada ao Supabase de produção ou alteração de banco foi realizado.
+**Estado atualizado em 30/10/2026:** os commits 5.5A, 5.5B e 5.5C (`0cfea4a`, `0ad5194`, `cdd99aa`) foram integrados à `main` pela PR #11. O proprietário relata as páginas publicadas na Vercel; a inspeção HTTP desta revisão conferiu somente o shell SPA. Não houve chamada ao Supabase de produção nem alteração de banco nesta revisão. A validação completa mais recente está em [validation.md](validation.md).
 
 ## 5.5A — Cadastro local
 
@@ -36,6 +36,6 @@
 ## Validação e limitações
 
 - Casos cobertos por testes: CRUD/validação, separação local por identidade, proteção da demo, migração não destrutiva do formato local 5.5A, progresso manual/capital investido, cobertura parcial e indisponível, valores extremos, cenários zero/negativo, prazos completos/vencidos/ausentes e limite de 600 meses.
-- Suite frontend completa: ver [registro de validação](validation.md). O backend não mudou; nesta execução o teste backend não pôde iniciar porque o `.venv` aponta para um executável Python da Microsoft Store inacessível. A integração PostgreSQL não foi executada.
+- A suíte frontend foi aprovada (217 testes em 28 arquivos) e o build TypeScript/Vite passou. A suíte backend completa passou nesta preparação (382 aprovados, 1 integração PostgreSQL opt-in ignorada); o ensaio PostgreSQL descartável 001–009 está registrado em [validation.md](validation.md).
 - A verificação automática do CSS e do build confirma as regras responsivas empacotadas; a revisão visual em navegador real deve ocorrer antes de publicar.
 - Os dados locais dependem da retenção do armazenamento do navegador. Limpar os dados do site ou usar outro perfil/dispositivo não transfere as metas.

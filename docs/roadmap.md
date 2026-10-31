@@ -1,6 +1,6 @@
 # Roadmap mestre — Investment Dashboard
 
-Atualizado em 30/10/2026. A `main` está no commit `1a7e4d8` e inclui a Fase 5.5, integrada na PR #11. O proprietário informa que Histórico, Relatórios, Simulador e Metas estão publicados na Vercel; essa publicação não foi verificada pelo painel nesta auditoria. O roadmap registra o estado observado no código e decisões do proprietário; não autoriza compra, migration persistente, push, merge, release ou deploy.
+Atualizado em 30/10/2026. `main`/`origin/main` estão em `1a7e4d8` e incluem a Fase 5.5 (PR #11). A branch local `chore/v1-release-readiness` deriva dessa base, sem divergência remota, e não foi integrada remotamente. O proprietário relata Histórico, Relatórios, Simulador e Metas publicados na Vercel. GETs desta revisão confirmaram somente shells SPA e o health check; login e SHAs implantados não foram validados. O backup manual único foi gerado e o hash/tamanho conferidos; o restore real ainda não foi executado. Este roadmap separa o escopo v1.0 dos candidatos futuros e não autoriza push, merge, release ou deploy.
 
 ## Estados usados
 
@@ -36,8 +36,26 @@ Atualizado em 30/10/2026. A `main` está no commit `1a7e4d8` e inclui a Fase 5.5
 | Release v4.0.0 | **Publicada; verificações operacionais reportadas como concluídas** | Proprietário confirmou `/api/operations`, `/api/dashboard/valuation`, `/api/dashboard/performance`, `/api/dashboard/equity-history`, histórico individual e comparação respondendo HTTP 200 em produção. Históricos sem provedor seguem indisponíveis de forma explícita. |
 | v4.4 — Rentabilidade temporal completa | **Bloqueado / condicional** | Depende de fluxo externo classificado, eventos pertinentes e avaliações históricas comparáveis. |
 | 5.0A — Navegação responsiva e identidade dinâmica | **Concluído** | Menu mobile acessível, sidebar desktop recolhível, identidade visual derivada da sessão e testes; sem alteração de backend/migration. Revisão visual geral da v1.0 segue no checklist de aceitação. |
-| v5.0.0 | **Implementada; v1.0 em preparação** | `main` integra 5.0A, 5.1, 5.3, 5.4 e 5.5A–C. A publicação das páginas 5.3–5.5 é reportada pelo proprietário. 5.2A foi retirada e 5.2B suspensa. Fase 5.6 continua condicional e fora do escopo indispensável da v1.0 pessoal. |
+| v5.0.0 | **Implementada; candidata v1.0.0 em revisão** | `main` integra 5.0A, 5.1, 5.3, 5.4 e 5.5A–C. As páginas 5.3–5.5 são reportadas como publicadas pelo proprietário; GET confirmou só os shells SPA. 5.2A foi retirada e 5.2B suspensa. Fase 5.6 fica fora da v1.0.0. |
 | Investment Dashboard 2.0 | **Planejado, após estabilidade pessoal** | Expansão por convite, com isolamento rigoroso e operação sustentável sem despesa obrigatória. |
+
+## Escopo organizado por versão
+
+### v1.0.0 — candidata local, release ainda não publicada
+
+Inclui demonstração offline com dados fictícios; área privada Supabase Auth; ações, renda fixa manual, eventos financeiros, Histórico, composição atual com cobertura declarada, relatórios imprimíveis, simulador hipotético e metas locais. Não inclui desempenho histórico completo/benchmarks nem sincronização de metas. O backup manual único foi gerado e teve seu tamanho e SHA-256 conferidos; restauração do artefato real em PostgreSQL descartável, revisão visual e homologação autenticada continuam gates no [checklist v1.0](v1.0-release-readiness.md).
+
+### v1.1 — candidatos ainda não aprovados
+
+Não há compromissos aprovados de implementação para v1.1. Itens já registrados que podem ser avaliados depois do lançamento incluem a Fase 5.6, somente se houver avaliações históricas e fonte permitida suficientes, e melhorias de UX/cobertura surgidas na homologação. Esta lista não autoriza implementação.
+
+### v2.0 — proposta de expansão sem compromisso
+
+O [plano de expansão multiusuário](multiuser-expansion-plan.md) propõe contas por convite, isolamento e operação multiusuário após estabilidade pessoal. Custos, privacidade, suporte e controles ainda dependem de decisão. Não está aprovado como prazo ou escopo da v1.0.
+
+### Backlog — propostas sem versão aprovada
+
+Open Finance, conexão com corretoras, conciliação, novas fontes de mercado, retorno histórico TWR/MWR e benchmarks permanecem ideias condicionais. CSV foi retirado; retomá-lo exige nova decisão explícita. Esses itens não são funcionalidades atuais nem compromisso de entrega.
 
 Referências de implementação e evidência: [revisão da 3.0.4](phase-3.0.4-final-review.md), [fase 4.1](phase-4.1-individual-equity-history.md) e [fase 4.2](phase-4.2-asset-comparison.md).
 
@@ -97,7 +115,7 @@ A 5.0A, 5.1, 5.3, 5.4 e 5.5A–C estão implementadas na `main`. A importação 
 | 5.2B — Adaptadores bancários | Parsers para layouts de instituições. | Suspensa com a retirada da importação; requer nova decisão antes de retomar. |
 | 5.3 — Relatórios e exportação | Aportes por mês/ano, composição por categoria/ativo, movimentos e eventos filtráveis e impressão para PDF. | Implementada no frontend privado com endpoints existentes; sem migration. PDF usa impressão nativa do navegador. |
 | 5.4 — Simulador | Aporte inicial/periódico, prazo, três taxas editáveis, convenção de aporte e inflação opcional. | Implementado localmente e sem persistência; não acessa carteira nem APIs externas. |
-| 5.5 — Metas | CRUD local, progresso manual confirmado ou custo/principal aberto com cobertura identificada, aporte mensal e projeções hipotéticas. | Implementada localmente em `feat/v5.5-goals`; sem API/migration; não sincroniza entre dispositivos. Base investida não é patrimônio de mercado. Revisar commits e testes antes de integrar. |
+| 5.5 — Metas | CRUD local, progresso manual confirmado ou custo/principal aberto com cobertura identificada, aporte mensal e projeções hipotéticas. | Integrada à `main` pela PR #11; publicação reportada pelo proprietário. Sem API/migration; não sincroniza entre dispositivos. Base investida não é patrimônio de mercado. |
 | 5.6 — Histórico de carteira e benchmarks | TWR/MWR e comparação com benchmarks somente após entradas e avaliações suficientes. | Condicional, possivelmente com persistência nova; fornecedor continua sujeito à regra gratuita. |
 
 **Opcionais preservados:** conexões bancárias/Open Finance, integração automática com corretores, conciliação e fontes comerciais. São propostas condicionais, exigem nova avaliação e não podem ser requisitos do produto.
@@ -134,7 +152,7 @@ Premissa: uma pessoa desenvolvedora, dias de trabalho focado, dependências loca
 | 5.2 | Retirada | — | Importação CSV removida; adaptadores suspensos. |
 | 5.3 | Média | 5–10 dias | Formatos e filtros. |
 | 5.4 | Concluída localmente | — | Simulador matemático sem persistência e independente da carteira. |
-| 5.5 | Integrada à `main`; publicação reportada | — | CRUD e planejamento local, sem migration; teste funcional em produção deve fazer parte do smoke autenticado. |
+| 5.5 | Integrada à `main`; publicação reportada | — | GET público confirmou shells, mas o fluxo autenticado/metas não foi validado nesta revisão. CRUD e planejamento são locais; sem migration. |
 | 5.6 | Condicional | 10–20+ dias de desenvolvimento | Fonte permitida e série histórica; aprovação externa sem prazo. |
 | Estabilização pessoal | Alta antes de expansão | 5–10 dias distribuídos | Ensaio de recuperação e operação. |
 | Preparação e MVP 2.0 | Baixa até aprovação própria | 20–40+ dias | Custos, privacidade, onboarding e suporte não definidos. |

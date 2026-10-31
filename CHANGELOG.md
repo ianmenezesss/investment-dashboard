@@ -1,10 +1,37 @@
 # Changelog
 
-## Preparação de lançamento v1.0 — 30/10/2026
+## v1.0.0 — candidata local; release ainda não publicada
+
+Investment Dashboard reúne controle manual de ações e renda fixa, eventos de caixa/proventos, composição, histórico, relatórios imprimíveis, simulador e metas financeiras locais. A demonstração pública é separada da área privada; a carteira privada usa Supabase Auth, API FastAPI e isolamento por proprietário/RLS.
+
+### Incluído
+
+- Ações, compras/vendas, renda fixa CDB e registro manual de aportes, retiradas, dividendos e JCP.
+- Histórico filtrável, composição atual com cobertura declarada, relatórios privados e impressão para PDF.
+- Simulador local com cenários e hipóteses editáveis; metas financeiras locais por identidade, sem sincronização entre dispositivos.
+- Demonstração com dados fictícios, documentação de segurança e um procedimento de backup manual único.
+
+### Validação desta preparação
+
+- Frontend: 217 testes aprovados em 28 arquivos; `npm run build` aprovado (TypeScript + Vite).
+- Dependências frontend: `npm audit` não reportou vulnerabilidades conhecidas.
+- Backend: 382 aprovados, 1 ignorado (integração PostgreSQL opt-in) em Python 3.12 descartável; aviso de depreciação `TestClient`/httpx.
+- PostgreSQL 17 descartável: cadeia de migrations até 009 e round-trip sintético de backup/restauração com eventos, políticas/RLS, grants e isolamento aprovados.
+- Backup real: artefato fora do repositório, 101085 bytes; SHA-256 foi recalculado e coincidiu com o registro fornecido pelo proprietário. A restauração desse artefato ainda não foi ensaiada; exige autorização específica para fornecer a frase localmente.
+- Smoke público: Vercel `/`, `/login` e `/metas` responderam HTTP 200 com o shell SPA; Render `/health` respondeu HTTP 200. Não foram autenticadas contas nem confirmados os SHAs implantados.
+
+### Limites conhecidos
+
+- A Fase 5.6, retorno histórico completo e benchmarks permanecem fora desta release; não há dados suficientes para calcular TWR/XIRR ou patrimônio histórico completo com confiança.
+- Preços e avaliações podem estar parciais ou indisponíveis; estimativas não são retorno garantido. Metas não são sincronizadas.
+- O backup único cobre o schema `public` exportável; não recupera Supabase Auth, arquivos binários do Storage, roles globais, configurações externas ou alterações posteriores ao dump.
+- A revisão visual desktop/celular, fluxos autenticados de produção e inspeção da CSP/rede da demo ainda requerem homologação manual. Não foi criado tag ou GitHub Release.
+
+## Auditoria inicial de preparação v1.0 — 30/10/2026 (registro histórico)
 
 - Auditoria local confirmou `main`/`origin/main` em `1a7e4d8`; páginas recentes publicadas na Vercel conforme relato do proprietário. Smoke GET: Render `/health` e frontend privado Vercel responderam HTTP 200; autenticação e painel não foram verificados.
 - Frontend: 217 testes em 28 arquivos e build passaram. Backend em Python 3.12/Docker: 374 aprovados, 1 ignorado; teste PostgreSQL 17 descartável com migrations até 009: 1 aprovado.
-- Atualizados README, status de segurança, roadmap, handoff e checklist; sem alteração funcional, migration ou banco. Restore completo e retenção do Supabase continuam pendentes de validação.
+- Naquele ponto, README, status de segurança, roadmap, handoff e checklist foram revisados; o backup real ainda não havia sido gerado. O status atual está registrado na entrada candidata v1.0.0 acima e em `docs/validation.md`.
 
 ## Fase 5.5 — integrada à `main`; publicação reportada pelo proprietário
 

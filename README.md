@@ -2,7 +2,7 @@
 
 Plataforma full stack para acompanhamento de investimentos em ações brasileiras. Reúne operações, posições por custo médio, resultados realizados e visualizações em uma interface responsiva em português, com valores em reais e persistência PostgreSQL.
 
-**Estado do produto: v1.0 em preparação de lançamento.** A `main` inclui autenticação Supabase, dashboard de carteira, ações, renda fixa, eventos financeiros, Histórico, relatórios, simulador e metas. A demonstração pública permanece offline e usa dados fictícios. Metas são salvas localmente por identidade no navegador e não sincronizam entre dispositivos. Consulte o [roadmap](docs/roadmap.md) e o [handoff](docs/v5-development-handoff.md) para limitações e critérios de lançamento; presença no código não comprova configuração ou saúde dos serviços hospedados.
+**Estado do produto: candidato v1.0.0 em revisão final; ainda não publicado como release GitHub.** A `main` inclui autenticação Supabase, dashboard de carteira, ações, renda fixa, eventos financeiros, Histórico, relatórios, simulador e metas. O proprietário relata que as fases recentes estão publicadas na Vercel; esta revisão não confirma a configuração autenticada nem o commit servido. A demonstração pública foi projetada para operar offline com dados fictícios. Metas são salvas localmente por identidade no navegador e não sincronizam entre dispositivos. Consulte o [roadmap](docs/roadmap.md), o [handoff](docs/v5-development-handoff.md) e o [checklist v1.0.0](docs/v1.0-release-readiness.md) para limitações e critérios.
 
 Tecnologias: React 19, TypeScript, Vite, Tailwind, componentes shadcn/Radix, Recharts, Lucide, React Router, TanStack Query; Python 3.12+, FastAPI, SQLAlchemy, Alembic, Pydantic, PostgreSQL 17, Pytest e PyJWT com criptografia.
 
@@ -16,6 +16,7 @@ Documentação:
 - [Configuração futura de Vercel, Render e Supabase](docs/deployment.md).
 - [Testes e limites da verificação](docs/validation.md).
 - [Checklist de aceitação para a v1.0](docs/v1.0-release-readiness.md).
+- [Rascunho das notas de lançamento v1.0.0](docs/release-notes-v1.0.0.md) e [changelog](CHANGELOG.md).
 
 ## Fase 1
 
@@ -108,7 +109,7 @@ docker compose cp db:/tmp/investment.dump ./investment.dump
 
 Guarde o arquivo fora do repositório. Para ensaiar uma restauração, use outro banco descartável e valide antes de qualquer substituição. O volume Docker local persiste entre reinicializações; não o remova se contiver dados pessoais.
 
-Para produção, confirme no painel Supabase o mecanismo de backup, retenção e janela de recuperação contratados para o projeto. Faça um restore de ensaio para um projeto/banco separado e valide schema, RLS, grants e isolamento antes de considerar a recuperação testada. Esta documentação não confirma configuração, retenção ou restore real do projeto hospedado.
+Para a v1.0.0 foi gerado um único backup manual do schema `public` fora do repositório; tamanho e SHA-256 foram conferidos. Não há agendamento, retenção de múltiplas cópias ou serviço pago. O arquivo é um dump custom PostgreSQL cifrado com AES-256-GCM; o restore do artefato real em PostgreSQL descartável ainda depende de autorização para informar a frase localmente. Auth, binários do Storage e configurações externas não fazem parte desse backup. Escopo e limitações estão em [docs/manual-backup.md](docs/manual-backup.md).
 
 ## Segurança e escopo
 

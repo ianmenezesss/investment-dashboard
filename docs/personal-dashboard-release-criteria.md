@@ -59,8 +59,8 @@ Definir antes do início quais das fases 5.1–5.6 entram na release. Requisitos
 - revisar dependências, CSP, XSS, autenticação de sessão e exposição de erros.
 
 ### Operação e recuperação
-- backup automático ou procedimento local gratuito conforme ambiente, com local de retenção protegido;
-- teste de restauração em clone descartável; documentar RPO/RTO realista, sem prometer disponibilidade;
+- um procedimento manual gratuito, conforme o ambiente, com o artefato protegido fora do repositório; para esta preparação v1.0 foi escolhido um único backup, sem agendamento ou retenção de cópias;
+- teste de restauração em PostgreSQL descartável; documentar que um único ponto de recuperação não garante disponibilidade nem recuperação de alterações posteriores;
 - processo de migration e rollback de aplicação; backup antes de schema change;
 - logs sem token, senha, DSN nem conteúdo financeiro; health check sem dados pessoais;
 - alertas e limites compatíveis com recursos gratuitos; procedimento em falha/suspensão.

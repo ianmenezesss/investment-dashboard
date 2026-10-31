@@ -1,6 +1,6 @@
 # Plano mestre — v5.0.0
 
-**Status em 30/10/2026:** a `main` local e `origin/main` estavam em `d80b69c` antes desta etapa. A branch local `feat/v5.5-goals` contém as entregas 5.5A–C em desenvolvimento; não houve merge, push ou deploy. As fases 5.0A, 5.1, 5.3 e 5.4 estão implementadas; 5.2A foi retirada e 5.2B está suspensa. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção; esta etapa não acessou nem modificou o banco. Este status não autoriza publicação.
+**Estado atualizado em 30/10/2026:** `main` e `origin/main` permanecem em `1a7e4d8`, com a Fase 5.5 integrada pela PR #11; esta branch de preparação deriva dessa base e não foi integrada remotamente. O proprietário relata a publicação das páginas recentes, mas a inspeção HTTP confirmou somente shells Vercel e health check Render, não o comportamento autenticado nem os SHAs implantados. 5.0A, 5.1, 5.3, 5.4 e 5.5A–C estão implementadas; 5.2A foi retirada e 5.2B está suspensa. A Fase 5.6 permanece fora da v1.0. O backup manual único foi gerado e seu hash/tamanho conferidos; restauração do arquivo real não foi executada. Esta atualização não acessou novamente nem alterou o banco de produção e não publica a release.
 
 ## Relação com o planejamento original
 
@@ -68,7 +68,7 @@ A arquitetura original reservava uma fase para planejamento: simulador com premi
 
 ### 5.5 — Metas
 
-**Estado:** implementada localmente em `feat/v5.5-goals`; aguarda revisão antes de qualquer merge ou publicação. Detalhes e limites em [especificação da Fase 5.5](phase-5.5-goals.md).
+**Estado:** integrada à `main` pela PR #11. O proprietário relata sua publicação na Vercel; a revisão HTTP desta preparação confirmou somente o shell SPA, não o fluxo autenticado. Detalhes e limites em [especificação da Fase 5.5](phase-5.5-goals.md).
 - 5.5A: criar, editar, excluir e separar metas ativas/concluídas; valida nome, valor e prazo; mostra barra/percentual. A persistência fica no `localStorage` segregado por identidade Supabase no navegador atual; não sincroniza entre dispositivos e não é copiada para a demo pública.
 - 5.5B: aceita progresso informado e confirmado manualmente ou capital investido da base privada `equity_open_acquisition_cost_plus_effective_cdb_principal`. O rótulo distingue patrimônio manual de custo/principal investido; o cálculo não inclui dinheiro externo, dividendos nem cotações de mercado. Dados incompletos são identificados, posições declaradas sem saldo ficam fora da base e o modo manual continua disponível.
 - 5.5C: calcula aporte necessário, prazo aproximado e evolução hipotética com o mesmo conversor de taxa anual efetiva e motor do Simulador 5.4. Taxas padrão de 6%, 10% e 14% a.a. são editáveis e nunca apresentadas como promessa. Aportes modelados ocorrem no fim do mês; projeções aceitam até 600 meses. Prazo vencido ou ausente usa horizonte manual.

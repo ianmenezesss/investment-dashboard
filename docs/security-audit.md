@@ -9,6 +9,12 @@ O registro abaixo descreve a auditoria inicial da Fase 1.5; suas afirmações so
 - Não houve pentest, auditoria de configuração de painéis, leitura de dados do Supabase, nem verificação de configuração de backups/retention hospedada. Rate limiting distribuído, MFA e revogação imediata de JWT não estão comprovados nesta revisão.
 - A demo precisa permanecer com sua CSP pública sem conexões privadas. A CSP observada no domínio Vercel privado permite as origens configuradas de Auth/API; confirme a CSP do domínio público separadamente antes da v1.0.
 
+## Atualização da finalização v1.0.0 — 30/10/2026
+
+- GET anônimo ao Vercel documentado respondeu HTTP 200 em `/`, `/login` e `/metas`, servindo o shell SPA e enviando CSP. O `connect-src` permite o próprio domínio, Supabase e Render, e o asset inclui marcadores dessas integrações; isso não prova uma chamada efetiva, mas tampouco confirma a demo offline. GET ao `Render /health` respondeu HTTP 200 com status `ok`. Login, execução/navegação do frontend, Network da demo e configurações internas dos painéis não foram validados.
+- O backup manual único está fora do checkout e teve tamanho/SHA conferidos. A restauração desse artefato não foi executada; contas Auth, binários Storage, roles globais e configurações externas continuam fora do escopo coberto pelo dump `public`.
+- `npm audit` não reportou vulnerabilidades conhecidas na árvore npm; isso não substitui revisão dos painéis nem pentest. A auditoria autenticada final permanece manual.
+
 Esta seção atual é o resumo de segurança para lançamento. Os achados e comandos abaixo permanecem como registro histórico da fase inicial, não como evidência de validação da produção atual.
 
 Atualização 1.6.3: confirmações nativas foram substituídas por um modal com semântica alertdialog, confirmação explícita e foco inicial em Cancelar. Os mesmos endpoints e filtros continuam protegendo operações privadas. O conjunto fictício foi ampliado sem sobrescrever documentos válidos antigos: o schema v1 é lido sem gravação, e o novo seed só entra por instalação limpa ou restauração confirmada. Não foram alterados autenticação, credenciais, banco pessoal ou volumes.
@@ -33,7 +39,7 @@ Atualização da Fase 1.6: [login Supabase implementado](supabase-auth.md), sem 
 | Sem configuração de hospedagem e revisão automatizada | Modelos Vercel/Render, CI e scanner local sem envio a terceiros |
 | Auditoria npm identificou avisos críticos no runner Vitest 3 e dependências transitivas | Runner atualizado para Vitest 5.0.5, compatível com Node 22.12+/24+; testes repetidos e auditoria final sem vulnerabilidades reportadas |
 
-## Estado local e riscos remanescentes
+## Registro histórico: estado e riscos da auditoria inicial
 
 - Não havia `.git` na pasta do projeto. Portanto não há histórico local nem arquivos rastreados a remover; não foi inicializado repositório ou executado push.
 - `.env` existe e permanece privado. A verificação detectou senha local de PostgreSQL ainda igual ao placeholder de exemplo. A senha não foi exibida nem alterada para não desalinhar sua instalação. Escolha uma senha aleatória e faça uma rotação coordenada da credencial do papel PostgreSQL e de `.env` antes de qualquer uso remoto. Alterar só a variável do Compose não modifica a senha de um volume já inicializado.
