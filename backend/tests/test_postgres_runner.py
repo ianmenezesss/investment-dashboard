@@ -2,11 +2,37 @@
 import pytest
 import subprocess
 import io
+import os
+import sys
+from pathlib import Path
 
 from run_postgres import (container_run_args, network_create_args, parse_loopback_port,
                           run_restore_role_setup, wait_for_postgres)
 from restore_supabase_backup import safe_output, validate_backup
 from scripts.backup_archive import encrypt_stream, sha256_file
+
+
+def test_runner_bootstraps_backend_imports_outside_checkout(tmp_path):
+    runner = Path(__file__).resolve().parent / "run_postgres.py"
+    backend_root = runner.parents[1]
+    code = (
+        f"import runpy; runpy.run_path({str(runner)!r}); "
+        "from scripts.backup_archive import encrypt_stream; "
+        "print(encrypt_stream.__module__)"
+    )
+    env = {key: value for key, value in os.environ.items()
+           if key != "PYTHONHOME"}
+    dependency_paths = [entry for entry in env.get("PYTHONPATH", "").split(os.pathsep)
+                        if entry and Path(entry).resolve() != backend_root]
+    if dependency_paths:
+        env["PYTHONPATH"] = os.pathsep.join(dependency_paths)
+    else:
+        env.pop("PYTHONPATH", None)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    result = subprocess.run([sys.executable, "-c", code], cwd=tmp_path,
+                            env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "scripts.backup_archive"
 
 
 def test_disposable_network_and_both_containers_bind_only_loopback():
