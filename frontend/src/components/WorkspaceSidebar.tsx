@@ -41,9 +41,8 @@ export function WorkspaceSidebar({ demo, routeTo, collapsed = false, onToggleCol
     <nav id={mobile ? undefined : 'desktop-primary-navigation'} aria-label="Navegação principal">
       {items.map(item => {
         const Icon = item.icon
-        const planned = item.to === '/metas'
-        return <NavLink end to={routeTo(item.to)} key={item.to} aria-label={`${item.label}${planned ? ' (Em breve)' : ''}`} title={item.label} onClick={onNavigate}>
-          <Icon size={19} aria-hidden="true"/><span className="nav-label">{item.label}</span>{planned && <span className="nav-planned">Em breve</span>}
+        return <NavLink end to={routeTo(item.to)} key={item.to} aria-label={item.label} title={item.label} onClick={onNavigate}>
+          <Icon size={19} aria-hidden="true"/><span className="nav-label">{item.label}</span>
         </NavLink>
       })}
     </nav>
