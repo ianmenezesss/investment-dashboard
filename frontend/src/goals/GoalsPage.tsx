@@ -4,8 +4,9 @@ import Decimal from 'decimal.js'
 import { useQuery } from '@tanstack/react-query'
 import { Check, Pencil, Plus, Target, Trash2, X } from 'lucide-react'
 import type { PrivateRepository } from '../repositories/PrivateRepository'
-import { createGoal, goalProgressPercent, goalState, loadGoals, saveGoals, updateGoal, type Goal, type GoalDraft } from './goalStorage'
+import { createGoal, goalProgressPercent, goalState, loadGoals, saveGoals, updateGoal, updateGoalPlanning, type Goal, type GoalDraft, type GoalPlanningSettings } from './goalStorage'
 import { confirmManualProgress, deriveInvestedBasis, goalForDisplay, setGoalToInvested, type InvestedBasis } from './goalProgress'
+import { GoalPlanning } from './GoalPlanning'
 import './goals.css'
 
 const emptyDraft: GoalDraft = { name: '', targetAmount: '', targetDate: '', initialReferenceAmount: '0' }
@@ -50,6 +51,12 @@ export function GoalsPage({ identity, repository }: { identity: string; reposito
       return 'Não foi possível salvar a confirmação manual.'
     } catch (error) { return (error as Error).message }
   }
+  function savePlanning(id: string, planning: GoalPlanningSettings) {
+    try {
+      const next = goals.map(goal => goal.id === id ? updateGoalPlanning(goal, planning) : goal)
+      return persist(next) ? '' : 'Não foi possível salvar as premissas neste dispositivo.'
+    } catch (error) { return (error as Error).message }
+  }
 
   const displayGoals = goals.map(goal => goalForDisplay(goal, investedBasis))
   const active = displayGoals.filter(goal => goalState(goal) !== 'completed')
@@ -68,8 +75,8 @@ export function GoalsPage({ identity, repository }: { identity: string; reposito
         <div className="goals-editor-actions"><button type="submit"><Check size={15}/>{editing ? 'Salvar alterações' : 'Adicionar meta'}</button>{editing && <button type="button" className="goals-secondary" onClick={() => { setEditing(null); setDraft(emptyDraft); setFormError('') }}><X size={15}/>Cancelar</button>}</div>
       </form>
     </article>
-    <section className="goals-list-section" aria-labelledby="active-goals-heading"><h2 id="active-goals-heading">Metas ativas ({active.length})</h2>{active.length ? <div className="goals-grid">{active.map(goal => <GoalCard key={goal.id} goal={goal} investedBasis={investedBasis} onUseInvested={useInvested} onConfirmManual={confirmManual} onEdit={beginEdit} onDelete={() => setDeleteId(goal.id)} deleting={deleteId === goal.id} onCancelDelete={() => setDeleteId(null)} onConfirmDelete={() => removeGoal(goal.id)}/>)}</div> : <div className="panel goals-empty"><Target size={20}/><h3>Nenhuma meta ativa</h3><p>Crie uma meta acima para começar a acompanhar.</p></div>}</section>
-    <section className="goals-list-section" aria-labelledby="completed-goals-heading"><h2 id="completed-goals-heading">Metas concluídas ({completed.length})</h2>{completed.length ? <div className="goals-grid">{completed.map(goal => <GoalCard key={goal.id} goal={goal} investedBasis={investedBasis} onUseInvested={useInvested} onConfirmManual={confirmManual} onEdit={beginEdit} onDelete={() => setDeleteId(goal.id)} deleting={deleteId === goal.id} onCancelDelete={() => setDeleteId(null)} onConfirmDelete={() => removeGoal(goal.id)}/>)}</div> : <p className="goals-empty-note">Metas concluídas aparecerão aqui quando o valor confirmado atingir o alvo.</p>}</section>
+    <section className="goals-list-section" aria-labelledby="active-goals-heading"><h2 id="active-goals-heading">Metas ativas ({active.length})</h2>{active.length ? <div className="goals-grid">{active.map(goal => <GoalCard key={goal.id} goal={goal} investedBasis={investedBasis} onUseInvested={useInvested} onConfirmManual={confirmManual} onSavePlanning={savePlanning} onEdit={beginEdit} onDelete={() => setDeleteId(goal.id)} deleting={deleteId === goal.id} onCancelDelete={() => setDeleteId(null)} onConfirmDelete={() => removeGoal(goal.id)}/>)}</div> : <div className="panel goals-empty"><Target size={20}/><h3>Nenhuma meta ativa</h3><p>Crie uma meta acima para começar a acompanhar.</p></div>}</section>
+    <section className="goals-list-section" aria-labelledby="completed-goals-heading"><h2 id="completed-goals-heading">Metas concluídas ({completed.length})</h2>{completed.length ? <div className="goals-grid">{completed.map(goal => <GoalCard key={goal.id} goal={goal} investedBasis={investedBasis} onUseInvested={useInvested} onConfirmManual={confirmManual} onSavePlanning={savePlanning} onEdit={beginEdit} onDelete={() => setDeleteId(goal.id)} deleting={deleteId === goal.id} onCancelDelete={() => setDeleteId(null)} onConfirmDelete={() => removeGoal(goal.id)}/>)}</div> : <p className="goals-empty-note">Metas concluídas aparecerão aqui quando o valor confirmado atingir o alvo.</p>}</section>
   </section>
 }
 
@@ -83,8 +90,9 @@ function InvestedBasisNotice({ basis }: { basis: InvestedBasis }) {
   </aside>
 }
 
-function GoalCard({ goal, investedBasis, onUseInvested, onConfirmManual, onEdit, onDelete, deleting, onCancelDelete, onConfirmDelete }: { goal: Goal; investedBasis: InvestedBasis; onUseInvested: (id: string) => void; onConfirmManual: (id: string, value: string) => string; onEdit: (goal: Goal) => void; onDelete: () => void; deleting: boolean; onCancelDelete: () => void; onConfirmDelete: () => void }) {
+function GoalCard({ goal, investedBasis, onUseInvested, onConfirmManual, onSavePlanning, onEdit, onDelete, deleting, onCancelDelete, onConfirmDelete }: { goal: Goal; investedBasis: InvestedBasis; onUseInvested: (id: string) => void; onConfirmManual: (id: string, value: string) => string; onSavePlanning: (id: string, settings: GoalPlanningSettings) => string; onEdit: (goal: Goal) => void; onDelete: () => void; deleting: boolean; onCancelDelete: () => void; onConfirmDelete: () => void }) {
   const [manualEditing, setManualEditing] = useState(false)
+  const [planningOpen, setPlanningOpen] = useState(false)
   const [manualValue, setManualValue] = useState(goal.manualProgressAmount)
   const [manualError, setManualError] = useState('')
   useEffect(() => { setManualValue(goal.manualProgressAmount) }, [goal.manualProgressAmount])
@@ -100,6 +108,8 @@ function GoalCard({ goal, investedBasis, onUseInvested, onConfirmManual, onEdit,
     <div className="goal-progress-actions">{goal.progressSource !== 'invested' && investedBasis.amount !== null && <button type="button" onClick={() => { onUseInvested(goal.id); setManualEditing(false); setManualError('') }}>Acompanhar capital investido</button>}<button type="button" className="goals-secondary" onClick={() => { setManualEditing(value => !value); setManualError(''); setManualValue(goal.manualProgressAmount) }}>{manualEditing ? 'Cancelar atualização' : goal.progressSource === 'manual' ? 'Atualizar valor manual' : 'Usar progresso manual'}</button></div>
     {manualEditing && <form className="goal-manual-form" onSubmit={event => { event.preventDefault(); const error = onConfirmManual(goal.id, manualValue); setManualError(error); if (!error) setManualEditing(false) }}><label>Patrimônio atual usado nesta meta (R$)<input name="manualProgressAmount" type="number" min="0" max="1000000000000" step="0.01" value={manualValue} onChange={event => setManualValue(event.target.value)} required/></label><button type="submit"><Check size={14}/>Confirmar valor manual</button>{manualError && <p role="alert">{manualError}</p>}</form>}
     {goal.progressSource === 'invested' && investedBasis.status === 'partial' && <p className="goal-incomplete-warning" role="status">Base de capital investido parcial: {investedBasis.warnings.join('; ')}. Confira a composição ou use o valor manual.</p>}
+    <button type="button" className="goal-planning-toggle" aria-expanded={planningOpen} onClick={() => setPlanningOpen(value => !value)}><Plus size={14}/>{planningOpen ? 'Fechar planejamento' : 'Planejar aportes e projeções'}</button>
+    {planningOpen && <GoalPlanning currentAmount={goal.currentAmount} targetAmount={goal.targetAmount} targetDate={goal.targetDate} settings={goal.planning} onSave={settings => onSavePlanning(goal.id, settings)}/>}
     {deleting && <div className="goal-delete-confirm" role="alertdialog" aria-label={`Confirmar exclusão de ${goal.name}`}><span>Excluir esta meta local?</span><button type="button" onClick={onConfirmDelete}>Excluir</button><button type="button" className="goals-secondary" onClick={onCancelDelete}>Cancelar</button></div>}
   </article>
 }

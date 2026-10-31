@@ -36,7 +36,7 @@ Atualizado em 30/10/2026. Este documento é a fonte principal de verdade do plan
 | Release v4.0.0 | **Publicada; verificações operacionais reportadas como concluídas** | Proprietário confirmou `/api/operations`, `/api/dashboard/valuation`, `/api/dashboard/performance`, `/api/dashboard/equity-history`, histórico individual e comparação respondendo HTTP 200 em produção. Históricos sem provedor seguem indisponíveis de forma explícita. |
 | v4.4 — Rentabilidade temporal completa | **Bloqueado / condicional** | Depende de fluxo externo classificado, eventos pertinentes e avaliações históricas comparáveis. |
 | 5.0A — Navegação responsiva e identidade dinâmica | **Concluído localmente** | Menu mobile acessível, sidebar desktop recolhível, identidade visual derivada da sessão e testes; sem alteração de backend/migration. Revisão visual final do proprietário permanece antes de publicação. |
-| v5.0.0 | **Em desenvolvimento local** | 5.0A, 5.1, 5.3 (relatórios) e 5.4 (simulador local) implementadas; importação 5.2A retirada e 5.2B suspensa. 5.5 permanece placeholder; 5.6 condicional. |
+| v5.0.0 | **Em desenvolvimento local** | 5.0A, 5.1, 5.3, 5.4 e 5.5A–C implementadas localmente; branch `feat/v5.5-goals` ainda não integrada/publicada. Importação 5.2A retirada e 5.2B suspensa. 5.6 condicional. |
 | Investment Dashboard 2.0 | **Planejado, após estabilidade pessoal** | Expansão por convite, com isolamento rigoroso e operação sustentável sem despesa obrigatória. |
 
 Referências de implementação e evidência: [revisão da 3.0.4](phase-3.0.4-final-review.md), [fase 4.1](phase-4.1-individual-equity-history.md) e [fase 4.2](phase-4.2-asset-comparison.md).
@@ -46,7 +46,7 @@ Referências de implementação e evidência: [revisão da 3.0.4](phase-3.0.4-fi
 A arquitetura original agrupava em fases numeradas: fundação de ações; contas/corretoras, edição e proventos; renda fixa; medição com snapshots, caixa externo, benchmarks e TWR/XIRR; planejamento com simulador, metas e relatórios; e uso remoto seguro. A execução evoluiu em versões 1.x, 2.x, 3.x e 4.x diferentes da numeração inicial. Os documentos históricos não são reescritos para sugerir que a numeração atual existia desde o começo.
 
 - **Entregue em fases anteriores:** ledger de ações com custo médio; demo offline; Supabase Auth privado, autorização por proprietário e RLS; renda fixa CDB com principal, revisões REPLACE/VOID, observações manuais e estimativa CDI sob premissas; cotações pontuais; histórico unificado de operações; fluxos e composição por bases declaradas.
-- **Ainda não entregue ou incompleto:** contas/corretoras, edição transacional geral de operações, saldo de caixa conciliado, suporte IPCA no motor de rendimento, cotações manuais com fonte e timestamp como base de valuation, relatórios completos, metas e simulador.
+- **Ainda não entregue ou incompleto:** contas/corretoras, edição transacional geral de operações, saldo de caixa conciliado, suporte IPCA no motor de rendimento, cotações manuais com fonte e timestamp como base de valuation e desempenho histórico completo.
 - **Retirado ou suspenso:** importação CSV e adaptadores bancários estão fora do escopo atual. Integração bancária e conciliação automatizada não devem ser iniciadas sem nova decisão.
 - **Fase de medição original:** snapshots patrimoniais, fluxos externos separados de negociações e benchmarks oficiais. Continua dependente dos itens da 5.1 e da 4.4.
 - **Fase de uso remoto original:** parte da base técnica já existe, mas não substitui o planejamento de onboarding, operação, recuperação, privacidade e controles para convidados.
@@ -87,7 +87,7 @@ Critérios e processo: [critérios de release pessoal](personal-dashboard-releas
 
 ## v5.0.0 — planejamento, dados e relatórios
 
-A **5.0A — Navegação responsiva e identidade dinâmica**, a 5.1, os relatórios 5.3 e o simulador local 5.4 estão implementados. A importação 5.2A foi retirada e 5.2B está suspensa. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção e que as tabelas de eventos existem; esta atualização não acessou nem modificou esse banco. **Metas** permanece placeholder. A 5.4 não lê nem grava dados da carteira. As etapas seguintes continuam sujeitas aos critérios, dependências e decisões descritos no [plano mestre v5](phase-5-master-plan.md).
+A **5.0A — Navegação responsiva e identidade dinâmica**, a 5.1, os relatórios 5.3, o simulador local 5.4 e as metas locais 5.5A–C estão implementados. A importação 5.2A foi retirada e 5.2B está suspensa. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção e que as tabelas de eventos existem; esta atualização não acessou nem modificou esse banco. A 5.4 continua independente da carteira. As metas ficam no navegador privado, sem sincronização nem persistência em servidor. As etapas seguintes continuam sujeitas aos critérios, dependências e decisões descritos no [plano mestre v5](phase-5-master-plan.md).
 
 | Fase proposta | Conteúdo | Prioridade / dependências |
 |---|---|---|
@@ -97,7 +97,7 @@ A **5.0A — Navegação responsiva e identidade dinâmica**, a 5.1, os relatór
 | 5.2B — Adaptadores bancários | Parsers para layouts de instituições. | Suspensa com a retirada da importação; requer nova decisão antes de retomar. |
 | 5.3 — Relatórios e exportação | Aportes por mês/ano, composição por categoria/ativo, movimentos e eventos filtráveis e impressão para PDF. | Implementada no frontend privado com endpoints existentes; sem migration. PDF usa impressão nativa do navegador. |
 | 5.4 — Simulador | Aporte inicial/periódico, prazo, três taxas editáveis, convenção de aporte e inflação opcional. | Implementado localmente e sem persistência; não acessa carteira nem APIs externas. |
-| 5.5 — Metas | Patrimônio-alvo, prazo, progresso e projeção com base claramente identificada. | Escopo original e placeholder; depende da definição da base do progresso. |
+| 5.5 — Metas | CRUD local, progresso manual confirmado ou custo/principal aberto com cobertura identificada, aporte mensal e projeções hipotéticas. | Implementada localmente em `feat/v5.5-goals`; sem API/migration; não sincroniza entre dispositivos. Base investida não é patrimônio de mercado. Revisar commits e testes antes de integrar. |
 | 5.6 — Histórico de carteira e benchmarks | TWR/MWR e comparação com benchmarks somente após entradas e avaliações suficientes. | Condicional, possivelmente com persistência nova; fornecedor continua sujeito à regra gratuita. |
 
 **Opcionais preservados:** conexões bancárias/Open Finance, integração automática com corretores, conciliação e fontes comerciais. São propostas condicionais, exigem nova avaliação e não podem ser requisitos do produto.
@@ -118,8 +118,9 @@ A expansão para convidados só deve começar após backup/restauração ensaiad
 | Gráfico de patrimônio histórico | Posições reconstruíveis e preços/valores observados por data para cada classe incluída. |
 | Comparação/histórico de ações real | Fonte diária gratuita, licença, cobertura B3 e base de preços validadas. |
 | Simulador | Premissas editáveis, fórmulas testadas e apresentação como cenário, não previsão. |
-| Metas | Definição de “patrimônio atual” e método de progresso; sem isso, explicar indisponibilidade. |
 | Multiusuário | Conta e convite, autorização, isolamento, suporte, privacidade, limites, backup e observabilidade. |
+
+Para a implementação local 5.5, a base foi delimitada: progresso manual confirmado ou custo/principal aberto calculado pelo endpoint privado existente; não é patrimônio de mercado nem inclui fluxos externos. As metas não são sincronizadas entre dispositivos.
 
 ## Estimativas e prioridades
 
@@ -132,7 +133,8 @@ Premissa: uma pessoa desenvolvedora, dias de trabalho focado, dependências loca
 | 5.1 | Implementada | — | Proprietário informa migration 009 aplicada à produção; não verificada nesta alteração. Sem backfill. |
 | 5.2 | Retirada | — | Importação CSV removida; adaptadores suspensos. |
 | 5.3 | Média | 5–10 dias | Formatos e filtros. |
-| 5.4 e 5.5 | Média | 8–15 dias somadas | Persistir simulações/metas exigiria schema; apenas cenário temporário talvez não. |
+| 5.4 | Concluída localmente | — | Simulador matemático sem persistência e independente da carteira. |
+| 5.5 | Concluída localmente | — | CRUD e planejamento sem migration; revisão e integração continuam manuais. |
 | 5.6 | Condicional | 10–20+ dias de desenvolvimento | Fonte permitida e série histórica; aprovação externa sem prazo. |
 | Estabilização pessoal | Alta antes de expansão | 5–10 dias distribuídos | Ensaio de recuperação e operação. |
 | Preparação e MVP 2.0 | Baixa até aprovação própria | 20–40+ dias | Custos, privacidade, onboarding e suporte não definidos. |

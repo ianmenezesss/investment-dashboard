@@ -76,3 +76,18 @@ test('uses open-position capital without adding external flows and allows manual
   expect(host.textContent).toContain('Patrimônio informado manualmente')
   expect(JSON.parse(localStorage.getItem(goalsStorageKey('owner-a'))!)[0]).toMatchObject({ currentAmount: '700.00', manualProgressAmount: '700.00', progressSource: 'manual' })
 })
+
+test('shows the monthly contribution plan, lets the user edit scenario rates and saves assumptions locally', async () => {
+  const goal = createGoal({ name: 'Objetivo', targetAmount: '10000', targetDate: null, initialReferenceAmount: '1000' })
+  localStorage.setItem(goalsStorageKey('owner-a'), JSON.stringify([goal]))
+  await renderPage()
+  await act(async () => button('Planejar aportes e projeções').click())
+  expect(host.textContent).toContain('Diferença até o alvo')
+  expect(host.textContent).toContain('Projeção no horizonte')
+  await act(async () => setField('annualRateConservative', '0'))
+  expect(host.textContent).toContain('Conservador · 0% a.a.')
+  expect(host.textContent).toContain('R$ 75,00')
+  await act(async () => host.querySelector('.goal-planning form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })))
+  expect(host.textContent).toContain('Premissas salvas neste dispositivo.')
+  expect(JSON.parse(localStorage.getItem(goalsStorageKey('owner-a'))!)[0].planning).toMatchObject({ monthlyContribution: '500.00', annualRates: { conservative: '0' }, horizonMonths: '120' })
+})

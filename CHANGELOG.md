@@ -1,6 +1,13 @@
 # Changelog
 
-## Em desenvolvimento — `feat/v5.3-reports`
+## Em desenvolvimento — `feat/v5.5-goals`
+
+- Criadas as metas financeiras locais em entregas 5.5A, 5.5B e 5.5C, com CRUD, acompanhamento manual ou por custo/principal investido, avisos de cobertura e planejamento hipotético de aportes.
+- Metas ficam no navegador privado e por identidade; não sincronizam entre dispositivos, não aparecem na demo e não alteram o banco. A projeção usa o motor do simulador, com taxas editáveis e limite de 600 meses.
+- Frontend: 217 testes aprovados em 28 arquivos. Backend não alterado; sua suíte não iniciou porque o Python referenciado pelo `.venv` está inacessível neste ambiente. Build final registrado em [validação](docs/validation.md).
+- Nenhum merge, push, deploy ou alteração de migration/banco de produção foi executado.
+
+## Fases 5.3/5.4 — `feat/v5.3-reports` (integradas localmente)
 
 - Removida a importação CSV da interface, do cliente privado e da API; cadastro manual de operações/eventos e Histórico permanecem.
 - Os gráficos de composição de ações e renda fixa agora usam duas colunas equilibradas; em telas estreitas, são empilhados. Valores e cálculos não mudaram.

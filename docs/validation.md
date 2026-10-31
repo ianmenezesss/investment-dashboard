@@ -1,5 +1,13 @@
 # Validação do Investment Dashboard
 
+## Fase 5.5 — Metas financeiras — 30/10/2026
+
+- Frontend completo: **217 testes aprovados em 28 arquivos** (`npm test`). Abrange criação/edição/exclusão, validações, identidade local, isolamento da demo, formato local anterior 5.5A, progresso manual/investido, cobertura parcial/indisponível, taxas, metas concluídas/vencidas/sem prazo e limites de projeção.
+- Build frontend: `npm run build` aprovado (TypeScript + Vite; `GoalsPage` é carregada em chunk separado).
+- A revisão do CSS confirma cartões em duas colunas que empilham abaixo de 850 px, formulários em uma coluna abaixo de 560 px e cenários/gráfico ajustados abaixo de 600 px. O build inclui as regras responsivas; uma conferência visual em navegador real permanece recomendada antes da publicação.
+- Backend: nenhum arquivo de backend foi alterado. A suíte foi tentada por `.venv/Scripts/python.exe -m pytest`, mas o executável falhou ao iniciar: o ambiente virtual aponta para `C:\Users\IAN\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\python.exe`, inacessível neste ambiente. Portanto, esta etapa não tem novo resultado de testes backend.
+- PostgreSQL descartável e Supabase de produção não foram acessados. Nenhuma migration ou dado foi alterado. O proprietário informa que a migration 009 e as tabelas financeiras estão presentes em produção; isso não foi verificado nesta execução.
+
 ## Fases 5.3 e 5.4 — 30/10/2026
 
 - Frontend completo: **196 testes aprovados em 24 arquivos**. `npm run build` passou.
@@ -17,7 +25,7 @@
 - PostgreSQL descartável: **1 aprovado**; cadeia 001–009, RLS/FORCE RLS, isolamento A/B, grants, constraints e round-trip backup/restore aprovados.
 - O proprietário informa que a migration 009 foi aplicada ao Supabase de produção e que as duas tabelas de eventos existem. Esta validação local não acessou nem alterou o banco de produção.
 - Os donuts de ações e renda fixa ocupam colunas iguais; em telas estreitas são empilhados. Cálculos e endpoints do dashboard não foram alterados.
-- 5.2A foi retirada e 5.2B suspensa. 5.3–5.5 ainda não implementadas; 5.6 permanece condicional a avaliações e fonte histórica adequadas.
+- Registro histórico daquela validação: 5.2A retirada, 5.2B suspensa e 5.3–5.5 ainda pendentes à época; 5.6 permanecia condicional a avaliações e fonte histórica adequadas.
 - Referência: [documentação da Fase 5.1](phase-5.1-cash-flow-and-income-events.md) e [handoff v5](v5-development-handoff.md).
 
 ## Fase 3.0.4 — revisão final local

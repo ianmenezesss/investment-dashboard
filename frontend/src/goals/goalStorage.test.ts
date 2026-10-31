@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { createGoal, goalProgressPercent, goalState, goalsStorageKey, loadGoals, saveGoals, updateGoal, validateGoalDraft } from './goalStorage'
+import { createGoal, DEFAULT_GOAL_PLANNING, goalProgressPercent, goalState, goalsStorageKey, loadGoals, saveGoals, updateGoal, validateGoalDraft } from './goalStorage'
 
 const draft = { name: 'Casa', targetAmount: '100000', targetDate: '2030-12-31', initialReferenceAmount: '1250.50' }
 const now = new Date('2026-10-30T12:00:00.000Z')
@@ -50,4 +50,13 @@ test('does not overwrite malformed or incompatible local records', () => {
   expect(() => saveGoals('owner-a', [{ id: 'bad' } as never], storage)).toThrow()
   expect(memory.get(goalsStorageKey('owner-a'))).toBe('{bad json')
   expect(storage.setItem).not.toHaveBeenCalled()
+})
+
+test('preserves metas saved by the 5.5A format when progress and planning fields are added', () => {
+  const original = createGoal(draft, now)
+  const phaseARecord: Partial<typeof original> = { ...original }
+  delete phaseARecord.manualProgressAmount; delete phaseARecord.planning
+  const memory = new Map<string, string>([[goalsStorageKey('owner-a'), JSON.stringify([phaseARecord])]])
+  const storage = { getItem: (key: string) => memory.get(key) ?? null, setItem: (key: string, value: string) => { memory.set(key, value) } }
+  expect(loadGoals('owner-a', storage)[0]).toMatchObject({ id: original.id, currentAmount: '1250.50', manualProgressAmount: '1250.50', planning: DEFAULT_GOAL_PLANNING })
 })
