@@ -1,6 +1,6 @@
 # Plano mestre — v5.0.0
 
-**Status em 29/10/2026:** desenvolvimento na branch `feat/v5-development`. A 5.0A e 5.1 estão implementadas. A importação CSV 5.2A foi retirada por decisão do proprietário; 5.2B está suspensa. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção. Este status não autoriza publicação.
+**Status em 30/10/2026:** a `main` local e `origin/main` estavam em `d80b69c` antes desta etapa. A branch local `feat/v5.5-goals` contém as entregas 5.5A–C em desenvolvimento; não houve merge, push ou deploy. As fases 5.0A, 5.1, 5.3 e 5.4 estão implementadas; 5.2A foi retirada e 5.2B está suspensa. O proprietário informa que a migration 009 foi aplicada ao Supabase de produção; esta etapa não acessou nem modificou o banco. Este status não autoriza publicação.
 
 ## Relação com o planejamento original
 
@@ -68,11 +68,12 @@ A arquitetura original reservava uma fase para planejamento: simulador com premi
 
 ### 5.5 — Metas
 
-**Prioridade:** média; placeholder atual e escopo original.
-- Meta de patrimônio, prazo, data-base, progresso e cenário hipotético.
-- Se patrimônio atual não puder ser consolidado, permitir valor manual confirmado ou mostrar progresso indisponível; nunca estimar silenciosamente.
-- **Migration:** necessária para sincronizar metas persistentes entre dispositivos; não necessária para fluxo não persistido aprovado.
-- **Aceite:** atingir/ultrapassar meta, ausência de base, ajustes, precisão, acessibilidade, owner_id e remoção/edição auditável.
+**Estado:** implementada localmente em `feat/v5.5-goals`; aguarda revisão antes de qualquer merge ou publicação. Detalhes e limites em [especificação da Fase 5.5](phase-5.5-goals.md).
+- 5.5A: criar, editar, excluir e separar metas ativas/concluídas; valida nome, valor e prazo; mostra barra/percentual. A persistência fica no `localStorage` segregado por identidade Supabase no navegador atual; não sincroniza entre dispositivos e não é copiada para a demo pública.
+- 5.5B: aceita progresso informado e confirmado manualmente ou capital investido da base privada `equity_open_acquisition_cost_plus_effective_cdb_principal`. O rótulo distingue patrimônio manual de custo/principal investido; o cálculo não inclui dinheiro externo, dividendos nem cotações de mercado. Dados incompletos são identificados, posições declaradas sem saldo ficam fora da base e o modo manual continua disponível.
+- 5.5C: calcula aporte necessário, prazo aproximado e evolução hipotética com o mesmo conversor de taxa anual efetiva e motor do Simulador 5.4. Taxas padrão de 6%, 10% e 14% a.a. são editáveis e nunca apresentadas como promessa. Aportes modelados ocorrem no fim do mês; projeções aceitam até 600 meses. Prazo vencido ou ausente usa horizonte manual.
+- **Migration:** nenhuma. Não adiciona API nem altera registros financeiros. A leitura da base investida usa o endpoint privado existente `GET /api/dashboard/performance`, com autenticação e isolamento atuais.
+- **Aceite validado localmente:** CRUD e validações; isolamento local por identidade; demo sem metas; preservação de metas no formato anterior 5.5A; capital parcial/indisponível e fallback manual; cenários, zero/negativo, completo, vencido/sem prazo e limite de 600 meses. A suíte frontend completa e o build devem ser conferidos no registro de validação.
 
 ### 5.6 — Rentabilidade histórica e benchmarks
 
@@ -94,7 +95,7 @@ O refinamento da demonstração pública offline, descrito historicamente como u
 
 ## Ordem e aceitação de release
 
-Ordem recomendada a partir deste estado: revisar e aprovar as entregas locais 5.3/5.4; depois planejar 5.5 Metas, definindo a base de patrimônio atual antes de prometer progresso. A importação 5.2 está retirada. A 5.6 segue condicional aos dados/fontes previstos em 4.4.
+Ordem recomendada a partir deste estado: revisar a branch 5.5 e seus commits/testes; decidir manualmente se será integrada/publicada; acompanhar eventuais lacunas de uso; planejar 5.6 sem iniciar implementação até existirem avaliações datadas, cobertura suficiente e uma fonte permitida. A importação 5.2 continua retirada/suspensa.
 
 Release v5.0.0 só após as fases escolhidas para o release terem critérios aprovados, testes e documentação. Uma fase bloqueada por fonte não pode ser apresentada como implementada. A lista exata de escopo v5 permanece decisão do proprietário.
 
@@ -104,7 +105,7 @@ Release v5.0.0 só após as fases escolhidas para o release terem critérios apr
 - API auth/owner_id/RLS; nenhum acesso cruzado.
 - Cadastro manual, autorização, idempotência, isolamento por proprietário e comportamento vazio.
 - Simulação determinística e cenários extremos.
-- Metas sem patrimônio base e mudança de identidade.
+- Metas sem patrimônio base e mudança de identidade; distinguir fonte manual/custo investido; preservar isolamento da demo; conferir taxas, projeções, prazos vencidos e sem prazo.
 - Export sanitization, privacidade, filtros e encoding.
 - Frontend responsivo, acessível, loading/error/empty/unavailable.
 - Suite inteira, build, documentação e diff review.

@@ -7,6 +7,7 @@ import App from './App'
 import { request } from './api'
 import { DEMO_STORAGE_KEY } from './repositories/DemoRepository'
 import { initialOperations } from './demo/fixtures'
+import { goalsStorageKey } from './goals/goalStorage'
 
 beforeEach(() => localStorage.clear())
 afterEach(() => vi.unstubAllGlobals())
@@ -57,6 +58,18 @@ test('visitante navega entre dashboard e histórico sem autenticação ou rede',
     client.clear()
     host.remove()
   }
+})
+
+test('metas privadas não aparecem nem são criadas no contexto da demonstração pública', async () => {
+  const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock)
+  const host = document.createElement('div'); document.body.append(host)
+  const root = createRoot(host), client = new QueryClient()
+  try {
+    await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/metas']}><App/></MemoryRouter></QueryClientProvider>))
+    expect(host.textContent).not.toContain('Metas financeiras')
+    expect(localStorage.getItem(goalsStorageKey('anonymous'))).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  } finally { await act(async () => root.unmount()); client.clear(); host.remove() }
 })
 
 test('compra pela interface persiste, atualiza carteira, permite excluir e restaurar sem rede', async () => {

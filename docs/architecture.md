@@ -51,7 +51,7 @@ compose.yaml     PostgreSQL local
 5. **Planejamento:** simulador com premissas explícitas, metas, projeções e relatórios.
 6. **Uso remoto:** autenticação de usuário, autorização por proprietário, HTTPS, política de backup/restauração testada e observabilidade antes de exposição pública.
 
-Cada fase deve ser validada antes de expandir o escopo. Os links de CDBs, metas e simulador mostram o escopo planejado, sem simular funcionalidades implementadas.
+Cada fase deve ser validada antes de expandir o escopo. A navegação da demo oculta páginas privadas: metas usam armazenamento local segregado por identidade e não devem aparecer na demonstração; o simulador permanece independente da carteira.
 
 ## Decisões e dependências
 

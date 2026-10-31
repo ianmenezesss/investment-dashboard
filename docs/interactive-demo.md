@@ -47,7 +47,7 @@ O limite é de 10.000 operações demonstrativas, datas históricas até hoje, a
 
 Compra adiciona `quantidade × preço + taxas` ao custo. Venda remove `quantidade vendida × preço médio anterior`; resultado realizado é `valor da venda − taxas − custo removido`. A validação cronológica ocorre sobre todo o histórico antes de persistir uma criação ou exclusão.
 
-Os indicadores monetários são calculados em decimal e mantidos como strings. Os gráficos usam Number somente para visualização. O gráfico atual é de fluxo bruto de operações, não rentabilidade ou patrimônio a mercado. Preços são fictícios e patrimônio a mercado continua indisponível sem cotações identificadas. CDBs, metas e simulador foram retirados da navegação demonstrativa; suas páginas existentes continuam explicitamente planejadas.
+Os indicadores monetários são calculados em decimal e mantidos como strings. Os gráficos usam Number somente para visualização. O gráfico atual é de fluxo bruto de operações, não rentabilidade ou patrimônio a mercado. Preços são fictícios e patrimônio a mercado continua indisponível sem cotações identificadas. CDBs e metas permanecem fora da navegação demonstrativa; metas são privadas e salvas localmente por identidade. O simulador é acessível na demo, mas continua offline, independente da carteira e sem persistência.
 
 ## Validação
 
