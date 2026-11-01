@@ -40,7 +40,7 @@ def test_message_validation(client, message):
     app.dependency_overrides[authenticate] = lambda: Principal(uuid4())
     assert client.post('/api/assistant/chat', json={'message':message}).status_code == 422
 
-def test_one_call_no_private_context(client, monkeypatch):
+def test_one_call_sends_question_static_knowledge_and_safe_screen_context(client, monkeypatch):
     app.dependency_overrides[authenticate] = lambda: Principal(uuid4())
     groq_key = 'mock-groq-api-key'
     supabase_token = 'mock-supabase-session-token'
@@ -57,7 +57,7 @@ def test_one_call_no_private_context(client, monkeypatch):
         async def __aexit__(self,*args): pass
         async def post(self,*args,**kwargs): calls.append(kwargs); return Response()
     monkeypatch.setattr(assistant.httpx,'AsyncClient',FakeClient)
-    result=client.post('/api/assistant/chat',json={'message':'O que é CDB?'},
+    result=client.post('/api/assistant/chat',json={'message':'O que é CDB?', 'context':'equities'},
                        headers={'Authorization': f'Bearer {supabase_token}'})
     assert result.status_code == 200 and result.json()['answer']
     assert len(calls) == 1
@@ -68,12 +68,19 @@ def test_one_call_no_private_context(client, monkeypatch):
     assert payload['max_completion_tokens'] == 350
     assert 'max_tokens' not in payload
     assert len(payload['messages']) == 2
+    assert payload['messages'][0]['content'].endswith('Contexto não sensível da tela atual: Ações. Use essa informação somente se ajudar a responder.')
+    assert payload['messages'][1]['content'] == 'O que é CDB?'
     assert provider_headers['User-Agent'] == 'InvestmentDashboard/1.2'
     assert provider_headers['Authorization'] == f'Bearer {groq_key}'
     sent = str(provider_call)
     assert supabase_token not in sent
     assert groq_key not in result.text
     assert 'operations' not in sent.lower() and 'saldo' not in sent.lower()
+
+def test_screen_context_is_allowlisted(client):
+    app.dependency_overrides[authenticate] = lambda: Principal(uuid4())
+    assert client.post('/api/assistant/chat', json={'message': 'Explique este gráfico', 'context': 'private-portfolio'}).status_code == 422
+    assert client.post('/api/assistant/chat', json={'message': 'Explique este gráfico', 'owner_id': str(uuid4())}).status_code == 422
 
 @pytest.mark.parametrize('failure,status', [('429',503),('timeout',503),('connection',503)])
 def test_provider_failures(client, monkeypatch, failure, status):

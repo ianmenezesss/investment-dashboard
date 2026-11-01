@@ -7,7 +7,7 @@ TABLES = (
     "operations", "fixed_income_investments", "fixed_income_lots",
     "fixed_income_movements", "fixed_income_observations",
     "fixed_income_investment_archives", "fixed_income_application_revisions",
-    "financial_events", "financial_event_revisions",
+    "financial_events", "financial_event_revisions", "portfolio_valuation_observations",
 )
 OWNERS = (
     "11111111-1111-4111-8111-111111111111",
@@ -20,8 +20,8 @@ def snapshot(url: str) -> dict:
     try:
         with engine.connect() as connection:
             result = {"head": connection.scalar(text("SELECT version_num FROM alembic_version"))}
-            if result["head"] != "009":
-                raise AssertionError("Banco restaurado não está no Alembic head 009")
+            if result["head"] != "010":
+                raise AssertionError("Banco restaurado não está no Alembic head 010")
             result["counts"] = {
                 table: connection.scalar(text(f'SELECT count(*) FROM public."{table}"'))
                 for table in TABLES
@@ -65,7 +65,7 @@ def snapshot(url: str) -> dict:
                 raise AssertionError("Policies RLS ausentes em tabelas financeiras")
             result["append_only_triggers"] = sorted(connection.execute(text("""
                 SELECT c.relname || '.' || t.tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
-                WHERE NOT t.tgisinternal AND c.relname IN ('fixed_income_investment_archives','fixed_income_application_revisions','financial_events','financial_event_revisions')
+                WHERE NOT t.tgisinternal AND c.relname IN ('fixed_income_investment_archives','fixed_income_application_revisions','financial_events','financial_event_revisions','portfolio_valuation_observations')
             """)).scalars().all())
             if not any("fixed_income_investment_archives.fi_archive_append_only" == name for name in result["append_only_triggers"]):
                 raise AssertionError("Trigger append-only de arquivamento ausente após restore")
@@ -75,6 +75,8 @@ def snapshot(url: str) -> dict:
                 raise AssertionError("Trigger append-only de eventos financeiros ausente após restore")
             if not any("financial_event_revisions.financial_event_revisions_append_only" == name for name in result["append_only_triggers"]):
                 raise AssertionError("Trigger append-only de revisões financeiras ausente após restore")
+            if not any("portfolio_valuation_observations.portfolio_valuation_observations_append_only" == name for name in result["append_only_triggers"]):
+                raise AssertionError("Trigger append-only de observações patrimoniais ausente após restore")
             result["runtime_role"] = connection.execute(text("""
                 SELECT rolcanlogin, rolinherit, rolsuper, rolbypassrls,
                        rolcreatedb, rolcreaterole, rolreplication,
@@ -108,6 +110,7 @@ def snapshot(url: str) -> dict:
                 ("public.fixed_income_application_revisions", "public.fixed_income_application_revisions_id_seq"),
                 ("public.financial_events", "public.financial_events_id_seq"),
                 ("public.financial_event_revisions", "public.financial_event_revisions_id_seq"),
+                ("public.portfolio_valuation_observations", "public.portfolio_valuation_observations_id_seq"),
             ):
                 grants = connection.execute(privilege_sql, {"table": table, "sequence": sequence}).one()
                 if grants != (True, True, False, False, False, True):
@@ -129,10 +132,14 @@ def snapshot(url: str) -> dict:
                 financial_foreign = connection.scalar(text("SELECT count(*) FROM public.financial_events WHERE owner_id <> CAST(:owner AS uuid)"), {"owner": owner})
                 revisions_visible = connection.scalar(text("SELECT count(*) FROM public.financial_event_revisions"))
                 revision_foreign = connection.scalar(text("SELECT count(*) FROM public.financial_event_revisions WHERE owner_id <> CAST(:owner AS uuid)"), {"owner": owner})
+                wealth_visible = connection.scalar(text("SELECT count(*) FROM public.portfolio_valuation_observations"))
+                wealth_foreign = connection.scalar(text("SELECT count(*) FROM public.portfolio_valuation_observations WHERE owner_id <> CAST(:owner AS uuid)"), {"owner": owner})
                 if not visible or not financial_visible or not revisions_visible or foreign or archive_foreign or financial_foreign or revision_foreign:
                     raise AssertionError("Isolamento RLS por proprietário falhou no restore")
+                if wealth_visible != (1 if owner == OWNERS[0] else 0) or wealth_foreign:
+                    raise AssertionError("Isolamento RLS das observações patrimoniais falhou no restore")
                 result["owner_visible"][owner] = (visible, foreign, archive_foreign, financial_visible, financial_foreign,
-                                                   revisions_visible, revision_foreign)
+                                                   revisions_visible, revision_foreign, wealth_visible, wealth_foreign)
         return result
     finally:
         engine.dispose()

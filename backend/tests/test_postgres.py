@@ -51,7 +51,7 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
           ('fixed_income_investments','fixed_income_lots','fixed_income_movements')}
     command.upgrade(Config("alembic.ini"), "head")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "009"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "010"
     with engine.connect() as connection:
         for table, rows in original.items():
             assert list(connection.execute(text(f'SELECT * FROM {table} ORDER BY id'))) == rows
@@ -82,6 +82,7 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
                 connection.execute(text("CREATE ROLE investment_test_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS"))
                 connection.execute(text("GRANT SELECT, INSERT, UPDATE, DELETE ON operations TO investment_test_runtime"))
                 connection.execute(text("GRANT USAGE, SELECT ON SEQUENCE operations_id_seq TO investment_test_runtime"))
+                connection.execute(text("GRANT SELECT ON portfolio_valuation_observations TO investment_test_runtime"))
                 connection.execute(text("ALTER ROLE investment_runtime PASSWORD 'fictional-test-only-password'"))
                 connection.execute(text("GRANT SELECT ON operations TO investment_runtime"))
 
@@ -190,13 +191,38 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
             assert [row["id"] for row in client.get("/api/financial-events").json()] == [event_a.json()["id"]]
             assert Decimal(client.get("/api/dashboard/financial-events/summary").json()["contributions"]) == Decimal("130.00000003")
 
+            observation = client.post("/api/dashboard/wealth-observations",
+                headers={"Idempotency-Key": "ffffffff-ffff-4fff-8fff-ffffffffffff"},
+                json={"as_of": "2026-01-07", "equities_market_value": "250.00",
+                      "equities_source": "Extrato fictício da corretora"})
+            assert observation.status_code == 201, observation.text
+            # Active synthetic CDBs have no observation on this date, so a total
+            # would be misleading; the missing coverage must remain explicit.
+            assert observation.json()["fixed_income_coverage"] == "unavailable"
+            assert observation.json()["missing_fixed_income"]
+            assert observation.json()["consolidated_net_value"] is None
+            assert observation.json()["consolidated_coverage"] == "partial"
+            app.dependency_overrides[authenticate] = lambda: Principal(b)
+            assert client.get("/api/dashboard/wealth-observations").json() == []
+            app.dependency_overrides[authenticate] = lambda: Principal(a)
+            assert len(client.get("/api/dashboard/wealth-observations").json()) == 1
+
             with runtime_engine.begin() as connection:
                 assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.financial_events','UPDATE')"))
                 assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.financial_events','DELETE')"))
                 assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.financial_event_revisions','UPDATE')"))
                 assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.financial_event_revisions','DELETE')"))
+                assert connection.scalar(text("SELECT has_table_privilege(current_user,'public.portfolio_valuation_observations','SELECT')"))
+                assert connection.scalar(text("SELECT has_table_privilege(current_user,'public.portfolio_valuation_observations','INSERT')"))
+                assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.portfolio_valuation_observations','UPDATE')"))
+                assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.portfolio_valuation_observations','DELETE')"))
+                assert not connection.scalar(text("SELECT has_table_privilege(current_user,'public.portfolio_valuation_observations','TRUNCATE')"))
+                assert connection.scalar(text("SELECT has_sequence_privilege(current_user,'public.portfolio_valuation_observations_id_seq','USAGE')"))
                 connection.execute(text("SELECT set_config('app.user_id', '', true), set_config('app.auth_mode', 'supabase', true)"))
                 assert connection.scalar(text("SELECT count(*) FROM public.financial_events")) == 0
+                assert connection.scalar(text("SELECT count(*) FROM public.portfolio_valuation_observations")) == 0
+                connection.execute(text("SELECT set_config('app.user_id', :owner, true)"), {"owner": str(a)})
+                assert connection.scalar(text("SELECT count(*) FROM public.portfolio_valuation_observations")) == 1
             with engine.begin() as connection:
                 connection.execute(text("GRANT SELECT ON public.financial_events, public.financial_event_revisions TO investment_test_runtime"))
             runtime_engine.dispose()

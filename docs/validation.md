@@ -1,5 +1,15 @@
 # Validação do Investment Dashboard
 
+## Candidata v2.0.0 — 01/11/2026 (local, não publicada)
+
+- Backend completo: **419 aprovados, 1 ignorado** em Python 3.12. O teste ignorado é o opt-in PostgreSQL na execução geral; a integração abaixo foi executada separadamente. Permaneceu um aviso de depreciação do `TestClient`/HTTPX.
+- PostgreSQL 17 descartável: **1 aprovado**; migrations 001–010, endpoints sob role runtime restrita, isolamento de dois proprietários e backup/restauração sintéticos `IDBKP010` passaram. Contagens, hashes dos dados, RLS/FORCE RLS, policies, triggers e grants conferidos.
+- Frontend: **230 testes aprovados em 32 arquivos**. `npm run build`: aprovado (TypeScript + Vite; **2.384 módulos** transformados). JSDOM ainda emite avisos de dimensões zero do Recharts e avisos de `act(...)`; não causaram falhas.
+- Os testes usaram fixtures fictícias e mocks; `GROQ_API_KEY`/`GROQ_MODEL` foram removidos do ambiente de validação. Não houve chamada real à Groq, Brapi ou BCB, conexão/migração de PostgreSQL remoto, leitura/escrita de carteira real, commit, push ou deploy.
+- A observação patrimonial só é consolidada quando as classes necessárias têm cobertura na mesma data. O teste PostgreSQL confirmou que contratos CDB ativos sem observação nessa data deixam o total indisponível, sem inferir saldo.
+- A Íris recebe conhecimento estático e somente um rótulo de tela de uma lista fechada; a suíte mockada verifica que valores, `owner_id` e token Supabase não entram no conteúdo enviado ao modelo. Rótulos dos gráficos diários mostram dia e mês para distinguir datas dentro da janela gratuita.
+- A inspeção visual autenticada em navegador e a validação de sessão Supabase em produção não foram feitas. A demonstração pública foi exercitada por testes automatizados, não por inspeção de tráfego no domínio publicado.
+
 ## Candidato v1.2.1/v1.3.0 — 31/10/2026 (local, não publicado)
 
 - Backend completo: **404 aprovados, 1 ignorado**, em Python 3.12 com configuração isolada; o ignorado é a integração PostgreSQL opt-in. Permaneceu um aviso de depreciação de `TestClient`/HTTPX.

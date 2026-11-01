@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { ArrowUp, Sparkles, X } from 'lucide-react'
-import { askAssistant } from '../api'
+import { askAssistant, type AssistantScreenContext } from '../api'
 import './assistant.css'
 
 const suggestions = ['O que é CDB?', 'Como funciona o CDI?', 'Como usar o dashboard?']
@@ -12,7 +12,7 @@ type ViewportStyle = CSSProperties & {
   '--iris-viewport-top'?: string
 }
 
-export function AssistantChat({ token }: { token: string }) {
+export function AssistantChat({ token, context = 'overview' }: { token: string; context?: AssistantScreenContext }) {
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -56,7 +56,7 @@ export function AssistantChat({ token }: { token: string }) {
     setMessages(current => [...current, { role: 'user', text: message }])
     setBusy(true)
     try {
-      const answer = await askAssistant(message, token)
+      const answer = await askAssistant(message, token, context)
       setMessages(current => [...current, { role: 'assistant', text: answer }])
     } catch (error) {
       const text = error instanceof Error ? error.message : 'A Íris está indisponível. Tente novamente mais tarde.'

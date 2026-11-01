@@ -59,6 +59,13 @@ def test_empty_identical_duplicates_and_numeric_json_values():
     assert points[0].value == Decimal("0.012345678901")
 
 
+def test_ipca_provider_preserves_monthly_unit_from_official_series():
+    result = fetch(httpx.Response(200, json=[{"data": "01/01/2025", "valor": "0.16"}]), code=433)
+    assert result[0][0].series_code == 433
+    assert result[0][0].unit == "% ao mês"
+    assert result[0][0].value == Decimal("0.16")
+
+
 @pytest.mark.parametrize("body", [b"not json", b'[{"data":"02/01/2025","valor":NaN}]',
     b'[{"data":"02/01/2025","valor":"0.05","other":NaN}]',
     b'[{"data":"02/01/2025","valor":"1","valor":"2"}]', b"[" * 2000])

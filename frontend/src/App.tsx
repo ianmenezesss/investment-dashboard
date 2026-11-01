@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, ChartNoAxesCombined, Wallet, FlaskConical, Plus, Download, X, ShieldCheck, ChevronRight, Eye, Trash2, RotateCcw, LogOut, LogIn, Menu, FlaskConical as DemoIcon } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from './components/ui/button'
-import { ApiError } from './api'
+import { ApiError, type AssistantScreenContext } from './api'
 import './style.css'
 import './dashboard-ux.css'
 import './navigation.css'
@@ -22,7 +22,8 @@ import { FinancialHint } from './components/FinancialHint'
 import { WorkspaceSidebar, workspaceNavItems } from './components/WorkspaceSidebar'
 const FixedIncomePage = lazy(() => import('./fixed-income/FixedIncomePage').then(module => ({ default: module.FixedIncomePage })))
 const PortfolioInsights = lazy(() => import('./portfolio/PortfolioInsights').then(module => ({ default: module.PortfolioInsights })))
-const EquityHistory = lazy(() => import('./portfolio/EquityHistory').then(module => ({ default: module.EquityHistory })))
+const WealthEvolution = lazy(() => import('./portfolio/WealthEvolution').then(module => ({ default: module.WealthEvolution })))
+const BenchmarkComparison = lazy(() => import('./portfolio/BenchmarkComparison').then(module => ({ default: module.BenchmarkComparison })))
 const IndividualEquityHistory = lazy(() => import('./portfolio/IndividualEquityHistory').then(module => ({ default: module.IndividualEquityHistory })))
 const AssetComparison = lazy(() => import('./portfolio/AssetComparison').then(module => ({ default: module.AssetComparison })))
 const MovementHistory = lazy(() => import('./portfolio/MovementHistory').then(module => ({ default: module.MovementHistory })))
@@ -71,6 +72,10 @@ export default function App() {
   const demoState = useSyncExternalStore(demoRepository?.subscribe ?? noSubscription, demoRepository?.getSnapshot ?? emptySnapshot)
   const privateRepository = useMemo(() => new PrivateRepository(activeToken), [activeToken])
   const page = demo && !PUBLIC_DEMO ? location.pathname.slice(5) || '/' : location.pathname
+  const assistantContext: AssistantScreenContext = ({
+    '/': 'overview', '/acoes': 'equities', '/cdbs': 'fixed_income', '/historico': 'history',
+    '/relatorios': 'reports', '/simulador': 'simulator', '/metas': 'goals',
+  } as Record<string, AssistantScreenContext>)[page] ?? 'overview'
   useEffect(() => {
     try { window.localStorage.setItem('investment-sidebar-collapsed', String(sidebarCollapsed)) } catch { /* preferência opcional */ }
   }, [sidebarCollapsed])
@@ -153,7 +158,7 @@ export default function App() {
   const displayName = demo ? 'Demonstração' : sessionDisplay.name
   const avatarInitial = demo ? 'D' : sessionDisplay.initial
   return <div className={`shell${sidebarCollapsed ? ' sidebar-is-collapsed' : ''}`} data-navigation-collapsed={sidebarCollapsed}>
-    {!demo && SUPABASE_AUTH && auth.session?.access_token && <AssistantChat token={auth.session.access_token}/>}
+    {!demo && SUPABASE_AUTH && auth.session?.access_token && <AssistantChat token={auth.session.access_token} context={assistantContext}/>}
     <WorkspaceSidebar demo={demo} routeTo={routeTo} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed(value => !value)} displayName={displayName} avatarInitial={avatarInitial}/>
     <main><header><div className="mobile-header-brand"><span className="brand-icon"><ChartNoAxesCombined size={20}/></span>investment<span className="brand-dot">.</span></div><Dialog.Root open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}><Dialog.Trigger asChild><button type="button" className="mobile-menu-trigger" aria-label="Abrir menu de navegação" aria-controls="mobile-navigation-panel"><Menu size={20}/></button></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="mobile-nav-overlay" onClick={() => setMobileNavigationOpen(false)}/><Dialog.Content id="mobile-navigation-panel" className="mobile-nav-content"><Dialog.Title className="sr-only">Menu de navegação</Dialog.Title><button type="button" className="mobile-nav-close" aria-label="Fechar menu de navegação" onPointerDown={() => setMobileNavigationOpen(false)} onClick={() => setMobileNavigationOpen(false)}><X size={19}/></button><WorkspaceSidebar demo={demo} routeTo={routeTo} mobile onNavigate={() => setMobileNavigationOpen(false)} displayName={displayName} avatarInitial={avatarInitial}/></Dialog.Content></Dialog.Portal></Dialog.Root><div className="breadcrumb">Workspace <ChevronRight size={13}/> <span>{workspaceNavItems.find(n => n.to === page)?.label}</span></div><span className="local-badge"><span className="status-dot"/> {demo ? 'Modo Demonstração' : 'Ambiente pessoal'}</span></header>
 
@@ -168,7 +173,7 @@ export default function App() {
       {(page === '/' || page === '/acoes') && <>
         <div className={demo ? 'metrics' : 'metrics private-cost-metrics'}><article className="metric featured"><div><span>Capital em ações · custo</span><Wallet size={19}/></div><h2>{data ? money(data.acquisition_cost) : 'R$ —'}</h2><small><span className="status-dot"/> Custo de aquisição da posição aberta</small><div className="metric-decoration"/></article><article className="metric"><div><span>Compras acumuladas</span><ArrowDownLeft size={19}/></div><h2>{data ? money(data.total_purchases) : 'R$ —'}</h2><small>Inclui taxas de aquisição</small></article><article className="metric"><div><span>Resultado realizado {!demo && <FinancialHint label="resultado realizado">Resultado das vendas após custo de aquisição e taxas registradas de compra e venda. Tributos não são calculados; separado das posições abertas.</FinancialHint>}</span><ChartNoAxesCombined size={19}/></div><h2 className={Number(data?.realized_profit) < 0 ? 'negative' : 'positive'}>{data ? money(data.realized_profit) : 'R$ —'}</h2><small>{demo ? 'Resultado líquido das vendas' : 'Vendas após taxas registradas; antes de tributos'}</small></article>{demo && <article className="metric"><div><span>Patrimônio a mercado</span><Eye size={19}/></div><h2 className="muted">Indisponível</h2><small>Sem cotações de mercado</small></article>}</div>
         {!demo && summary.data && <MarketDashboard snapshot={summary.data} updating={summary.isFetching} failed={summary.isError} onRefresh={() => { void refresh() }}/>}
-        {!demo ? <Suspense fallback={<p role="status" className="panel">Carregando gráficos financeiros…</p>}><><PortfolioInsights repository={privateRepository} identity={identity}/><EquityHistory repository={privateRepository} identity={identity}/></></Suspense> : <div className="chart-grid"><Suspense fallback={<p role="status" className="panel">Carregando gráfico…</p>}><DemoFlowChart period={period} onPeriodChange={setPeriod} series={series}/></Suspense>
+        {!demo ? <Suspense fallback={<p role="status" className="panel">Carregando gráficos financeiros…</p>}><><PortfolioInsights repository={privateRepository} identity={identity}/><WealthEvolution repository={privateRepository} identity={identity}/><BenchmarkComparison repository={privateRepository} identity={identity}/></></Suspense> : <div className="chart-grid"><Suspense fallback={<p role="status" className="panel">Carregando gráfico…</p>}><DemoFlowChart period={period} onPeriodChange={setPeriod} series={series}/></Suspense>
         <article className="panel allocation"><div className="panel-heading"><div><h3>Composição em ações</h3><p>Distribuição pelo custo de aquisição</p></div><span className="tag">B3</span></div><div className="donut" style={{ background: data?.holdings.length ? `conic-gradient(${data.holdings.map((h, i) => { const start = data.holdings.slice(0, i).reduce((sum, item) => sum + Number(item.cost), 0) / Number(data.acquisition_cost) * 100; const end = start + Number(h.cost) / Number(data.acquisition_cost) * 100; return `${palette[i % palette.length]} ${start}% ${end}%` }).join(', ')})` : '#253039' }}><div><span>Ativos em carteira</span><strong>{data?.holdings.length ?? 0}</strong></div></div><div className="allocation-list">{data?.holdings.map((h, i) => <div key={h.ticker}><span><i style={{ background: palette[i % palette.length] }}/>{h.ticker}</span><strong>{(Number(h.cost) / Number(data.acquisition_cost) * 100).toFixed(1)}%</strong></div>)}{!data?.holdings.length && <p>Nenhuma posição cadastrada.</p>}</div></article></div>}
         {demo && page === '/acoes' && <article className="panel"><div className="panel-heading"><h3>Posições por custo médio</h3></div><div className="table-scroll"><table><thead><tr><th>Ativo</th><th>Quantidade</th><th>Preço médio</th><th>Custo da posição</th></tr></thead><tbody>{data?.holdings.map(h => <tr key={h.ticker}><td>{h.ticker}</td><td>{number(h.quantity)}</td><td>{money(h.average_price)}</td><td>{money(h.cost)}</td></tr>)}</tbody></table></div></article>}
       </>}

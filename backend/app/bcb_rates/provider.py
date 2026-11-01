@@ -5,7 +5,7 @@ from decimal import Decimal
 from email.utils import parsedate_to_datetime
 import httpx
 from pydantic import ValidationError
-from .schemas import Observation, Period, RateError, SERIES
+from .schemas import Observation, Period, RateError, SERIES, SERIES_UNITS
 
 BASE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{code}/dados"
 MAX_BYTES = 256 * 1024
@@ -54,7 +54,7 @@ def parse_payload(payload: bytes, code: int, period: Period):
                 value = Decimal(value)
             elif not isinstance(value, Decimal):
                 raise ValueError()
-            point = Observation(date=day, value=value, series_code=code)
+            point = Observation(date=day, value=value, series_code=code, unit=SERIES_UNITS[code])
             if day in points:
                 if points[day].value != point.value:
                     raise ValueError()

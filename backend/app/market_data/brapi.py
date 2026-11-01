@@ -21,7 +21,7 @@ async def _request_slot(gate):
 
 def valid_ticker(ticker: str) -> bool:
     # B3SA3 contains a digit in its four-character issuer code. No URLs, suffixes or lists.
-    return isinstance(ticker, str) and re.fullmatch(r"[A-Z0-9]{4}[0-9]{1,2}", ticker) is not None
+    return isinstance(ticker, str) and (ticker == "^BVSP" or re.fullmatch(r"[A-Z0-9]{4}[0-9]{1,2}", ticker) is not None)
 
 
 def retry_after(value: str | None, now: datetime) -> int:

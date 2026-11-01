@@ -1,4 +1,4 @@
-"""Authenticate and restore one encrypted Alembic-009 archive into disposable PostgreSQL."""
+"""Authenticate and restore a supported versioned archive into disposable PostgreSQL."""
 import argparse
 import getpass
 import os
@@ -12,15 +12,16 @@ from uuid import uuid4
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from backup_archive import MAGIC, decrypt_stream, sha256_file
+from backup_archive import MAGIC, MAGIC_010, SUPPORTED_MAGICS, decrypt_stream, sha256_file
 
 
-REQUIRED_TABLES = {
+REQUIRED_TABLES_009 = {
     "alembic_version", "operations", "fixed_income_investments", "fixed_income_lots",
     "fixed_income_movements", "fixed_income_observations", "fixed_income_investment_archives",
     "fixed_income_application_revisions", "financial_events", "financial_event_revisions",
 }
-RLS_TABLES = REQUIRED_TABLES - {"alembic_version"}
+REQUIRED_TABLES_010 = REQUIRED_TABLES_009 | {"portfolio_valuation_observations"}
+VERSIONS = {MAGIC: ("009", REQUIRED_TABLES_009), MAGIC_010: ("010", REQUIRED_TABLES_010)}
 EVENTS = {"financial_events", "financial_event_revisions"}
 
 
@@ -62,9 +63,15 @@ def validate_backup(path, expected_hash=None):
         if sha256_file(backup).lower() != expected_hash.lower():
             raise RuntimeError("SHA-256 do arquivo criptografado não confere")
     with backup.open("rb") as source:
-        if source.read(len(MAGIC)) != MAGIC:
-            raise RuntimeError("Cabeçalho do backup não corresponde a IDBKP009")
+        if source.read(len(MAGIC)) not in VERSIONS:
+            raise RuntimeError("Cabeçalho do backup não corresponde a IDBKP009 ou IDBKP010")
     return backup
+
+
+def archive_version(path):
+    with path.open("rb") as source:
+        magic = source.read(len(MAGIC))
+    return VERSIONS[magic][0]
 
 
 def run_docker(*args, input_data=None, env=None):
@@ -81,13 +88,16 @@ def run_docker(*args, input_data=None, env=None):
 def main(argv=None):
     args = parse_args(argv)
     backup = validate_backup(args.backup, args.sha256)
+    version = archive_version(backup)
+    required_tables = REQUIRED_TABLES_009 if version == "009" else REQUIRED_TABLES_010
+    rls_tables = required_tables - {"alembic_version"}
     passphrase = getpass.getpass("Frase de proteção do backup: ")
     if input("Este processo cria e remove somente um container PostgreSQL descartável. Digite DESCARTAVEL: ").strip() != "DESCARTAVEL":
         raise RuntimeError("Confirmação não recebida; nenhuma restauração iniciada")
     if os.environ.get("DOCKER_HOST") or os.environ.get("DOCKER_CONTEXT"):
         raise RuntimeError("DOCKER_HOST/DOCKER_CONTEXT definido; destino Docker não será presumido local")
     run_id = uuid4().hex[:12]
-    name, database = f"investment-restore-009-{run_id}", f"investment_restore_{run_id}"
+    name, database = f"investment-restore-{version}-{run_id}", f"investment_restore_{run_id}"
     label_key, label_value = "com.investment-dashboard.backup-restore", run_id
     password = secrets.token_urlsafe(24)
     env = {k: v for k, v in os.environ.items() if not any(s in k.upper() for s in
@@ -152,10 +162,10 @@ def main(argv=None):
         pattern = re.compile(r"^\s*(?:;\s*)?\d+;\s+\d+\s+\d+\s+(TABLE(?: DATA)?)\s+(\S+)\s+(\S+)\s+(\S+)\s*$")
         for line in toc.splitlines():
             match = pattern.match(line)
-            if match and match.group(2) == "public" and match.group(3) in REQUIRED_TABLES:
+            if match and match.group(2) == "public" and match.group(3) in required_tables:
                 (archive_data if match.group(1) == "TABLE DATA" else archive_tables).add(match.group(3))
-        if archive_tables != REQUIRED_TABLES or archive_data != REQUIRED_TABLES:
-            raise RuntimeError("TOC não contém todas as tabelas/entradas de dados da migration 009")
+        if archive_tables != required_tables or archive_data != required_tables:
+            raise RuntimeError(f"TOC não contém todas as tabelas/entradas de dados da migration {version}")
         docker("exec", name, "pg_restore", "--file=/dev/null", "/restore/input.dump")
 
         roles_sql = """CREATE ROLE anon NOLOGIN;
@@ -177,27 +187,32 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
         docker("exec", name, "pg_restore", "--exit-on-error", "--schema=public", "--no-owner", "-d", database, "/restore/input.dump")
         psql("GRANT SELECT ON public.financial_events, public.financial_event_revisions "
              "TO investment_test_runtime")
+        if version == "010":
+            psql("GRANT SELECT ON public.portfolio_valuation_observations TO investment_test_runtime")
 
-        version = psql("SELECT version_num FROM public.alembic_version")
-        if version != "009":
-            raise RuntimeError("A versão Alembic restaurada não é 009")
+        restored_version = psql("SELECT version_num FROM public.alembic_version")
+        if restored_version != version:
+            raise RuntimeError(f"A versão Alembic restaurada não é {version}")
         restored_tables = set(psql("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename").splitlines())
-        if not REQUIRED_TABLES.issubset(restored_tables):
+        if not required_tables.issubset(restored_tables):
             raise RuntimeError("Faltam tabelas da aplicação após a restauração")
-        counts = {table: int(psql(f'SELECT count(*) FROM public."{table}"')) for table in sorted(REQUIRED_TABLES)}
+        counts = {table: int(psql(f'SELECT count(*) FROM public."{table}"')) for table in sorted(required_tables)}
 
         rls_rows = psql("SELECT relname || '=' || relrowsecurity || '/' || relforcerowsecurity FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind IN ('r','p') AND relname <> 'alembic_version' ORDER BY relname").splitlines()
         rls = dict(row.split("=", 1) for row in rls_rows)
-        if not RLS_TABLES.issubset(rls) or any(rls[t] != "true/true" for t in RLS_TABLES):
+        if not rls_tables.issubset(rls) or any(rls[t] != "true/true" for t in rls_tables):
             raise RuntimeError("RLS/FORCE RLS não foi restaurado em todas as tabelas financeiras")
         policies = int(psql("SELECT count(*) FROM pg_policy WHERE polrelid IN (SELECT oid FROM pg_class WHERE relnamespace='public'::regnamespace AND relname <> 'alembic_version')"))
-        if policies < len(RLS_TABLES):
+        if policies < len(rls_tables):
             raise RuntimeError("Policies RLS insuficientes após o restore")
-        for table, sequence in (
+        grant_targets = [
             ("public.financial_events", "public.financial_events_id_seq"),
             ("public.financial_event_revisions", "public.financial_event_revisions_id_seq"),
             ("public.fixed_income_application_revisions", "public.fixed_income_application_revisions_id_seq"),
-        ):
+        ]
+        if version == "010":
+            grant_targets.append(("public.portfolio_valuation_observations", "public.portfolio_valuation_observations_id_seq"))
+        for table, sequence in grant_targets:
             grants = psql("SELECT has_table_privilege('investment_runtime', '" + table + "', 'SELECT') || '|' || "
                           "has_table_privilege('investment_runtime', '" + table + "', 'INSERT') || '|' || "
                           "has_table_privilege('investment_runtime', '" + table + "', 'UPDATE') || '|' || "
@@ -214,9 +229,17 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
                              "SELECT count(*) FROM public.financial_events WHERE owner_id <> current_setting('app.user_id')::uuid; ROLLBACK;")
             if not isolation.splitlines()[-2].endswith("0"):
                 raise RuntimeError("Falha no teste RLS sintético por proprietário")
+            if version == "010":
+                wealth = psql("BEGIN; SET LOCAL ROLE investment_test_runtime; "
+                    "SELECT set_config('app.auth_mode','supabase',true); "
+                    f"SELECT set_config('app.user_id','{owner}',true); "
+                    "SELECT count(*) FROM public.portfolio_valuation_observations "
+                    "WHERE owner_id <> current_setting('app.user_id')::uuid; ROLLBACK;")
+                if not wealth.splitlines()[-2].endswith("0"):
+                    raise RuntimeError("Falha no teste RLS das observações patrimoniais")
         result_lines = [
-            "RESTORE=PASS; formato autenticado AES-256-GCM IDBKP009",
-            "Alembic=009; public tables=PASS; archive data entries=PASS",
+            f"RESTORE=PASS; formato autenticado AES-256-GCM IDBKP{version}",
+            f"Alembic={version}; public tables=PASS; archive data entries=PASS",
             "financial_events/revisions restaurados; contagens preservadas (podem estar vazias)=PASS",
             "RLS/FORCE RLS e policies=PASS; grants runtime SELECT/INSERT sem UPDATE/DELETE/TRUNCATE=PASS",
             "isolamento RLS para dois proprietários fictícios=PASS",

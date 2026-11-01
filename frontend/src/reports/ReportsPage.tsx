@@ -6,6 +6,7 @@ import { Download } from 'lucide-react'
 import type { PrivateRepository } from '../repositories/PrivateRepository'
 import { aggregateContributions, contributionRows, decimalMoney } from './contributions'
 import { filterReportMovements, movementTotals, sharePercent } from './movementReport'
+import { aggregateIncomeReport } from './movementReport'
 import './reports.css'
 
 const today = () => new Date().toLocaleDateString('en-CA')
@@ -18,6 +19,7 @@ export function ReportsPage({ repository, identity }: { repository: PrivateRepos
   const [bucket, setBucket] = useState<'month' | 'year'>('month')
   const [movementClass, setMovementClass] = useState('all')
   const [assetSearch, setAssetSearch] = useState('')
+  const [incomeKind, setIncomeKind] = useState<'all' | 'DIVIDEND' | 'JCP'>('all')
   const query = useQuery({ queryKey: ['reports-movements', identity], queryFn: ({ signal }) => repository.movements(signal), retry: false })
   const compositionQuery = useQuery({ queryKey: ['reports-composition', identity], queryFn: ({ signal }) => repository.composition(signal), retry: false })
   const reportMovements = useMemo(() => filterReportMovements(query.data ?? [], start, end, movementClass, assetSearch), [query.data, start, end, movementClass, assetSearch])
@@ -30,6 +32,12 @@ export function ReportsPage({ repository, identity }: { repository: PrivateRepos
   const total = equities.plus(fixed)
   const generatedAt = new Date().toLocaleString('pt-BR')
   const totals = useMemo(() => movementTotals(reportMovements), [reportMovements])
+  const incomeRows = useMemo(() => (query.data ?? []).filter(row =>
+    (row.operation === 'DIVIDEND' || row.operation === 'JCP') && row.date >= start && row.date <= end
+      && (incomeKind === 'all' || row.operation === incomeKind)
+      && row.asset.toLocaleLowerCase('pt-BR').includes(assetSearch.trim().toLocaleLowerCase('pt-BR'))),
+  [query.data, start, end, incomeKind, assetSearch])
+  const income = useMemo(() => aggregateIncomeReport(incomeRows), [incomeRows])
   return <section className="reports-page" aria-label="Relatórios financeiros">
     <article className="panel reports-panel">
       <div className="panel-heading"><div><h2>Relatório de aportes</h2><p>Compras de ações incluem taxas; renda fixa considera principal aplicado. Valores registrados, sem rentabilidade ou valor de mercado.</p></div><button type="button" className="reports-print-button" onClick={() => window.print()}><Download size={15}/> Exportar PDF</button></div>
@@ -51,6 +59,18 @@ export function ReportsPage({ repository, identity }: { repository: PrivateRepos
       {compositionQuery.isPending ? <p role="status" className="reports-state">Carregando composição da carteira…</p> : compositionQuery.isError ? <p role="alert" className="reports-state">Não foi possível carregar a composição. Confira sua sessão e tente novamente.</p> : compositionQuery.data && <div className="reports-distributions">
         {([['Ações · custo aberto', compositionQuery.data.equities, compositionQuery.data.class_totals.equities_open_cost], ['Renda fixa · principal efetivo', compositionQuery.data.fixed_income, compositionQuery.data.class_totals.fixed_income_open_principal], ['Observações declaradas · separadas', compositionQuery.data.declared_positions, compositionQuery.data.class_totals.declared_positions]] as const).map(([title, items, totalValue]) => <section className="reports-distribution" key={title}><h3>{title}</h3><p>Total registrado: {decimalMoney(new Decimal(totalValue))}</p>{items.length ? <ul>{items.map((item, index) => <li key={`${item.asset}-${index}`}><span>{item.asset}<small>{item.basis === 'declared_observation' ? 'Observação declarada' : item.basis}</small></span><strong>{decimalMoney(new Decimal(item.value))}<small>{sharePercent(item.value, totalValue)}% da categoria</small></strong><i aria-hidden="true" style={{ width: `${Math.min(100, Number(sharePercent(item.value, totalValue)))}%` }}/></li>)}</ul> : <p>Sem posições disponíveis nesta categoria.</p>}</section>)}
       </div>}
+    </article>
+    <article className="panel reports-panel reports-income">
+      <div className="panel-heading"><div><h2>Relatório de dividendos e JCP</h2><p>Valores líquidos registrados manualmente. Não inclui eventos não cadastrados nem representa rentabilidade total.</p></div></div>
+      <div className="reports-movement-filters"><label>Tipo de provento<select aria-label="Tipo de provento" value={incomeKind} onChange={event => setIncomeKind(event.target.value as typeof incomeKind)}><option value="all">Dividendos e JCP</option><option value="DIVIDEND">Dividendos</option><option value="JCP">JCP</option></select></label><label>Ativo<input aria-label="Ativo dos proventos" value={assetSearch} onChange={event => setAssetSearch(event.target.value)} placeholder="Buscar ativo…"/></label></div>
+      {query.isPending ? <p role="status" className="reports-state">Carregando proventos registrados…</p> : query.isError ? <p role="alert" className="reports-state">Não foi possível carregar os proventos registrados.</p> : <>
+        <div className="reports-summary reports-income-totals"><div><span>Dividendos líquidos</span><strong>{decimalMoney(income.dividends)}</strong></div><div><span>JCP líquido</span><strong>{decimalMoney(income.jcp)}</strong></div><div><span>Total recebido registrado</span><strong>{decimalMoney(income.total)}</strong></div><div><span>Lançamentos</span><strong>{income.count}</strong></div></div>
+        {income.monthly.length ? <div className="reports-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={income.monthly.map(row => ({ key: row.key, dividends: row.dividends.toNumber(), jcp: row.jcp.toNumber() }))} margin={{ top: 10, right: 12, left: 12, bottom: 6 }}>
+          <CartesianGrid vertical={false} stroke="#25313a" strokeDasharray="3 5"/><XAxis dataKey="key" tick={{ fill: '#9aabb4', fontSize: 11 }}/><YAxis tickFormatter={chartMoney} tick={{ fill: '#9aabb4', fontSize: 10 }}/><Tooltip formatter={(value, name) => [chartMoney(Number(value)), name === 'dividends' ? 'Dividendos' : 'JCP']}/><Legend formatter={name => name === 'dividends' ? 'Dividendos' : 'JCP'}/><Bar dataKey="dividends" stackId="income" fill="#68e5b4"/><Bar dataKey="jcp" stackId="income" fill="#8298f8" radius={[4, 4, 0, 0]}/>
+        </BarChart></ResponsiveContainer></div> : <div className="reports-state"><h3>Sem proventos no período</h3><p>Registre dividendos ou JCP no Histórico para iniciar este relatório.</p></div>}
+        {income.monthly.length > 0 && <div className="table-scroll reports-table"><table><thead><tr><th>Mês</th><th>Dividendos líquidos</th><th>JCP líquido</th><th>Total registrado</th></tr></thead><tbody>{income.monthly.map(row => <tr key={row.key}><td>{row.key}</td><td>{decimalMoney(row.dividends)}</td><td>{decimalMoney(row.jcp)}</td><td>{decimalMoney(row.dividends.plus(row.jcp))}</td></tr>)}</tbody></table></div>}
+        <div className="reports-income-assets"><h3>Distribuição por ativo</h3>{income.byAsset.length ? <div className="table-scroll reports-table"><table><thead><tr><th>Ativo</th><th>Dividendos</th><th>JCP</th><th>Total líquido</th></tr></thead><tbody>{income.byAsset.map(row => <tr key={row.asset}><th scope="row">{row.asset}</th><td>{decimalMoney(row.dividends)}</td><td>{decimalMoney(row.jcp)}</td><td>{decimalMoney(row.dividends.plus(row.jcp))}</td></tr>)}</tbody></table></div> : <p className="reports-state">Sem ativos no filtro selecionado.</p>}</div>
+      </>}
     </article>
     <article className="panel reports-panel reports-movements">
       <div className="panel-heading"><div><h2>Compras, vendas e eventos financeiros</h2><p>Movimentações efetivas e eventos registrados no período; valores movimentados não representam lucro nem rendimento.</p></div></div>

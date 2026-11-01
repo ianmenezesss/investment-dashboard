@@ -221,6 +221,22 @@ def test_brapi_individual_history_never_falls_back_to_raw_close():
     asyncio.run(run())
 
 
+def test_brapi_sharp_adjusted_move_is_preserved_without_smoothing_or_raw_fallback():
+    async def handler(_request):
+        return httpx.Response(200, json={"results": [{"requestedSymbol": "ITUB4", "symbol": "ITUB4", "data": {
+            "historicalDataPrice": [
+                {"date": "2026-10-27", "rawClose": 10, "adjustedClose": 10},
+                {"date": "2026-10-28", "rawClose": 10, "adjustedClose": 4},
+            ]}}]})
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler), trust_env=False) as client:
+            result = await BrapiIndividualHistoryProvider(client, "test").fetch(
+                "ITUB4", start=date(2026, 10, 1), end=TODAY)
+        assert result.price_basis == "adjusted_close"
+        assert [point.close for point in result.points] == [D("10"), D("4")]
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize(("status", "reason"), [(401, "provider_auth_error"), (403, "provider_forbidden"), (429, "provider_rate_limited")])
 def test_brapi_plan_and_rate_errors_are_sanitized(status, reason):
     async def handler(_request):

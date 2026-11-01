@@ -1,10 +1,12 @@
 # Arquitetura e plano
 
-> Este documento mantém as decisões fundacionais e a arquitetura original. Para a sequência atual v1.2.1/v1.3/v2.0/v3.0, consulte o [roadmap de versões públicas](INVESTMENT_DASHBOARD_V2_ROADMAP.md); o [plano mestre](INVESTMENT_DASHBOARD_MASTER_PLAN.md) preserva a história técnica.
+> Este documento mantém as decisões fundacionais e a arquitetura original. Para o estado local v2.0.0 e o escopo v3.0, consulte o [roadmap de versões públicas](INVESTMENT_DASHBOARD_V2_ROADMAP.md); o [plano mestre](INVESTMENT_DASHBOARD_MASTER_PLAN.md) preserva a história técnica.
 
-Atualização do candidato local v1.3.0 (31/10/2026; não publicado): histórico individual e comparação podem usar a Brapi Free com `adjustedClose`, uma chamada por ticker, cache de 30 minutos e um limitador de 12.000 chamadas/uma chamada simultânea **por processo**. O limitador não representa a cota da conta e não coordena outros workers, reinicializações ou aplicações; flags de dados de mercado permanecem desligadas até configuração explícita. Intervalos acima de 3 meses são parciais e a comparação só expõe datas cobertas por todos os ativos, sem preencher lacunas. `adjustedClose` não é usado para reconstruir valor histórico da carteira; o provider agregado que requer dados crus permanece desligado. A integração foi coberta por respostas simuladas, sem chamadas externas ou dados privados.
+Atualização do candidato local v2.0.0 (01/11/2026; não publicado): preserva a integração histórica Brapi Free da v1.3 e adiciona `portfolio_valuation_observations` em migration 010. `GET/POST /api/dashboard/wealth-observations` usa autenticação privada, owner/RLS e escrita append-only idempotente. CDI/IPCA/Ibovespa são comparados somente em meses completos comuns; cobertura curta é marcada como parcial. O relatório de proventos usa eventos efetivos já cadastrados. `adjustedClose` não reconstrói patrimônio e quedas abruptas não são suavizadas. TWR/XIRR continuam indisponíveis. A Íris combina conhecimento estático com um rótulo de tela restrito a uma lista fechada; não recebe valores, filtros, operações ou carteira. A migration não foi executada em produção.
 
-Atualização v4.0.0 / Fase 4.3A (29/10/2026): `GET /api/dashboard/performance` é um
+O histórico individual Brapi usa `adjustedClose`, uma chamada por ticker, cache de 30 minutos e limitador de 12.000 chamadas/uma chamada simultânea **por processo**. O limitador não representa a cota da conta e não coordena outros workers, reinicializações ou aplicações; flags continuam opt-in. Intervalos acima de três meses são parciais. Nenhuma chamada externa foi feita nesta implementação local.
+
+Registro histórico v4.0.0 / Fase 4.3A (29/10/2026): `GET /api/dashboard/performance` é um
 snapshot privado somente de leitura que combina o ledger de ações, fluxos e projeção
 efetiva CDB, composição e avaliação por cotações pontuais. Ele preserva `owner_id`,
 `REPLACE`/`VOID`, `Decimal` e `Cache-Control: no-store`; resultado consolidado da carteira
@@ -18,7 +20,7 @@ Atualização 1.6.3: `components/ui/ConfirmDialog.tsx` reutiliza Radix Dialog ex
 
 Atualização 1.6.2: demonstração interativa com `DemoRepository` local e `PrivateRepository` HTTP separados. Somente a primeira usa localStorage; nenhum token ou dado privado é persistido ali. O cálculo Decimal.js foi alinhado ao contexto Decimal Python e possui casos de contrato em `shared/finance-cases.json`, executados pelos dois runtimes. Consulte [demonstração interativa](interactive-demo.md).
 
-Aplicação pessoal local, com frontend React/TypeScript/Vite e API FastAPI. PostgreSQL é a fonte dos registros reais; a demonstração existe apenas em memória no frontend. Não há dependência de localStorage nem integração financeira externa nesta fase.
+Registro da fase inicial: aplicação pessoal local, com frontend React/TypeScript/Vite e API FastAPI. O estado de produto atual também inclui históricos opcionais e observações patrimoniais; os limites estão no roadmap público.
 
 Atualização da Fase 1.5: o build público é sempre uma demonstração sem rede privada. O acesso local por token foi preservado, e o backend ganhou um modo Supabase opt-in, autorização por proprietário e RLS. Veja [separação público/privado](demo-and-private.md), [auditoria](security-audit.md) e [deploy futuro](deployment.md). A integração externa não foi ativada.
 
@@ -37,6 +39,8 @@ frontend/src/
 backend/
   app/database.py configuração, engine e sessão SQLAlchemy
   app/models.py   modelo persistente
+  app/wealth_observations.py snapshots patrimoniais observados, owner-scoped
+  app/benchmarks.py comparação mensal BCB/Brapi com cobertura comum
   app/finance.py  cálculo por custo médio sem dependência HTTP
   app/main.py     validação, autenticação e endpoints
   app/auth.py     token local ou JWT Supabase com allowlist
@@ -45,6 +49,8 @@ backend/
   tests/         testes das regras financeiras
 compose.yaml     PostgreSQL local
 ```
+
+O head local da cadeia é a migration `010_portfolio_valuation_observations.py`. Ela cria uma tabela financeira append-only com RLS/FORCE RLS e grants mínimos. A publicação exige migration autorizada separada; o código local não consulta o estado do schema remoto.
 
 ## Fases e critérios
 

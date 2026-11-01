@@ -1,6 +1,6 @@
 # Investment Dashboard — plano mestre e histórico
 
-**Documento de continuidade e histórico.** Atualizado em 31/10/2026. A v1.2.0 — Íris foi publicada segundo relato do proprietário. O roadmap atual das versões públicas é [INVESTMENT_DASHBOARD_V2_ROADMAP.md](INVESTMENT_DASHBOARD_V2_ROADMAP.md); este documento preserva decisões e fases técnicas anteriores. A revisão documental não acessa dados privados/produção nem autoriza migration, commit ou deploy.
+**Documento de continuidade e histórico.** Atualizado em 01/11/2026. A v1.2.0 — Íris foi publicada segundo relato do proprietário; a candidata v2.0.0 está em validação local e não foi publicada. O roadmap atual das versões públicas é [INVESTMENT_DASHBOARD_V2_ROADMAP.md](INVESTMENT_DASHBOARD_V2_ROADMAP.md); este documento preserva decisões e fases técnicas anteriores. Nenhum banco de produção foi acessado ou migrado.
 
 ## Como interpretar este documento
 
@@ -11,9 +11,9 @@
 - Documentos de fases antigas preservam decisões e evidência da época. Use o [roadmap público atual](INVESTMENT_DASHBOARD_V2_ROADMAP.md) para sequência e escopo; este master e os documentos de fase guardam histórico e evidência.
 - As etiquetas de fase 1.9.x, 2.0.x, 3.x, 4.x e 5.x são marcos internos, não versões major públicas. O novo roadmap define v1.2.1/v1.3/v2.0/v3.0 do produto.
 
-### Estado atual do candidato (2026-10-31)
+### Estado atual do candidato (2026-11-01)
 
-O último release publicado continua sendo v1.2.0. As correções v1.2.1 e o histórico individual/comparação v1.3 estão implementados localmente e cobertos por testes mockados; ainda não foram publicados nem testados com a conta Brapi em produção. A Brapi Free limita cada resposta a até 3 meses, e os flags do provider permanecem opt-in. O histórico agregado de patrimônio segue desativado porque o fluxo atual requer preços `rawClose`/eventos societários ausentes do plano gratuito. Não foram acessados serviços, banco ou carteira de produção nesta implementação. Veja os resultados e o escopo vigente no [roadmap de versões](INVESTMENT_DASHBOARD_V2_ROADMAP.md).
+O último release publicado continua sendo v1.2.0. A candidata local v2.0.0 incorpora a estabilização v1.2.1, históricos v1.3 e análise patrimonial observada. A migration 010, endpoints, benchmarks, relatórios e backup/restore sintético passaram em PostgreSQL 17 descartável; a suíte local registrou 419 testes backend aprovados/1 ignorado, 230 frontend aprovados, build aprovado e integração PostgreSQL 001–010 aprovada. Não houve consulta externa nem acesso a carteira ou banco de produção. A Brapi Free permanece opt-in e limita histórico a até três meses. O valor patrimonial por ação é inserido pelo usuário a partir de fonte identificada; `adjustedClose` não é usado para reconstruir patrimônio. Quedas ajustadas são exibidas como recebidas, sem suavização; sem `rawClose` e eventos não se confirma automaticamente a causa. TWR/XIRR permanecem indisponíveis sem valuations e fluxos suficientemente completos. A Íris recebe somente um rótulo de tela permitido além da pergunta e do conhecimento estático. A v3.0 por convite ainda não foi implementada. Veja estado e critérios no [roadmap de versões](INVESTMENT_DASHBOARD_V2_ROADMAP.md).
 
 ## A. Visão geral do projeto
 
@@ -39,7 +39,7 @@ Navegador React/Vite
 |---|---|
 | Frontend | React 19, TypeScript, Vite, React Router, TanStack Query, Recharts, Tailwind, componentes Radix/shadcn e Decimal.js para apresentação/cálculos locais apropriados. |
 | API | Python 3.12+, FastAPI, Pydantic, SQLAlchemy 2, PyJWT/JWKS e psycopg. Rotas privadas validam token e consultam o banco sob contexto transacional de identidade. |
-| Banco | PostgreSQL; migrations Alembic em `backend/migrations/versions`; valores contábeis `NUMERIC(20,8)`. Head no checkout: `009_financial_events`. |
+| Banco | PostgreSQL; migrations Alembic em `backend/migrations/versions`; valores contábeis em `NUMERIC`. Head do checkout local candidato: `010_portfolio_valuation_observations`; estado de produção não consultado. |
 | Identidade | Supabase Auth no modo privado; JWT assimétrico ES256/RS256, issuer/audience/expiração, allowlist de UUIDs e autorização por proprietário. O cliente não recebe chave de serviço do Supabase. |
 | Hospedagem reportada | Frontend Vercel, API Render e banco/Auth Supabase. Esta documentação não lê secrets nem confirma variáveis, SHAs implantados, plano contratado ou configurações atuais dos painéis. |
 | Desenvolvimento | Frontend local por Vite; API local FastAPI; PostgreSQL local via Compose ou PostgreSQL descartável em containers para integração. |
@@ -58,7 +58,8 @@ Navegador React/Vite
 | `backend/app/finance.py`, `valuation.py`, `performance.py`, `portfolio.py` | Custo médio, valuation atual, agregados de performance atual e composição/fluxos registrados. |
 | `backend/app/fixed_income/`, `financial_events.py` | Ledger CDB, projeção/revisões/observações e eventos de caixa/proventos. |
 | `backend/app/market_data/`, `bcb_rates/` | Cotações pontuais e integração de taxas BCB/SGS; serviços históricos permanecem separados e condicionais. |
-| `backend/migrations/versions/` | Cadeia de migrations 001–009. |
+| `backend/app/wealth_observations.py`, `benchmarks.py` | Snapshots patrimoniais manuais owner-scoped e índices de referência mensais; não declaram retorno da carteira. |
+| `backend/migrations/versions/` | Cadeia de migrations 001–010 no checkout local; 010 ainda não aplicada em produção. |
 | `backend/tests/`, `frontend/src/**/*.test.*` | Testes unitários, de API, auth, componentes e cálculo; integração PostgreSQL opt-in/runner descartável. |
 | `scripts/`, `backend/scripts/` | Auditoria de publicação e utilitários de backup/restore; arquivos de backup devem permanecer fora do Git. |
 | `docs/` | Decisões, registros de fases, segurança, deploy, backups, release e planejamento. Este arquivo centraliza estado e próximos passos. |
@@ -121,14 +122,16 @@ Detalhes e logs históricos estão em [validação](validation.md), [segurança]
 | Ações, compras e vendas | **Implementado** | Ledger por custo médio cronológico, taxas, validação de venda e resultado realizado. Não inclui por si só saldo em caixa ou retorno total. |
 | Cotações/valuation atual | **Parcial / dependente de configuração e fonte** | Serviço pontual valida preço/moeda/timestamp/stale/cobertura; total agregado fica nulo se falta componente. Fonte e termos devem ser revalidados antes de ativar. |
 | Renda fixa/CDB | **Implementado para ledger/estimativas contratadas, com limites** | Produtos, lotes, aplicação/resgate, saldo/principal, observações, revisões, taxas BCB/SGS e estimativas por contrato. Estimativa não é saldo de resgate garantido ou rendimento efetivamente recebido. |
-| Fluxos/eventos | **Implementado** | Eventos manuais privados de caixa, dividendos/JCP e revisão append-only. Migration 009 é o head no código; estado atual do Supabase não foi consultado nesta tarefa. |
+| Fluxos/eventos | **Implementado** | Eventos manuais privados de caixa, dividendos/JCP e revisão append-only; migration 009 criou as tabelas de eventos. A migration 010 acrescenta observações patrimoniais; o estado atual do Supabase não foi consultado nesta tarefa. |
 | Histórico | **Implementado para movimentos registrados** | Timeline unificada com filtros e estados; não é avaliação patrimonial histórica. Históricos de preço podem ficar indisponíveis. |
 | Dashboard, composição, gráficos | **Implementado com cobertura/bases definidas** | Capital investido/custo/principal e valuation atual não se confundem; fluxos não são retorno. |
 | Relatórios/PDF | **Implementado** | Relatórios privados reaproveitam endpoints; PDF via impressão nativa. Não há arquivo/relatório server-side persistido. |
 | Simulador | **Implementado** | Cálculo local com cenários editáveis, inflação opcional e premissas; não consulta saldo da carteira. |
 | Metas | **Implementado com persistência local** | Progresso manual ou custo/principal investido; metas não sincronizam e não aparecem na demo; uma limpeza do armazenamento do navegador pode removê-las. |
-| Patrimônio e rentabilidade totais históricas | **Não implementado / deliberadamente indisponível** | Falta série completa e comparável de valuation/fluxos. TWR/XIRR e benchmarks não devem ser inferidos. |
-| Backup | **Um backup manual único feito, integridade reportada verificada; restore real pendente** | `docs/manual-backup.md`. Restore sintético em PostgreSQL descartável passou; arquivo real não foi restaurado. Não contém Auth, Storage ou config externa. |
+| Evolução patrimonial prospectiva | **Implementada no candidato local v2.0.0** | Observações append-only por data/fonte, actions informadas pelo usuário e CDBs observados na mesma data; total indisponível se cobertura incompleta. Migration 010 exige ensaio PostgreSQL descartável antes de qualquer migration de produção. |
+| Rentabilidade total/TWR/XIRR | **Indisponível por falta de série completa e limites de fluxo** | O resultado de ações realizado e o não realizado coberto ficam em seus próprios campos; valorização não é retorno total. |
+| Benchmarks CDI, Ibovespa e IPCA | **Comparação implementada no candidato local com cobertura condicionada** | CDI (12), IPCA (433) e `^BVSP`; somente meses comuns completos, índices base 100 e estado parcial quando falta mês. Não é retorno da carteira. |
+| Backup | **Processo manual versionado para schema 010; restore real pendente** | `docs/manual-backup.md` e `backend/scripts/backup_supabase_010.py`. O formato 010 inclui a tabela nova; restore de arquivo real não foi executado. Não contém Auth, Storage ou configuração externa. |
 
 ### Segurança e operações
 
@@ -152,16 +155,16 @@ Registros existentes mostram a v1.0 com frontend 217 testes em 28 arquivos, buil
 | Dividendos/JCP/eventos societários | Eventos em dinheiro registrados manualmente; **parcial** para histórico completo e ações societárias que mudam quantidade/custo. | A 009 registra eventos e revisão, mas evento observacional societário não altera posições. | Definir casos e proveniência antes de ampliar accounting. |
 | Histórico individual de preços | **Implementado localmente** com Brapi Free para `adjustedClose`; opt-in. | Até 3 meses por ticker; sem `rawClose` gratuito, não usar para valuation da carteira. Conta Brapi ainda não foi exercitada pelo candidato local. | Ativação produtiva requer configurar token/flags e conferir plano/termos sem assumir cobertura completa. |
 | Comparação de ações | **Implementada localmente** sobre a interseção coberta por dados ajustados; opt-in. | Uma chamada por ticker; sem interpolação; índice de preços não equivale a retorno total. | Validar disponibilidade externa e manter datas/limites de cobertura visíveis. |
-| Série de patrimônio consolidado | Planejada 4.4/5.6; **não implementada**. | Faltam snapshots de todas as classes, fluxos externos históricos, CDBs comparáveis e fonte histórica. | Frente de análise patrimonial da v2.0, condicionada a coleta futura. |
+| Série de patrimônio consolidado | **Observações prospectivas implementadas localmente na v2.0**. | Valores anteriores à primeira observação continuam ausentes; caixa/outros ativos não entram, e CDB sem posição na data torna a soma parcial. | Não reconstruir o passado; usar fonte e data registradas no painel. |
 | TWR | Planejado/bloqueado. | Requer valuation imediatamente antes/depois dos fluxos externos ou encadeamento justificado, datas e cobertura. | Não publicar antes dos testes e dados necessários. |
 | MWR / XIRR | Candidato, não implementado. | Requer todos fluxos externos assinados/datados e valuation terminal comparável; precisa de solução numérica e tratamento de múltiplas/ausentes raízes. | Pode ser mais adequado a retorno do investidor, mas só com entradas completas. |
-| Benchmarks | Planejados, não integrados como comparação de retorno. | Fonte, licença, calendário, moeda, base ajustada e alinhamento de datas. Taxa BCB/SGS usada em renda fixa não é benchmark da carteira por si só. | Depois de estabilizar a série própria e escolher fontes. |
+| Benchmarks | CDI, Ibovespa e IPCA têm endpoint de comparação mensal no candidato local. | Brapi Free tem janela limitada; 3M pode ser parcial. CDI/IPCA e índice de preços têm periodicidades diferentes, convertidas apenas para meses comuns. Não mede retorno da carteira. | Manter `partial`/`empty` explícito e não preencher lacunas. |
 | Persistência/sincronização de metas | LocalStorage por identidade, **não sincronizado**. | Foi escolha para evitar API/migration; dados dependem de dispositivo/perfil do browser. | Fora do escopo v1.2.1/v1.3/v2.0/v3.0; sem tarefa prevista. |
 | Backup operacional | Um único backup manual existente; **não há rotina automática ou restore real comprovado**. | Estratégia intencional de portfólio; Auth/Storage/configuração ficam de fora. | Antes de alterar esquema ou abrir v2, decidir backup/restore adequado e ensaiar em clone. |
 | Multiusuário por convite | Documentado, **não implementado**. | Requer onboarding controlado, tabelas/tokens/auditoria possíveis, RLS e processo operacional. | v3.0, após threat model, privacidade e recuperação. |
 | Agente de IA | **Íris publicada segundo o proprietário**. | Groq Free opcional, conhecimento estático, sem dados da carteira; esta atualização não revalidou painel nem sessão autenticada. | v1.2.0; não entregar ferramentas de escrita. |
 | MFA, rate limit, observabilidade/alerta, operação de incidentes | Parcial/pendente de validação ou capacidade na hospedagem atual. | Requer confirmar planos atuais, implantação, custo e requisitos de uso externo. | Reavaliar antes de convidar terceiros, não presumir como bloqueio de portfólio pessoal sem evidência de risco imediato. |
-| Precisão de metadado da API | **Corrigida localmente**: pacote Python, FastAPI/OpenAPI e pacote frontend em `1.3.0`. | A tag/release pública continua v1.2.0 até publicação formal. | Manter metadados alinhados nos próximos releases. |
+| Precisão de metadado da API | **Candidato local alinhado em `2.0.0`**: pacote Python, FastAPI/OpenAPI e frontend. | A release pública continua v1.2.0 até publicação formal. | Não declarar versão publicada antes de tag/release autorizadas. |
 
 Outras ideias antigas de expansão, agregação financeira, serviços premium, Open Finance e scraping permanecem opcionais ou fora da decisão de custo obrigatório zero. Não constituem “funcionalidade já feita”.
 
@@ -269,7 +272,7 @@ Complexidade é relativa (S pequena, M média, L grande) e não equivale a calen
 | v1.1.x | Sincronizar metas e acabamento de relatórios | Proposto, opcional | P2 | Caso de uso, persistência/privacidade | M | Funciona sob owner/RLS e não mistura demo nem identidade | Nova sugestão; confirmar escopo |
 | v1.2.0 | Chat privado Íris, conhecimento estático, limites e segurança | Publicada segundo o proprietário | Entregue | Groq Free opcional; auth Supabase; demo isolada | M | Validação anterior à release: 393 testes backend (1 skip), 221 frontend, build e chamadas reais completas; a revisão documental não acessou painéis | Seção F/CHANGELOG |
 | Fora do escopo aprovado | Ferramentas, memória persistente ou contexto automático da carteira na Íris | Não incluído em v1.2.1/v1.3/v2.0/v3.0 | — | Nenhuma dependência ativa | — | Nenhuma tarefa pendente; só reabrir por nova decisão explícita | Roadmap atual |
-| v2.0 | Snapshots patrimoniais, fluxos, rentabilidade e benchmarks sob cobertura explícita | Proposta atual no roadmap | Condicional a modelo, fontes e dados suficientes | Snapshot append-only, classificação de fluxos, migration/RLS/restore descartável | A | Métricas reproduzíveis, lacunas explícitas, cálculo recusado se incompleto | `INVESTMENT_DASHBOARD_V2_ROADMAP.md` |
+| v2.0 | Snapshots patrimoniais, fluxos, rentabilidade e benchmarks sob cobertura explícita | Implementada na candidata local; não publicada | Validação local aprovada; publicação ainda não solicitada | Snapshot append-only, classificação de fluxos, migration/RLS/restore descartável | A | Métricas reproduzíveis, lacunas explícitas, cálculo recusado se incompleto | `INVESTMENT_DASHBOARD_V2_ROADMAP.md` |
 | v3.0.1–.6 | A proposta antiga de onboarding restrito por convite | Reclassificada; não implementada | Após v2.0/estabilidade | Threat model, auth/admin, RLS, restore, suporte e limites | A | Acesso cruzado negado, restore e saída segura testados | `multiuser-expansion-plan.md` e novo roadmap |
 | Fora do escopo aprovado | Open Finance, scraping, APIs pagas/CSV/adaptadores, monetização/cadastro público | Explicitamente excluído das versões planejadas | Não agendado | Nova decisão de produto seria necessária para reabrir qualquer item | — | Sem requisito ou backlog dessas ideias | Roadmap atual |
 
@@ -277,12 +280,12 @@ Complexidade é relativa (S pequena, M média, L grande) e não equivale a calen
 
 ### Estado para retomar
 
-- Checkout examinado nesta revisão: `main` em `a815410`, inicialmente limpo e alinhado à referência local `origin/main`; a referência não foi atualizada pela rede. Foram feitas somente atualizações documentais nesta tarefa. O código de migrations contém a cadeia 001→009, com `009_financial_events` como head segundo o registro local; o banco de produção não foi consultado.
+- Checkout atual: `main` em `558e878` antes das alterações não commitadas da candidata v2.0. A referência `origin/main` não foi atualizada pela rede; não houve commit ou push. A árvore contém mudanças de v1.2.1/v1.3/v2.0 e seus testes/documentação. A cadeia local de migrations chega a `010_portfolio_valuation_observations`; o banco de produção não foi consultado.
 - Release v1.0.0 foi publicada segundo o proprietário; tag local existente aponta para `1d54a36`. Tag remota v1.0.1 no commit `329ba67` foi observada em consulta anterior; a reconsulta falhou por DNS. Não criar/mover tags ou release sem pedido.
-- Última correção técnica: import do runner PostgreSQL resolvido usando `Path(__file__).resolve().parents[1]` em `backend/tests/run_postgres.py`, eliminando dependência do CWD. A alteração está em `329ba67`; ela não altera a lógica financeira, schema ou DB.
-- Migration 009 existe e é head no código. Estado corrente do banco de produção não foi consultado; documentação do proprietário relata que foi aplicada. Não rodar migration ou query de produção sem autorização específica.
+- A implementação v2.0 inclui correção para serializar observações patrimoniais antes do commit sob RLS, contexto de tela não sensível na Íris, rótulos diários legíveis para histórico e ambiente de teste sem chaves Groq herdadas.
+- Migration 010 é head no código e foi ensaiada em PostgreSQL 17 descartável. O estado corrente do banco de produção não foi consultado; não rodar migration ou query de produção sem autorização específica.
 - Backup único cifrado fora do repo; documento não inclui frase/hash/DSN. Restore real ainda não foi ensaiado; somente dados fictícios e banco descartável foram usados nos testes sintéticos registrados.
-- v1.2.0 — Íris foi publicada segundo relato do proprietário. Nesta implementação local de v1.2.1/v1.3, não houve inspeção visual autenticada nem consulta a Render/Vercel/Supabase. A v1.2.1/v1.3 ainda requer revisão e publicação; v2.0 é análise patrimonial e v3.0 é multiusuário por convite. O escopo excluído está consolidado no roadmap atual.
+- v1.2.0 — Íris foi publicada segundo relato do proprietário. A candidata v2.0.0 local reúne v1.2.1, v1.3 e v2.0 e passou nas suítes e no ensaio PostgreSQL descritos em `docs/validation.md`; ainda não foi publicada. Não houve inspeção visual autenticada nem consulta a Render/Vercel/Supabase. A v3.0 por convite não foi implementada. O escopo excluído está consolidado no roadmap atual.
 
 ### Comandos locais
 

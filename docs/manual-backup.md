@@ -1,30 +1,32 @@
-# Backup manual único — Supabase Free / Investment Dashboard v1.0.0
+# Backup manual único — Supabase Free / Investment Dashboard
 
 **Estado:** um único arquivo foi gerado pelo proprietário em armazenamento local protegido fora do checkout. Em 30/10/2026, a revisão local encontrou 101085 bytes e SHA-256 coincidente com o valor registrado pelo proprietário. Não guarde aqui o hash, a frase, a URL PostgreSQL ou dados do dump. O banco de produção não foi acessado novamente nesta revisão. O restore deste arquivo real não foi executado; depende de autorização específica para inserir a frase de proteção localmente.
 
 ## Estratégia e compatibilidade
 
-O plano escolhido é fazer **um único backup manual** antes da release v1.0. Não existe agendamento, workflow GitHub Actions, política de retenção de cópias ou serviço pago. O plano Free do Supabase não oferece backups automáticos gerenciados; a própria documentação recomenda exportação manual por Supabase CLI e off-site backup. Este projeto usa `pg_dump`, também suportado pelo PostgreSQL. O Supabase recomenda conexão direta para operações de dump/restore; se a rede IPv4 não alcançar o endpoint direto (IPv6), o shared Session Pooler da porta `5432` é a alternativa disponível em todos os planos. Não use transaction pooler `6543`. A conexão deve usar TLS com `sslmode=verify-full` e a CA oficial do Supabase. O usuário do banco precisa ter acesso de leitura a todos os dados e objetos públicos exportados. O script recusa qualquer Alembic diferente de `009` e não executa migrations nem escreve no banco. Consulte [backups Supabase](https://supabase.com/docs/guides/platform/backups) e [métodos de conexão PostgreSQL](https://supabase.com/docs/guides/database/connecting-to-postgres).
+O plano permanece **manual**, sem agendamento, workflow GitHub Actions, retenção automática ou serviço pago. O procedimento original para schema 009 permanece documentado para compatibilidade histórica; a candidata v2.0 acrescenta o formato `IDBKP010`, que exige a tabela de observações patrimoniais e Alembic `010`. O leitor de restauração aceita os formatos 009 e 010 e valida as tabelas exigidas pelo cabeçalho. Nenhum script aplica migrations ou escreve no banco de origem. Consulte [backups Supabase](https://supabase.com/docs/guides/platform/backups) e [métodos de conexão PostgreSQL](https://supabase.com/docs/guides/database/connecting-to-postgres).
 
-O resultado é um único arquivo `.idbackup`: dump custom PostgreSQL (com compressão do formato custom) cifrado em streaming com AES-256-GCM. A frase de proteção é digitada sem eco, nunca passada em argumentos ou gravada em log. O script pede confirmação literal antes de conectar, não sobrescreve destino existente, não grava dump sem cifrar no host e valida a autenticação, a descompressão completa e a revisão `009` antes de promover o arquivo. O SHA-256 impresso identifica o arquivo cifrado; AES-GCM também detecta alteração ou frase incorreta.
+O resultado é um arquivo `.idbackup`: dump custom PostgreSQL cifrado em streaming com AES-256-GCM, marcado `IDBKP009` ou `IDBKP010`. A frase de proteção é digitada sem eco, nunca passada em argumentos ou gravada em log. O processo pede confirmação literal antes de conectar, não sobrescreve destino existente, não grava dump em claro no host e valida a autenticação, descompressão e revisão correspondente antes de promover o arquivo. O SHA-256 impresso identifica o arquivo cifrado; AES-GCM também detecta alteração ou frase incorreta.
 
-`pg_dump` e `pg_restore` são ferramentas PostgreSQL usuais no plano Free; a disponibilidade depende de o projeto aceitar a conexão Session Pooler e de o usuário ter `SELECT` suficiente. Limites de rede, conexões ou privilégios podem impedir o dump. O preflight falha sem produzir backup se não confirmar banco PostgreSQL 17, revisão única `009` e TLS. Não se deve contornar uma falha de permissão ampliando o papel runtime: use uma credencial de backup aprovada, somente com os privilégios necessários.
+`pg_dump` e `pg_restore` são ferramentas PostgreSQL usuais no plano Free; a disponibilidade depende de o projeto aceitar a conexão Session Pooler e de o usuário ter `SELECT` suficiente. Limites de rede, conexões ou privilégios podem impedir o dump. O preflight exige banco PostgreSQL 17, TLS e a revisão única correspondente ao script escolhido: `009` no fluxo legado ou `010` no fluxo da v2.0. Não se deve contornar uma falha de permissão ampliando o papel runtime: use uma credencial de backup aprovada, somente com os privilégios necessários.
 
 ## Preparação local e backup real
 
-Os testes sintéticos em PostgreSQL descartável foram aprovados (ver abaixo). O backup único já foi gerado após autorização; **não gere uma segunda cópia nem execute novamente o script de produção**. Nunca cole a URL, senha, frase de proteção ou CA no Git, issue, chat ou log.
+O registro anterior informa que o proprietário gerou um arquivo de backup em armazenamento local protegido, identificado como esquema 009. Esse artefato não foi aberto nesta implementação. Não gere uma segunda cópia nem execute um script de produção sem autorização específica. Nunca cole URL, senha, frase de proteção ou CA no Git, issue, chat ou log.
 
-O procedimento abaixo é a referência para recuperação documentada futura, não uma instrução para gerar outro arquivo. Quando uma futura substituição for necessária, confirme primeiro uma nova autorização. Para o artefato atual, a URL/CA não são necessárias para validar o hash local.
+O procedimento abaixo documenta o fluxo futuro; não foi executado nesta implementação. Uma geração de backup real requer autorização própria e a URL/CA não são necessárias para os testes locais sintéticos.
+
+Para a candidata v2.0, o script versionado é `backend/scripts/backup_supabase_010.py`. O comando não foi executado durante a implementação; exige autorização própria e credenciais locais.
 
 ```powershell
-python backend/scripts/backup_supabase_009.py --output '<PASTA_PROTEGIDA_FORA_DO_REPOSITORIO>\investment-dashboard-v1.0.0.idbackup'
+python backend/scripts/backup_supabase_010.py --output '<PASTA_PROTEGIDA_FORA_DO_REPOSITORIO>\investment-dashboard-v2.0.0.idbackup'
 ```
 
-No uso futuro, o script solicita a frase duas vezes e, antes da primeira consulta, exige `BACKUP PRODUCTION 009`. Em sucesso, não é criado arquivo de manifesto ou log. Limpe as variáveis da sessão depois do uso. A frase do arquivo atual deve permanecer guardada separadamente em meio protegido. Como existe só uma cópia, perda do arquivo ou da frase elimina este ponto de recuperação.
+O script 010 solicita a frase duas vezes e exige `BACKUP PRODUCTION 010`. O script legado `backup_supabase_009.py` continua disponível para schema 009 e exige a confirmação 009. Em sucesso, não é criado arquivo de manifesto ou log. Limpe variáveis de sessão após uso e guarde a frase separadamente em meio protegido. A candidata v2.0 não declara backup 010 de produção nem aplicação de migration.
 
 ## Ensaio e verificação do restore
 
-O ensaio automatizado usa fixtures fictícias, PostgreSQL 17 efêmero e o mesmo formato cifrado. A integração executa migrations 001–009, grava operações/eventos sintéticos, tira dump, cifra, autentica/descriptografa, restaura em outro PostgreSQL descartável e compara contagens, fingerprints de linhas, RLS/FORCE RLS, policies, triggers, role runtime, grants e visibilidade de dois proprietários. Os containers não recebem dados de produção. A frase sintética do teste não é reutilizável. O backup real atual teve seu tamanho e hash conferidos, mas sua descriptografia/restauração ainda não foi testada; somente prosseguir quando houver autorização específica para inserir a frase localmente.
+O ensaio automatizado da candidata usa fixtures fictícias, PostgreSQL 17 efêmero e formato 010. A integração executa migrations 001–010, grava registros sintéticos, tira dump, cifra, autentica/descriptografa, restaura em outro PostgreSQL descartável e compara contagens, RLS/FORCE RLS, policies, triggers, grants e isolamento de proprietários. O leitor também mantém compatibilidade 009. Os containers não recebem dados de produção; a frase sintética não é reutilizável. O backup real histórico mencionado no registro acima não foi restaurado nem revalidado nesta implementação.
 
 Para restaurar um arquivo real futuramente **somente em PostgreSQL descartável**:
 
@@ -38,7 +40,7 @@ O restaurador solicita a frase e confirmação `DESCARTAVEL`. Ele valida o hash 
 
 ## Escopo recuperável e limites
 
-O artefato contém o schema PostgreSQL `public`: tabelas, sequências, índices, constraints, funções/triggers/policies incluídos pelo `pg_dump`, grants de objetos disponíveis à credencial e os dados acessíveis das tabelas da aplicação, incluindo operações, renda fixa, `financial_events`, `financial_event_revisions` e `alembic_version=009`. As ACLs exigem que os papéis referenciados existam no destino; o dump PostgreSQL não cria roles globais nem repõe senhas/atributos de cluster. O restore de ensaio recria roles locais fictícias e verifica grants e RLS.
+O artefato contém o schema PostgreSQL `public`: tabelas, sequências, índices, constraints, funções/triggers/policies incluídos pelo `pg_dump`, grants de objetos disponíveis à credencial e os dados acessíveis das tabelas da aplicação. No formato 010 isso inclui `portfolio_valuation_observations` e `alembic_version=010`; o formato 009 contém o conjunto anterior e `alembic_version=009`. As ACLs exigem que os papéis referenciados existam no destino; o dump não cria roles globais nem repõe senhas/atributos de cluster. O restore de ensaio recria roles locais fictícias e verifica grants e RLS.
 
 Não é uma imagem completa do projeto Supabase e não recupera:
 

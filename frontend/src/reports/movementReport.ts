@@ -26,3 +26,36 @@ export function sharePercent(value: string, total: string) {
   const base = new Decimal(total)
   return base.isZero() ? '0.0' : new Decimal(value).div(base).mul(100).toDecimalPlaces(1).toFixed(1)
 }
+
+export function aggregateIncomeReport(rows: readonly UnifiedMovement[]) {
+  let totalDividend = new Decimal(0), totalJcp = new Decimal(0)
+  const monthly = new Map<string, { key: string; dividends: Decimal; jcp: Decimal }>()
+  const byAsset = new Map<string, { asset: string; dividends: Decimal; jcp: Decimal }>()
+  let count = 0
+  for (const row of rows) {
+    if (row.operation !== 'DIVIDEND' && row.operation !== 'JCP') continue
+    const amount = new Decimal(row.financial_value ?? '0').abs()
+    if (!amount.isFinite()) continue
+    count++
+    const isDividend = row.operation === 'DIVIDEND'
+    if (isDividend) totalDividend = totalDividend.plus(amount)
+    else totalJcp = totalJcp.plus(amount)
+    const key = row.date.slice(0, 7)
+    const month = monthly.get(key) ?? { key, dividends: new Decimal(0), jcp: new Decimal(0) }
+    if (isDividend) month.dividends = month.dividends.plus(amount)
+    else month.jcp = month.jcp.plus(amount)
+    monthly.set(key, month)
+    const asset = byAsset.get(row.asset) ?? { asset: row.asset, dividends: new Decimal(0), jcp: new Decimal(0) }
+    if (isDividend) asset.dividends = asset.dividends.plus(amount)
+    else asset.jcp = asset.jcp.plus(amount)
+    byAsset.set(row.asset, asset)
+  }
+  return {
+    dividends: totalDividend,
+    jcp: totalJcp,
+    total: totalDividend.plus(totalJcp),
+    count,
+    monthly: [...monthly.values()].sort((a, b) => a.key.localeCompare(b.key)),
+    byAsset: [...byAsset.values()].sort((a, b) => b.dividends.plus(b.jcp).comparedTo(a.dividends.plus(a.jcp))),
+  }
+}

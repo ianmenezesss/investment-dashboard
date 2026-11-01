@@ -53,7 +53,7 @@ def test_history_flag_does_not_disable_current_quotes(monkeypatch):
             shared_gate = app.state.quote_service.provider.request_gate
             assert shared_gate is app.state.equity_history_service.provider.request_gate
             assert shared_gate is app.state.individual_equity_price_history_service.provider.request_gate
-            assert app.version == "1.3.0"
+            assert app.version == "2.0.0"
 
     asyncio.run(run())
 

@@ -4,6 +4,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import Decimal from 'decimal.js'
 import type { IndividualEquityPriceHistory as HistoryData } from '../api'
 import type { PrivateRepository } from '../repositories/PrivateRepository'
+import { formatDailyAxisDate } from './chartDates'
 import './portfolio.css'
 
 const periods: { value: HistoryData['period']; label: string }[] = [
@@ -108,7 +109,7 @@ export function IndividualEquityHistory({ repository, identity, tickers }: {
         {data.availability === 'partial' && <p className="portfolio-coverage" role="status">{data.reason ? unavailableMessage[data.reason] : 'A cobertura é parcial; são exibidos apenas os preços retornados pela fonte.'}</p>}
         <div className="individual-history-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData} margin={{ top: 15, right: 20, left: 8, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="#222c33" strokeDasharray="3 5"/>
-          <XAxis dataKey="date" tickFormatter={value => new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })} axisLine={false} tickLine={false}/>
+          <XAxis dataKey="date" interval="preserveStartEnd" minTickGap={16} tickFormatter={formatDailyAxisDate} axisLine={false} tickLine={false}/>
           <YAxis tickFormatter={value => Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} axisLine={false} tickLine={false} width={54}/>
           <Tooltip labelFormatter={value => dateLabel(String(value))} formatter={(_value, _name, item) => [formatDailyPrice(String(item.payload.close), data.currency), `Fechamento de ${ticker}`]}/>
           <Line type="monotone" dataKey="close_plot" name="close" stroke="#68e5b4" strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={false}/>

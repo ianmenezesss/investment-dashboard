@@ -40,6 +40,8 @@ from .individual_equity_history import EquityPriceHistoryService, router as indi
 from .equity_comparison import router as equity_comparison_router
 from .financial_events import router as financial_events_router
 from .assistant import router as assistant_router
+from .wealth_observations import router as wealth_observations_router
+from .benchmarks import router as benchmarks_router
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 from uuid import uuid4
@@ -73,7 +75,7 @@ async def lifespan(app):
             app.state.bcb_rates_service = None
 
 
-app = FastAPI(title="Investment Dashboard", version="1.3.0", lifespan=lifespan, docs_url=None if settings.environment == "production" else "/docs", redoc_url=None, openapi_url=None if settings.environment == "production" else "/openapi.json")
+app = FastAPI(title="Investment Dashboard", version="2.0.0", lifespan=lifespan, docs_url=None if settings.environment == "production" else "/docs", redoc_url=None, openapi_url=None if settings.environment == "production" else "/openapi.json")
 app.include_router(fixed_income_router)
 app.include_router(revision_router)
 app.include_router(bcb_rates_router)
@@ -86,6 +88,8 @@ app.include_router(individual_equity_history_router)
 app.include_router(equity_comparison_router)
 app.include_router(financial_events_router)
 app.include_router(assistant_router)
+app.include_router(wealth_observations_router)
+app.include_router(benchmarks_router)
 
 
 @app.exception_handler(RequestValidationError)

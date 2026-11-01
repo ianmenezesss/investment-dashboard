@@ -1,4 +1,4 @@
-"""Executa integração 001–009 e ensaio pg_dump/restore em containers efêmeros."""
+"""Executa integração 001–010 e ensaio pg_dump/restore em containers efêmeros."""
 import os
 import io
 from pathlib import Path
@@ -102,8 +102,17 @@ def main():
     temp_root = Path(os.environ.get("INVESTMENT_TEMP_DIR", ""))
     if not temp_root.is_absolute() or not temp_root.is_dir():
         raise RuntimeError("INVESTMENT_TEMP_DIR precisa apontar para uma pasta temporária existente")
-    if os.name == "nt" and str(temp_root.resolve()).lower() != r"e:\investmentdashboard\temp":
-        raise RuntimeError("O temporário deste ensaio deve ficar em E:\\InvestmentDashboard\\temp")
+    temp_root = temp_root.resolve()
+    if os.name == "nt":
+        backend_root = BACKEND_ROOT.resolve()
+        try:
+            temp_root.relative_to(backend_root)
+        except ValueError:
+            if str(temp_root).lower() != r"e:\investmentdashboard\temp":
+                raise RuntimeError(
+                    "No Windows, o temporário deve ficar dentro do checkout do backend "
+                    "ou em E:\\InvestmentDashboard\\temp"
+                )
     backup_path = None
     decrypted_dump = None
     network_created = False
@@ -165,6 +174,7 @@ def main():
         env = {k: v for k, v in os.environ.items() if k not in {
             "DATABASE_URL", "MIGRATION_DATABASE_URL", "TEST_DATABASE_URL", "SUPABASE_URL",
             "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY", "API_TOKEN", "BRAPI_TOKEN",
+            "GROQ_API_KEY", "GROQ_MODEL",
             "AUTH_MODE", "ENVIRONMENT", "ALLOWED_USER_IDS", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_BIN",
             "PGHOST", "PGPORT", "PGUSER", "PGDATABASE", "PGPASSWORD", "PGSERVICE", "PGSERVICEFILE",
             "PGSSLMODE", "PGSSLROOTCERT", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
@@ -183,18 +193,18 @@ def main():
         if result.returncode:
             return result.returncode
 
-        print("INTEGRACAO_POSTGRESQL_001_009=PASSOU")
+        print("INTEGRACAO_POSTGRESQL_001_010=PASSOU")
         print("Criando backup lógico fictício e iniciando servidor de restore independente...")
         dump = subprocess.run([docker, "exec", "-e", f"PGPASSWORD={password}", name, "pg_dump", "-h", "127.0.0.1", "-p", "5432",
                                "-U", "postgres", "-Fc", source_db], capture_output=True)
         if dump.returncode:
             detail = (dump.stderr or b"Falha sem diagnostico").decode(errors="replace").replace(password, "[redacted]")[:2000]
             raise RuntimeError(f"pg_dump falhou: {detail}")
-        from scripts.backup_archive import decrypt_stream, encrypt_stream
+        from scripts.backup_archive import MAGIC_010, decrypt_stream, encrypt_stream
         synthetic_passphrase = "Synthetic-only-passphrase-2026"
         fd, backup_path = tempfile.mkstemp(prefix=f"investment-dashboard-{run_id}-", suffix=".idbackup", dir=temp_root)
         with os.fdopen(fd, "wb") as backup_file:
-            encrypted_size, encrypted_hash = encrypt_stream(io.BytesIO(dump.stdout), backup_file, synthetic_passphrase)
+            encrypted_size, encrypted_hash = encrypt_stream(io.BytesIO(dump.stdout), backup_file, synthetic_passphrase, magic=MAGIC_010)
         decrypted = io.BytesIO()
         with open(backup_path, "rb") as encrypted_file:
             decrypted_size, decrypted_hash = decrypt_stream(encrypted_file, decrypted, synthetic_passphrase)
@@ -225,8 +235,8 @@ CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service
         if source_snapshot != restored_snapshot:
             raise RuntimeError("Snapshot de contagens, RLS/grants ou isolamento divergiu após restore")
         print(f"BACKUP_RESTORE=PASSOU; encrypted_bytes={encrypted_size}; encrypted_sha256={encrypted_hash}; plaintext_sha256={decrypted_hash}")
-        print("BACKUP_ENCRYPTION=AES-256-GCM; AUTHENTICATED_DECRYPTION=PASS")
-        print("RESTORE_HEAD=009; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
+        print("BACKUP_ENCRYPTION=AES-256-GCM; AUTHENTICATED_DECRYPTION=PASS; format=IDBKP010")
+        print("RESTORE_HEAD=010; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
         return 0
     finally:
         # Only containers created by this invocation are stopped; no volumes are mounted or removed.

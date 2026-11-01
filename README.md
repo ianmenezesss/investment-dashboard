@@ -6,7 +6,7 @@ Uma plataforma web para registrar e acompanhar investimentos em ações e renda 
 
 **[Abrir a aplicação](https://investment-dashboard-pvd.vercel.app)** · **[Explorar a demonstração pública](https://investment-dashboard-pvd.vercel.app)** · **[Conhecer o roadmap](docs/INVESTMENT_DASHBOARD_V2_ROADMAP.md)**
 
-`v1.2.0` publicada · `v1.3.0` implementada localmente, não publicada · React · TypeScript · FastAPI · PostgreSQL
+`v1.2.0` publicada · `v2.0.0` em validação local, não publicada · React · TypeScript · FastAPI · PostgreSQL
 
 ---
 
@@ -28,7 +28,9 @@ O projeto nasceu para reunir registros de investimentos e tornar suas bases mais
 
 - **Dashboard e composição:** visualize posições, fluxos registrados e bases de composição com indicações de cobertura.
 - **Histórico de ações:** quando habilitado no backend, consulte preços ajustados da Brapi Free; períodos além de três meses aparecem como parciais. Isso não reconstrói o patrimônio histórico da carteira.
-- **Relatórios:** explore aportes, composição e movimentações com filtros; imprima pelo navegador ou salve como PDF.
+- **Evolução patrimonial:** registre observações datadas com fonte; CDBs só entram no total quando todos os contratos ativos estão cobertos exatamente na data. Não infere datas ou retorno.
+- **Indicadores de referência:** compare CDI, Ibovespa e IPCA apenas em meses completos comuns; a cobertura limitada da Brapi pode tornar 3M parcial.
+- **Relatórios:** explore aportes, composição, movimentações e proventos manuais com filtros; imprima pelo navegador ou salve como PDF.
 - **Simulador:** compare cenários hipotéticos com aportes, prazos, taxas editáveis e inflação opcional.
 - **Metas:** acompanhe progresso manual ou por custo/principal investido e planeje aportes. As metas ficam no navegador e não sincronizam entre dispositivos.
 
@@ -38,7 +40,7 @@ O projeto nasceu para reunir registros de investimentos e tornar suas bases mais
 
 - **Demonstração pública:** usa dados fictícios e foi projetada para funcionar separada da API privada.
 - **Área privada:** autenticação Supabase e autorização no backend; os registros são isolados por proprietário.
-- **Íris:** assistente opcional de educação financeira, disponível somente na área privada autenticada. Usa conhecimento estático, não recebe dados da carteira e não recomenda investimentos. As perguntas são enviadas à Groq; não inclua informações pessoais ou financeiras.
+- **Íris:** assistente opcional de educação financeira, disponível somente na área privada autenticada. Combina conhecimento estático com o nome permitido da tela atual; não recebe valores, posições, operações, filtros nem outros dados da carteira. As perguntas são enviadas à Groq; não inclua informações pessoais ou financeiras.
 - **Privacidade:** a demonstração não usa a carteira privada. O produto não oferece cadastro público irrestrito.
 
 ## Prévia do produto
@@ -58,19 +60,12 @@ O backend concentra as regras financeiras e usa `Decimal` para cálculos monetá
 
 O botão de exportação gera um JSON de operações de ações. Ele não inclui renda fixa/CDB, observações, eventos financeiros ou metas e não substitui um backup.
 
-## Próximas versões
+## Estado das versões
 
-O planejamento atual separa as versões públicas das antigas etiquetas de fases técnicas:
-
-- **v1.2.1 — Estabilização:** implementada localmente, ainda não publicada.
-- **v1.3 — Históricos gratuitos:** histórico individual e comparação com cobertura de até três meses; implementada localmente, opt-in no backend e ainda não publicada.
-- **v2.0 — Análise patrimonial:** planejada; snapshots somente se necessários, fluxos classificados, relatórios e benchmarks comparáveis.
-- **v3.0 — Expansão por convite:** planejada; multiusuário restrito, condicionado a testes de isolamento e recuperação.
-
-O escopo, as dependências, os limites gratuitos e os critérios de aceite estão no [roadmap v2.0 e v3.0](docs/INVESTMENT_DASHBOARD_V2_ROADMAP.md). O [plano mestre](docs/INVESTMENT_DASHBOARD_MASTER_PLAN.md) preserva o histórico e aponta para essa fonte atual.
+O último lançamento publicado é a v1.2.0. A candidata local v2.0.0 reúne a estabilização v1.2.1, os históricos gratuitos da v1.3 e a análise patrimonial desta versão; ainda não foi publicada. O escopo aprovado para a v3.0 é acesso limitado por convite, sem cadastro público, e não foi iniciado. Consulte o [roadmap v2.0/v3.0](docs/INVESTMENT_DASHBOARD_V2_ROADMAP.md) para escopo e critérios.
 
 ## Conheça o projeto
 
 Abra a [aplicação](https://investment-dashboard-pvd.vercel.app) para explorar a demonstração pública. O Investment Dashboard apresenta uma aplicação prática de desenvolvimento full-stack, segurança por proprietário, regras financeiras e visualização — com limites explícitos para dados que ainda não permitem conclusões históricas confiáveis.
 
-**Documentação:** [Master Plan](docs/INVESTMENT_DASHBOARD_MASTER_PLAN.md) · [Arquitetura](docs/architecture.md) · [Segurança](docs/security-audit.md) · [Roadmap](docs/roadmap.md) · [Changelog](CHANGELOG.md)
+**Documentação:** [Master Plan](docs/INVESTMENT_DASHBOARD_MASTER_PLAN.md) · [Análise financeira v2.0](docs/v2.0-financial-analysis.md) · [Arquitetura](docs/architecture.md) · [Segurança](docs/security-audit.md) · [Roadmap](docs/INVESTMENT_DASHBOARD_V2_ROADMAP.md) · [Changelog](CHANGELOG.md)

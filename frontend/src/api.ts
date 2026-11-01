@@ -41,6 +41,21 @@ export type EquityComparison = {
     | 'invalid_provider_response' | 'incompatible_data' | 'no_common_date' | 'empty_history'
     | 'provider_auth_error' | 'provider_forbidden' | 'provider_rate_limited' | 'request_budget_exhausted' | 'plan_limit' | 'source_coverage' | null
 }
+export type WealthObservation = {
+  id: number; as_of: string; equities_market_value: string | null; equities_source: string | null
+  fixed_income_gross_value: string | null; fixed_income_net_value: string | null
+  fixed_income_coverage: 'complete' | 'partial' | 'unavailable' | 'empty'
+  fixed_income_sources: { asset: string; source: string }[]; missing_fixed_income: string[]
+  consolidated_gross_value: string | null; consolidated_net_value: string | null
+  consolidated_coverage: 'complete' | 'partial'; created_at: string
+}
+export type WealthObservationInput = { as_of: string; equities_market_value: string; equities_source: string }
+export type BenchmarkComparison = {
+  period: '1M' | '3M'; coverage_start: string | null; coverage_end: string | null
+  availability: 'available' | 'partial' | 'disabled' | 'unavailable' | 'empty'
+  reason: 'feature_disabled' | 'provider_not_configured' | 'provider_unavailable' | 'source_coverage' | 'incompatible_data' | 'insufficient_common_period' | null
+  source: string; bases: Record<string, string>; points: { month: string; values: Record<string, string> }[]
+}
 export type Summary = { acquisition_cost: string; total_purchases: string; sale_proceeds: string; realized_profit: string; market_value: null; holdings: { ticker: string; quantity: string; cost: string; average_price: string }[] }
 export type MarketQuote = {
   ticker: string; price: string | null; currency: string; provider: string
@@ -106,8 +121,9 @@ export type FinancialPerformance = {
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
 }
-export async function askAssistant(message: string, token: string): Promise<string> {
-  const result = await request<{answer:string}>('assistant/chat', token, {method:'POST', body:JSON.stringify({message})})
+export type AssistantScreenContext = 'overview' | 'equities' | 'fixed_income' | 'history' | 'reports' | 'simulator' | 'goals'
+export async function askAssistant(message: string, token: string, context: AssistantScreenContext = 'overview'): Promise<string> {
+  const result = await request<{answer:string}>('assistant/chat', token, {method:'POST', body:JSON.stringify({message, context})})
   return result.answer
 }
 export async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {

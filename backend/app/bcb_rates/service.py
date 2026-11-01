@@ -2,7 +2,7 @@ import asyncio
 import time
 from collections import OrderedDict, deque
 from datetime import datetime, timedelta, timezone
-from .schemas import Period, RateHistory, RateError, SERIES, today
+from .schemas import Period, RateHistory, RateError, SERIES, SERIES_UNITS, today
 
 
 class RateService:
@@ -58,7 +58,7 @@ class RateService:
                         raise
                     fetched_at = self.now()
                     ttl = 60 if not observations else 900 if period.end_date >= today() - timedelta(days=7) else 21600
-                    result = RateHistory(series_code=code, name=SERIES[code], start_date=period.start_date,
+                    result = RateHistory(series_code=code, name=SERIES[code], unit=SERIES_UNITS[code], start_date=period.start_date,
                         end_date=period.end_date, status="ok" if observations else "empty", observations=observations,
                         duplicates_removed=duplicates, last_observation_date=observations[-1].date if observations else None,
                         fetched_at=fetched_at, expires_at=fetched_at + timedelta(seconds=ttl))

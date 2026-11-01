@@ -4,6 +4,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import Decimal from 'decimal.js'
 import type { EquityComparison as ComparisonData, IndividualEquityPriceHistory } from '../api'
 import type { PrivateRepository } from '../repositories/PrivateRepository'
+import { formatDailyAxisDate } from './chartDates'
 import './portfolio.css'
 
 const periods: { value: IndividualEquityPriceHistory['period']; label: string }[] = [
@@ -143,7 +144,7 @@ export function AssetComparison({ repository, identity, tickers }: {
         {data.availability === 'partial' && <p className="portfolio-coverage" role="status">{data.reason ? reasonMessages[data.reason] : 'Comparação limitada ao trecho coberto simultaneamente pela fonte; datas ausentes não são interpoladas.'}</p>}
         <div className="equity-comparison-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData} margin={{ top: 15, right: 20, left: 8, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="#222c33" strokeDasharray="3 5"/>
-          <XAxis dataKey="date" tickFormatter={value => new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })} axisLine={false} tickLine={false}/>
+          <XAxis dataKey="date" interval="preserveStartEnd" minTickGap={16} tickFormatter={formatDailyAxisDate} axisLine={false} tickLine={false}/>
           <YAxis tickFormatter={value => `${(Number(value) - 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`} axisLine={false} tickLine={false} width={60}/>
           <Tooltip labelFormatter={value => dateLabel(String(value))} formatter={(value, name) => value === null
             ? ['Sem fechamento nesta data', String(name)]

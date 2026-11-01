@@ -111,7 +111,7 @@ def test_bounded_windows_reuse_sgs_contract_without_overlap():
                 assert code == 12
                 periods.append(period)
                 now = datetime.now(timezone.utc)
-                return RateHistory(series_code=12, name="CDI", **period.model_dump(), status="empty", observations=(),
+                return RateHistory(series_code=12, name="CDI", unit="% ao dia", **period.model_dump(), status="empty", observations=(),
                     duplicates_removed=0, last_observation_date=None, fetched_at=now, expires_at=now)
         points, refs, error = await collect_cdi(Service(), date(2024, 1, 2), date(2026, 1, 2))
         assert error is None and not points and len(refs) == 2

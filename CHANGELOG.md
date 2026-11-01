@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.0.0 — análise patrimonial com cobertura explícita (implementada localmente; não publicada)
+
+- Substituída a antiga seção de evolução histórica desativada por observações patrimoniais datadas, fonte informada, cobertura de CDB e total apenas quando as classes cobertas permitem.
+- Adicionada migration append-only 010 com RLS/FORCE RLS, endpoint privado de leitura/gravação idempotente e verificação de permissões no PostgreSQL descartável.
+- Adicionados CDI, Ibovespa e IPCA em meses completos comuns; janela parcial é identificada e o gráfico não é apresentado como retorno da carteira.
+- Adicionado relatório filtrável de dividendos e JCP com totais mensais e por ativo, usando somente eventos manuais efetivos.
+- A Íris recebeu conhecimento estático dos indicadores e limites da v2.0 e um contexto de tela restrito a rótulos permitidos. Nenhum valor, ativo, operação, filtro ou token da carteira é enviado como contexto à Groq.
+- O procedimento de backup/restauração versionado passou a reconhecer o schema 010 e a tabela patrimonial; os arquivos 009 permanecem compatíveis com arquivos históricos.
+- Metadados locais do frontend, pacote Python e FastAPI/OpenAPI alinhados a `2.0.0`.
+- Validação local: backend **419 aprovados/1 ignorado**, PostgreSQL 17 descartável com migrations 001–010 e backup/restore `IDBKP010` aprovados, frontend **230 testes aprovados**, build aprovado (2.384 módulos). Sem chamadas Groq/Brapi/BCB, banco remoto, migration de produção, commit, push ou deploy; detalhes em `docs/validation.md`.
+- Cobertura limitada a observações prospectivas. Caixa não entra no total patrimonial; TWR/XIRR continuam indisponíveis; a janela Brapi de três meses pode tornar a comparação 3M parcial.
+
 ## v1.3.0 — históricos individuais de ações (implementada localmente; não publicada)
 
 - Adicionado provider histórico Brapi Free com `adjustedClose`, uma chamada por ticker, cache por janela efetiva e serialização/limite local por processo.
@@ -14,7 +26,7 @@
 - Exportação identificada como operações de ações em JSON e acompanhada das exclusões; não é backup integral.
 - A Íris informa que as perguntas são enviadas à Groq e recomenda não incluir informações pessoais ou financeiras.
 - Estado sem pontos do histórico CDB orienta registrar observação datada e não presume valores anteriores.
-- Versões do frontend, pacote Python e FastAPI/OpenAPI alinhadas a `1.3.0`, que engloba as alterações locais da v1.2.1 e v1.3.
+- Naquele candidato, as versões foram alinhadas a `1.3.0`; o candidato v2.0.0 atual incorpora a estabilização, os históricos e a análise patrimonial.
 
 ## v1.2.0 — Íris, assistente de educação financeira (publicada segundo o proprietário)
 

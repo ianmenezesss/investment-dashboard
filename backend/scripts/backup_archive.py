@@ -11,6 +11,8 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 
 MAGIC = b"IDBKP009"
+MAGIC_010 = b"IDBKP010"
+SUPPORTED_MAGICS = (MAGIC, MAGIC_010)
 SALT_BYTES = 16
 NONCE_BYTES = 12
 TAG_BYTES = 16
@@ -23,10 +25,12 @@ def _derive_key(passphrase: str, salt: bytes) -> bytes:
     return Scrypt(salt=salt, length=32, n=2**15, r=8, p=1).derive(passphrase.encode("utf-8"))
 
 
-def encrypt_stream(source, destination, passphrase: str) -> tuple[int, str]:
-    """Encrypt a readable stream as IDBKP009 + salt + nonce + AES-256-GCM data/tag."""
+def encrypt_stream(source, destination, passphrase: str, *, magic: bytes = MAGIC) -> tuple[int, str]:
+    """Encrypt a PostgreSQL custom archive with a versioned AES-256-GCM header."""
+    if magic not in SUPPORTED_MAGICS:
+        raise ValueError("Formato de backup não suportado")
     salt, nonce = secrets.token_bytes(SALT_BYTES), secrets.token_bytes(NONCE_BYTES)
-    header = MAGIC + salt + nonce
+    header = magic + salt + nonce
     encryptor = Cipher(algorithms.AES(_derive_key(passphrase, salt)), modes.GCM(nonce)).encryptor()
     encryptor.authenticate_additional_data(header)
     digest = sha256()
@@ -48,10 +52,10 @@ def encrypt_stream(source, destination, passphrase: str) -> tuple[int, str]:
 
 
 def decrypt_stream(source, destination, passphrase: str) -> tuple[int, str]:
-    """Authenticate/decrypt an IDBKP009 stream; caller must discard output on error."""
+    """Authenticate/decrypt a supported backup; caller must discard output on error."""
     header_size = len(MAGIC) + SALT_BYTES + NONCE_BYTES
     header = source.read(header_size)
-    if len(header) != header_size or not header.startswith(MAGIC):
+    if len(header) != header_size or not any(header.startswith(magic) for magic in SUPPORTED_MAGICS):
         raise ValueError("Formato do backup não reconhecido")
     salt = header[len(MAGIC):len(MAGIC) + SALT_BYTES]
     nonce = header[-NONCE_BYTES:]

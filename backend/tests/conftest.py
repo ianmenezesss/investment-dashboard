@@ -22,3 +22,5 @@ os.environ["CORS_ORIGIN"] = "http://localhost:5173"
 os.environ["MARKET_DATA_ENABLED"] = "false"
 os.environ["INDIVIDUAL_EQUITY_HISTORY_ENABLED"] = "false"
 os.environ["BRAPI_TOKEN"] = ""
+os.environ.pop("GROQ_API_KEY", None)
+os.environ.pop("GROQ_MODEL", None)

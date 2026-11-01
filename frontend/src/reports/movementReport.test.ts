@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { UnifiedMovement } from '../repositories/PrivateRepository'
-import { filterReportMovements, movementTotals, sharePercent } from './movementReport'
+import { aggregateIncomeReport, filterReportMovements, movementTotals, sharePercent } from './movementReport'
 
 const make = (id: string, date: string, operation: UnifiedMovement['operation'], investment_class: UnifiedMovement['investment_class'], asset: string, financial_value: string | null, fees: string | null = null, cash_received: string | null = null): UnifiedMovement => ({ id, date, operation, investment_class, asset, financial_value, fees, cash_received, quantity: null, unit_price: null })
 
@@ -28,5 +28,21 @@ describe('filtered movement reports', () => {
   it('calculates category percentages without dividing by zero', () => {
     expect(sharePercent('1', '3')).toBe('33.3')
     expect(sharePercent('0', '0')).toBe('0.0')
+  })
+  it('groups manually recorded dividends and JCP by month and asset without mixing them', () => {
+    const income = aggregateIncomeReport([
+      make('d1', '2026-01-08', 'DIVIDEND', 'PROVENTOS', 'ITUB4', '3.10'),
+      make('j1', '2026-01-09', 'JCP', 'PROVENTOS', 'ITUB4', '1.50'),
+      make('d2', '2026-02-08', 'DIVIDEND', 'PROVENTOS', 'BBAS3', '2.25'),
+      make('buy', '2026-02-09', 'BUY', 'AÇÕES', 'ITUB4', '100'),
+    ])
+    expect(income.dividends.toFixed(2)).toBe('5.35')
+    expect(income.jcp.toFixed(2)).toBe('1.50')
+    expect(income.total.toFixed(2)).toBe('6.85')
+    expect(income.count).toBe(3)
+    expect(income.monthly.map(row => [row.key, row.dividends.toFixed(2), row.jcp.toFixed(2)])).toEqual([
+      ['2026-01', '3.10', '1.50'], ['2026-02', '2.25', '0.00'],
+    ])
+    expect(income.byAsset.map(row => row.asset)).toEqual(['ITUB4', 'BBAS3'])
   })
 })

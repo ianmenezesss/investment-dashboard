@@ -28,6 +28,11 @@ export class PrivateRepository {
     return request(`financial-events/${id}/revisions`, this.token, { method: 'POST', body: JSON.stringify(input), signal, headers: { 'Idempotency-Key': key } })
   }
   financialEventRevisions(id: number, signal?: AbortSignal) { return request<FinancialEventRevision[]>(`financial-events/${id}/revisions`, this.token, { signal }) }
+  wealthObservations(signal?: AbortSignal) { return request<import('../api').WealthObservation[]>('dashboard/wealth-observations', this.token, { signal }) }
+  createWealthObservation(input: import('../api').WealthObservationInput, key: string, signal?: AbortSignal) {
+    return request<import('../api').WealthObservation>('dashboard/wealth-observations', this.token, { method: 'POST', body: JSON.stringify(input), signal, headers: { 'Idempotency-Key': key } })
+  }
+  benchmarks(period: '1M' | '3M', signal?: AbortSignal) { return request<import('../api').BenchmarkComparison>(`dashboard/benchmarks?period=${period}`, this.token, { signal }) }
   equityHistory(period: string, signal?: AbortSignal) { return request<import('../api').EquityHistory>(`dashboard/equity-history?period=${period}`, this.token, { signal }) }
   equityPriceHistory(ticker: string, period: import('../api').IndividualEquityPriceHistory['period'], signal?: AbortSignal) {
     return request<import('../api').IndividualEquityPriceHistory>(`dashboard/equities/${encodeURIComponent(ticker)}/price-history?period=${period}`, this.token, { signal })

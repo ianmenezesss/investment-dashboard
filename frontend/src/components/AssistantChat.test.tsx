@@ -22,8 +22,8 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-async function mount() {
-  await act(async () => root.render(<AssistantChat token="test-supabase-access-token"/>))
+async function mount(context: 'overview' | 'equities' | 'fixed_income' | 'history' | 'reports' | 'simulator' | 'goals' = 'overview') {
+  await act(async () => root.render(<AssistantChat token="test-supabase-access-token" context={context}/>))
 }
 
 async function click(element: Element) {
@@ -66,7 +66,7 @@ test('sugestão usa o endpoint autenticado e mantém histórico somente enquanto
     headers: { 'Content-Type': 'application/json' },
   }))
   vi.stubGlobal('fetch', fetchMock)
-  await mount()
+  await mount('fixed_income')
   await openChat()
   await click(host.querySelector('.iris-suggestions button')!)
   await vi.waitFor(() => expect(host.textContent).toContain('CDB é um título de renda fixa emitido por bancos.'))
@@ -76,7 +76,7 @@ test('sugestão usa o endpoint autenticado e mantém histórico somente enquanto
   expect(url).toContain('/api/assistant/chat')
   expect(init.method).toBe('POST')
   expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-supabase-access-token')
-  expect(JSON.parse(init.body as string)).toEqual({ message: 'O que é CDB?' })
+  expect(JSON.parse(init.body as string)).toEqual({ message: 'O que é CDB?', context: 'fixed_income' })
 
   await click(host.querySelector('[aria-label="Fechar conversa com Íris"]')!)
   await openChat()

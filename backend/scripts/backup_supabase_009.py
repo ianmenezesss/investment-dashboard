@@ -22,6 +22,7 @@ except ImportError:  # Allow direct execution as a script from any working direc
 IMAGE = "postgres:17-alpine"
 POOLER_PORT = 5432
 DATABASE = "postgres"
+REVISION = "009"
 SERVICE_NAME = "investment-prod-backup"
 BACKUP_URL_ENV = "SUPABASE_BACKUP_DATABASE_URL"
 REQUIRED_TABLES = {
@@ -74,13 +75,14 @@ def parse_toc(toc):
     return tables, data
 
 
-def parse_archived_alembic_version(sql):
+def parse_archived_alembic_version(sql, revision=None):
+    revision = revision or REVISION
     lines = sql.splitlines()
     for index, line in enumerate(lines[:-2]):
         if re.fullmatch(r"COPY\s+public\.alembic_version\s*\(version_num\)\s+FROM stdin;", line):
-            if lines[index + 2] == r"\." and lines[index + 1] == "009":
+            if lines[index + 2] == r"\." and lines[index + 1] == revision:
                 return lines[index + 1]
-    raise ValueError("Não foi possível confirmar Alembic 009 dentro do dump")
+    raise ValueError(f"Não foi possível confirmar Alembic {revision} dentro do dump")
 
 
 def safe_text(value, secret_values=()):
@@ -131,7 +133,7 @@ def preflight_failures(parts, database):
         failures.append("database")
     if parts[1] != "17":
         failures.append("server_major")
-    if parts[2] != "009":
+    if parts[2] != REVISION:
         failures.append("alembic_version")
     return failures
 
@@ -156,7 +158,7 @@ def validate_output(path):
 
 def encrypt_process_output(process, output, passphrase):
     with output.open("xb") as encrypted:
-        size, digest = encrypt_stream(process.stdout, encrypted, passphrase)
+        size, digest = encrypt_stream(process.stdout, encrypted, passphrase, magic=MAGIC)
         process.stdout.close()
         stderr = process.stderr.read()
         return_code = process.wait()
@@ -166,7 +168,7 @@ def encrypt_process_output(process, output, passphrase):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Gera um único backup PostgreSQL 009 criptografado; não executa migrations")
+    parser = argparse.ArgumentParser(description=f"Gera um único backup PostgreSQL {REVISION} criptografado; não executa migrations")
     parser.add_argument("--output", required=True, type=Path, help="Arquivo .idbackup fora do repositório; não será sobrescrito")
     args = parser.parse_args(argv)
     output = validate_output(args.output)
@@ -180,7 +182,8 @@ def main(argv=None):
     passphrase = getpass.getpass("Frase de proteção do backup (mínimo 16 caracteres): ")
     if len(passphrase) < 16 or passphrase != getpass.getpass("Repita a frase de proteção: "):
         raise ValueError("As frases de proteção não coincidem ou são curtas demais")
-    if input("Para iniciar somente o pg_dump read-only, digite BACKUP PRODUCTION 009: ").strip() != "BACKUP PRODUCTION 009":
+    confirmation = f"BACKUP PRODUCTION {REVISION}"
+    if input(f"Para iniciar somente o pg_dump read-only, digite {confirmation}: ").strip() != confirmation:
         raise RuntimeError("Confirmação não recebida; nenhuma conexão foi aberta")
 
     run_id = uuid4().hex[:12]
@@ -277,13 +280,13 @@ def main(argv=None):
         docker("exec", name, "pg_restore", "--file=/dev/null", "/run/backup-secrets/archive.dump")
         version_sql = docker("exec", name, "pg_restore", "--data-only", "--table=alembic_version",
                              "--file=/dev/stdout", "/run/backup-secrets/archive.dump")
-        if parse_archived_alembic_version(version_sql) != "009":
-            raise RuntimeError("A versão Alembic arquivada não é 009")
+        if parse_archived_alembic_version(version_sql) != REVISION:
+            raise RuntimeError(f"A versão Alembic arquivada não é {REVISION}")
         if output.exists():
             raise RuntimeError("O destino foi criado durante a execução; preservando o arquivo existente")
         os.rename(partial, output)
         metadata = {"encrypted_bytes": output.stat().st_size, "encrypted_sha256": sha256_file(output),
-                    "plaintext_sha256": plaintext_hash, "alembic": "009", "format": MAGIC.decode(),
+                    "plaintext_sha256": plaintext_hash, "alembic": REVISION, "format": MAGIC.decode(),
                     "tables": sorted(tables), "tls": "verify-full"}
     finally:
         if created_container:
@@ -310,7 +313,7 @@ def main(argv=None):
         raise RuntimeError("O backup não passou por todas as verificações; artefato final removido")
     if not cleanup_ok:
         raise RuntimeError("Backup verificado, mas a limpeza de recurso descartável falhou; confira apenas o nome UUID informado no erro")
-    print("BACKUP_VALIDATION=PASS; AES-256-GCM=PASS; archive decompression=PASS; Alembic=009; TLS=verify-full")
+    print(f"BACKUP_VALIDATION=PASS; AES-256-GCM=PASS; archive decompression=PASS; Alembic={REVISION}; TLS=verify-full")
     print(f"Arquivo={output}; bytes={metadata['encrypted_bytes']}; SHA256={metadata['encrypted_sha256']}")
     print("Escopo validado: schema public e tabelas de aplicação requeridas; sem migration ou escrita no banco.")
     print("Guarde a frase de proteção separadamente; sem ela, o arquivo não pode ser recuperado.")
