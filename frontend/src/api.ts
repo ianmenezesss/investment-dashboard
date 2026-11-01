@@ -20,8 +20,9 @@ export type IndividualEquityPriceHistory = {
   coverage_start: string | null
   coverage_end: string | null
   points: { date: string; close: string }[]
-  availability: 'available' | 'disabled' | 'unavailable' | 'empty'
-  reason: 'feature_disabled' | 'provider_not_configured' | 'provider_unavailable' | 'ticker_not_found' | 'invalid_provider_response' | null
+  availability: 'available' | 'partial' | 'disabled' | 'unavailable' | 'empty'
+  reason: 'feature_disabled' | 'provider_not_configured' | 'provider_unavailable' | 'ticker_not_found' | 'invalid_provider_response'
+    | 'provider_auth_error' | 'provider_forbidden' | 'provider_rate_limited' | 'request_budget_exhausted' | 'plan_limit' | 'source_coverage' | null
 }
 export type EquityComparison = {
   tickers: string[]
@@ -32,11 +33,13 @@ export type EquityComparison = {
   period_start: string | null
   period_end: string
   common_start_date: string | null
+  common_end_date: string | null
   coverage: { ticker: string; coverage_start: string; coverage_end: string; base_price: string }[]
   points: { date: string; values: Record<string, string | null> }[]
-  availability: 'available' | 'disabled' | 'unavailable' | 'empty'
+  availability: 'available' | 'partial' | 'disabled' | 'unavailable' | 'empty'
   reason: 'feature_disabled' | 'provider_not_configured' | 'provider_unavailable' | 'ticker_not_found'
-    | 'invalid_provider_response' | 'incompatible_data' | 'no_common_date' | 'empty_history' | null
+    | 'invalid_provider_response' | 'incompatible_data' | 'no_common_date' | 'empty_history'
+    | 'provider_auth_error' | 'provider_forbidden' | 'provider_rate_limited' | 'request_budget_exhausted' | 'plan_limit' | 'source_coverage' | null
 }
 export type Summary = { acquisition_cost: string; total_purchases: string; sale_proceeds: string; realized_profit: string; market_value: null; holdings: { ticker: string; quantity: string; cost: string; average_price: string }[] }
 export type MarketQuote = {

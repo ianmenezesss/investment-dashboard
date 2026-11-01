@@ -19,11 +19,12 @@ from .individual_equity_history import (
 from .market_data.brapi import valid_ticker
 from .models import Operation
 
-ComparisonAvailability = Literal["available", "disabled", "unavailable", "empty"]
+ComparisonAvailability = Literal["available", "partial", "disabled", "unavailable", "empty"]
 ComparisonReason = Literal[
     "feature_disabled", "provider_not_configured", "provider_unavailable",
     "ticker_not_found", "invalid_provider_response", "incompatible_data",
-    "no_common_date", "empty_history",
+    "no_common_date", "empty_history", "provider_auth_error", "provider_forbidden", "provider_rate_limited",
+    "plan_limit", "source_coverage", "request_budget_exhausted",
 ]
 
 
@@ -56,6 +57,7 @@ class EquityComparison(BaseModel):
     period_start: date | None
     period_end: date
     common_start_date: date | None
+    common_end_date: date | None
     coverage: list[ComparisonCoverage]
     points: list[ComparisonPoint]
     availability: ComparisonAvailability
@@ -66,9 +68,11 @@ class EquityComparison(BaseModel):
         dates = [point.date for point in self.points]
         if dates != sorted(dates) or len(dates) != len(set(dates)):
             raise ValueError("comparison dates must be uniquely ordered")
-        if self.availability == "available":
-            if self.common_start_date is None or not self.points or self.points[0].date != self.common_start_date:
-                raise ValueError("available comparison requires a common first date")
+        if self.availability in ("available", "partial"):
+            if self.common_start_date is None or self.common_end_date is None or not self.points or self.points[0].date != self.common_start_date:
+                raise ValueError("available comparison requires common coverage dates")
+            if self.points[-1].date > self.common_end_date:
+                raise ValueError("comparison points cannot exceed common coverage")
             if [entry.ticker for entry in self.coverage] != self.tickers:
                 raise ValueError("coverage must match requested tickers")
             first_values = self.points[0].values
@@ -76,7 +80,7 @@ class EquityComparison(BaseModel):
                 raise ValueError("all series must start at base 100")
             if any(set(point.values) != set(self.tickers) for point in self.points):
                 raise ValueError("each point must include every ticker")
-        elif self.points or self.coverage or self.common_start_date is not None:
+        elif self.points or self.coverage or self.common_start_date is not None or self.common_end_date is not None:
             raise ValueError("unavailable comparison cannot contain normalized prices")
         return self
 
@@ -87,7 +91,7 @@ def _unavailable(
 ) -> EquityComparison:
     return EquityComparison(
         tickers=tickers, period=period, currency=None, source=None, price_basis=None,
-        period_start=period_start, period_end=period_end, common_start_date=None,
+        period_start=period_start, period_end=period_end, common_start_date=None, common_end_date=None,
         coverage=[], points=[], availability=availability, reason=reason,
     )
 
@@ -104,7 +108,9 @@ def normalize_comparison(
     unavailable = next((history for history in histories if history.availability == "unavailable"), None)
     if unavailable is not None:
         reason = unavailable.reason or "provider_unavailable"
-        if reason not in {"provider_not_configured", "provider_unavailable", "ticker_not_found", "invalid_provider_response"}:
+        if reason not in {"provider_not_configured", "provider_unavailable", "ticker_not_found",
+                          "invalid_provider_response", "provider_auth_error", "provider_forbidden", "provider_rate_limited",
+                          "request_budget_exhausted", "plan_limit"}:
             reason = "provider_unavailable"
         return _unavailable(tickers, period, first.period_start, first.period_end, "unavailable", reason)
     if any(history.availability == "empty" or not history.points for history in histories):
@@ -123,9 +129,10 @@ def normalize_comparison(
         return _unavailable(tickers, period, first.period_start, first.period_end, "empty", "no_common_date")
 
     base_date = min(common_dates)
+    common_end = min(max(prices) for prices in prices_by_ticker.values())
     bases = {ticker: prices[base_date] for ticker, prices in prices_by_ticker.items()}
     actual_dates = set.union(*(set(prices) for prices in prices_by_ticker.values()))
-    dates = sorted(day for day in actual_dates if day >= base_date)
+    dates = sorted(day for day in actual_dates if base_date <= day <= common_end)
     points = [ComparisonPoint(
         date=day,
         values={
@@ -143,8 +150,10 @@ def normalize_comparison(
     return EquityComparison(
         tickers=tickers, period=period, currency=currency, source=source,
         price_basis=price_basis, period_start=first.period_start, period_end=first.period_end,
-        common_start_date=base_date, coverage=coverage, points=points,
-        availability="available",
+        common_start_date=base_date, common_end_date=common_end, coverage=coverage, points=points,
+        availability="partial" if any(history.availability == "partial" for history in histories) else "available",
+        reason=("plan_limit" if any(history.reason == "plan_limit" for history in histories)
+                else "source_coverage" if any(history.reason == "source_coverage" for history in histories) else None),
     )
 
 

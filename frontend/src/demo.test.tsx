@@ -186,7 +186,7 @@ test('exportação demonstrativa contém apenas operações fictícias e não co
   const root = createRoot(host), client = new QueryClient()
   try {
     await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
-    const button = [...host.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Exportar')!
+    const button = [...host.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Exportar operações')!
     await act(async () => button.click())
     expect(create).toHaveBeenCalledTimes(1)
     const blob = create.mock.calls[0][0] as Blob

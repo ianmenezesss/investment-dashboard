@@ -50,6 +50,10 @@ def test_history_flag_does_not_disable_current_quotes(monkeypatch):
             assert app.state.equity_history_service.enabled is False
             assert app.state.individual_equity_price_history_service.enabled is False
             assert app.state.quote_service.provider.client is not app.state.equity_history_service.provider.client
+            shared_gate = app.state.quote_service.provider.request_gate
+            assert shared_gate is app.state.equity_history_service.provider.request_gate
+            assert shared_gate is app.state.individual_equity_price_history_service.provider.request_gate
+            assert app.version == "1.3.0"
 
     asyncio.run(run())
 
@@ -112,6 +116,29 @@ def test_missing_ticker_price_produces_partial_coverage_and_null_total():
     assert result["points"][0]["market_value"] is None
     assert result["points"][0]["partial_market_value"] == "11"
     assert result["points"][0]["missing_tickers"] == ["PETR4"]
+    assert result["coverage"] == "partial"
+
+
+def test_provider_range_truncation_is_not_reported_as_complete_history():
+    operations = [op(1, "ITUB4", "BUY", "2025-01-02", "1", "10")]
+    history = TickerHistory(
+        (DailyPrice(date(2025, 1, 9), D("12")), DailyPrice(date(2025, 1, 10), D("13"))),
+        coverage_start=date(2025, 1, 9), coverage_end=date(2025, 1, 10),
+    )
+    result = aggregate_equity_history([*operations, op(2, "ITUB4", "BUY", "2025-01-09", "1", "12")],
+        {"ITUB4": history}, start=date(2025, 1, 1), end=date(2025, 1, 10))
+    assert result["points"]
+    assert result["coverage"] == "partial"
+
+
+def test_provider_range_ending_early_is_not_reported_as_complete_history():
+    operations = [op(1, "ITUB4", "BUY", "2025-01-02", "1", "10")]
+    history = TickerHistory(
+        (DailyPrice(date(2025, 1, 2), D("10")),),
+        coverage_start=date(2025, 1, 2), coverage_end=date(2025, 1, 2),
+    )
+    result = aggregate_equity_history(operations, {"ITUB4": history},
+        start=date(2025, 1, 2), end=date(2025, 1, 10))
     assert result["coverage"] == "partial"
 
 

@@ -1,12 +1,12 @@
-# Investment Dashboard 2.0 — expansão restrita por convite
+# Investment Dashboard v3.0 — expansão restrita por convite
 
-**Status:** proposta futura; não faz parte das releases v4/v5 por padrão e não autoriza cadastro, convites ou mudanças remotas.
+**Status:** proposta futura, reclassificada para v3.0. O plano original usava “2.0” provisoriamente; a v2.0 pública agora trata da evolução patrimonial. Consulte [roadmap público v2.0/v3.0](INVESTMENT_DASHBOARD_V2_ROADMAP.md). Não autoriza cadastro, convites ou mudanças remotas.
 
 ## Decisão de produto
 
-Investment Dashboard 2.0 é nome provisório da expansão multiusuário, não a Fase técnica 2.x de renda fixa. O público futuro é pequeno e selecionado. Acesso somente por convite ou aprovação explícita; sem registro público irrestrito e sem monetização planejada. O projeto precisa funcionar sem despesas obrigatórias.
+Esta proposta de expansão multiusuário não é a fase técnica 2.x de renda fixa nem a v2.0 pública atual. O público futuro é pequeno e selecionado. Acesso somente por convite ou aprovação explícita; sem registro público irrestrito e sem monetização planejada. O projeto precisa funcionar sem despesas obrigatórias.
 
-A ideia anterior no roadmap menciona solicitação de acesso, aprovação manual e convite individual com expiração. O detalhe de preço/planos não foi localizado e não está aprovado. [Roadmap](roadmap.md)
+A ideia anterior menciona solicitação de acesso, aprovação manual e convite individual com expiração. O detalhe de preço/planos não foi localizado e não está aprovado. Consulte o [roadmap público atual](INVESTMENT_DASHBOARD_V2_ROADMAP.md).
 
 ## Fronteiras de dados e experiência
 

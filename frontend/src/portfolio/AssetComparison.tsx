@@ -22,6 +22,12 @@ const reasonMessages: Record<NonNullable<ComparisonData['reason']>, string> = {
   incompatible_data: 'Os ativos não têm moeda, fonte ou base de preço compatíveis para comparação.',
   no_common_date: 'Não há uma data com fechamento válido para todos os ativos selecionados.',
   empty_history: 'A fonte não retornou fechamentos diários para um dos ativos neste período.',
+  provider_auth_error: 'A fonte recusou a autenticação. Verifique a configuração no backend.',
+  provider_forbidden: 'A fonte recusou esta consulta. Verifique o acesso ao endpoint e as permissões do plano; nenhum dado foi exibido.',
+  provider_rate_limited: 'A fonte atingiu o limite temporário de consultas gratuitas. Tente mais tarde.',
+  request_budget_exhausted: 'O limite local de consultas foi atingido. Tente depois do período de espera.',
+  plan_limit: 'No plano gratuito, o histórico é limitado a três meses. Períodos maiores mostram somente preços efetivamente cobertos em comum.',
+  source_coverage: 'A fonte não cobre todo o início do período. A comparação usa apenas as datas disponíveis em comum.',
 }
 
 const decimalString = (value: unknown) => {
@@ -34,7 +40,7 @@ export function isEquityComparisonContract(value: unknown): value is ComparisonD
   const candidate = value as Partial<ComparisonData>
   if (!Array.isArray(candidate.tickers) || candidate.tickers.length < 2 || candidate.tickers.length > 4
     || !['1M', '3M', '6M', '1A', 'MAX'].includes(candidate.period ?? '')
-    || !['available', 'disabled', 'unavailable', 'empty'].includes(candidate.availability ?? '')
+    || !['available', 'partial', 'disabled', 'unavailable', 'empty'].includes(candidate.availability ?? '')
     || !Array.isArray(candidate.points) || !Array.isArray(candidate.coverage)) return false
   const dates = candidate.points.map(point => point?.date)
   if (dates.some(date => typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date))
@@ -42,11 +48,12 @@ export function isEquityComparisonContract(value: unknown): value is ComparisonD
   if (!candidate.points.every(point => point.values && typeof point.values === 'object'
     && Object.keys(point.values).length === candidate.tickers!.length
     && candidate.tickers!.every(ticker => point.values[ticker] === null || decimalString(point.values[ticker])))) return false
-  if (candidate.availability !== 'available') return candidate.points.length === 0 && candidate.coverage.length === 0
-    && candidate.common_start_date === null
+  if (!['available', 'partial'].includes(candidate.availability ?? '')) return candidate.points.length === 0 && candidate.coverage.length === 0
+    && candidate.common_start_date === null && candidate.common_end_date === null
   if (!candidate.currency || !candidate.source || !candidate.price_basis || candidate.price_basis === 'unknown'
-    || !candidate.common_start_date || !candidate.points.length
+    || !candidate.common_start_date || !candidate.common_end_date || !candidate.points.length
     || candidate.points[0].date !== candidate.common_start_date
+    || candidate.points.at(-1)!.date > candidate.common_end_date
     || candidate.coverage.length !== candidate.tickers.length) return false
   const firstPoint = candidate.points[0]
   const selectedTickers = candidate.tickers
@@ -96,7 +103,7 @@ export function AssetComparison({ repository, identity, tickers }: {
   const data = history.data
   const validData = isEquityComparisonContract(data)
   const chartData = useMemo(() => validData ? prepareComparisonChartData(data) : [], [data, validData])
-  const showChart = validData && data.availability === 'available' && chartData.length > 0
+  const showChart = validData && ['available', 'partial'].includes(data.availability) && chartData.length > 0
 
   function toggleTicker(ticker: string) {
     setSelected(current => current.includes(ticker)
@@ -129,10 +136,11 @@ export function AssetComparison({ repository, identity, tickers }: {
         <button type="button" onClick={() => void history.refetch()}>Tentar novamente</button>
       </div> : !validData ? <div className="empty compact equity-comparison-state" role="alert">
         <h4>Resposta de comparação inválida</h4><p>Nenhum preço foi exibido.</p>
-      </div> : data.availability !== 'available' ? <div className="empty compact equity-comparison-state" role="status">
+      </div> : !['available', 'partial'].includes(data.availability) ? <div className="empty compact equity-comparison-state" role="status">
         <h4>{data.availability === 'empty' ? 'Sem dados compatíveis' : 'Comparação indisponível'}</h4>
         <p>{data.reason ? reasonMessages[data.reason] : 'Não há uma série de preços disponível.'}</p>
       </div> : showChart ? <>
+        {data.availability === 'partial' && <p className="portfolio-coverage" role="status">{data.reason ? reasonMessages[data.reason] : 'Comparação limitada ao trecho coberto simultaneamente pela fonte; datas ausentes não são interpoladas.'}</p>}
         <div className="equity-comparison-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData} margin={{ top: 15, right: 20, left: 8, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="#222c33" strokeDasharray="3 5"/>
           <XAxis dataKey="date" tickFormatter={value => new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })} axisLine={false} tickLine={false}/>
@@ -150,12 +158,12 @@ export function AssetComparison({ repository, identity, tickers }: {
           </li>)}
         </ul>
         <div className="equity-comparison-footer">
-          <span>Base comum: {dateLabel(data.common_start_date!)}</span>
+          <span>Período em comum: {dateLabel(data.common_start_date!)} a {dateLabel(data.common_end_date!)}</span>
           <span>Moeda: {data.currency}</span>
           <span>Fonte: {data.source}</span>
           <span>Base do preço: {data.price_basis === 'raw_close' ? 'fechamento sem ajustes' : 'fechamento ajustado'}</span>
         </div>
-        <p className="equity-comparison-note">Índice base 100 mostra variação do preço desde a data comum; não representa retorno total nem inclui proventos.</p>
+        <p className="equity-comparison-note">Índice base 100 mostra variação do preço ajustado desde a data comum; não representa retorno total da carteira, pois não considera quantidades, fluxos, reinvestimentos, taxas ou impostos.</p>
       </> : null}
   </article>
 }

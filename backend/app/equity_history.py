@@ -1,7 +1,7 @@
 """Owner-scoped historical mark-to-market for recorded equity operations."""
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal, localcontext
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -118,7 +118,18 @@ def aggregate_equity_history(operations, histories: dict[str, TickerHistory], *,
     coverage_end = points[-1]["date"] if points else None
     # The first operation is the limit of this ledger: we cannot describe earlier
     # holdings from a trade history that did not yet exist in the application.
-    has_partial = bool(missing_any) or first_operation > start
+    provider_truncated = False
+    for history in histories.values():
+        if history is None:
+            continue
+        actual_days = [bar.day for bar in history.prices if bar.raw_close is not None]
+        actual_start = history.coverage_start or (min(actual_days) if actual_days else None)
+        actual_end = history.coverage_end or (max(actual_days) if actual_days else None)
+        if ((actual_start is not None and actual_start > start + timedelta(days=7))
+                or (actual_end is not None and actual_end < end - timedelta(days=7))):
+            provider_truncated = True
+            break
+    has_partial = bool(missing_any) or first_operation > start or provider_truncated
     coverage = "unavailable" if not points else "partial" if has_partial or any(p["coverage"] != "complete" for p in points) else "complete"
     return {"period_start": start.isoformat(), "period_end": end.isoformat(), "coverage_start": coverage_start,
             "coverage_end": coverage_end, "coverage": coverage, "source": "brapi", "price_basis": "raw_close",

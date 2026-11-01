@@ -16,17 +16,20 @@
   ver linhas/legendas, origem, cobertura e base, e informa indisponibilidade sem
   desenhar preços.
 
-## Fonte, flag e limitação atual
+## Fonte, flag e limitação atual — status v1.3
 
-`INDIVIDUAL_EQUITY_HISTORY_ENABLED` permanece `false` por padrão e nenhum provedor
-individual está configurado. Portanto, a API de comparação retorna explicitamente
-`disabled` ou `provider_not_configured`, sem chamar serviços externos e sem gerar
-preços. Cotações pontuais continuam independentes. A comparação de séries reais
-depende de aprovação de fonte, cobertura, licença e semântica de preços.
+O candidato v1.3 adiciona a mesma integração opt-in Brapi Free do histórico individual:
+`adjustedClose`, uma chamada por ticker, cache temporário e até 3 meses por resposta.
+`MARKET_DATA_ENABLED` e `INDIVIDUAL_EQUITY_HISTORY_ENABLED` permanecem `false` por padrão.
+Períodos mais longos recebem estado parcial; a comparação usa somente as datas cobertas em
+comum, sem interpolação. Cotações pontuais continuam independentes. A série é de preço
+ajustado, não de retorno total.
 
-O índice mede variação de preço desde a data comum. Não representa retorno total,
-não inclui proventos por conta própria e não usa interpolação. Dados em datas
-distintas permanecem ausentes nas linhas correspondentes.
+O índice mede variação de preço ajustado desde a data comum; `adjustedClose` pode
+refletir ajustes por desdobramentos e proventos. Ainda assim, o índice não representa
+retorno total da carteira, pois não considera quantidades, fluxos, reinvestimentos,
+taxas ou impostos. Não usa interpolação. Dados em datas distintas permanecem ausentes
+nas linhas correspondentes.
 
 ## Persistência e validação
 

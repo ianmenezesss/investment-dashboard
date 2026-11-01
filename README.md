@@ -4,9 +4,9 @@
 
 Uma plataforma web para registrar e acompanhar investimentos em ações e renda fixa, consultar movimentações e explorar cenários — com cuidado para separar capital investido, estimativas de mercado e patrimônio informado.
 
-**[Abrir a aplicação](https://investment-dashboard-pvd.vercel.app)** · **[Explorar a demonstração pública](https://investment-dashboard-pvd.vercel.app)** · **[Conhecer o plano do projeto](docs/INVESTMENT_DASHBOARD_MASTER_PLAN.md)**
+**[Abrir a aplicação](https://investment-dashboard-pvd.vercel.app)** · **[Explorar a demonstração pública](https://investment-dashboard-pvd.vercel.app)** · **[Conhecer o roadmap](docs/INVESTMENT_DASHBOARD_V2_ROADMAP.md)**
 
-`v1.0.1` publicada · `v1.2` em preparação local · React · TypeScript · FastAPI · PostgreSQL
+`v1.2.0` publicada · `v1.3.0` implementada localmente, não publicada · React · TypeScript · FastAPI · PostgreSQL
 
 ---
 
@@ -27,6 +27,7 @@ O projeto nasceu para reunir registros de investimentos e tornar suas bases mais
 ### 🔎 Análise e planejamento
 
 - **Dashboard e composição:** visualize posições, fluxos registrados e bases de composição com indicações de cobertura.
+- **Histórico de ações:** quando habilitado no backend, consulte preços ajustados da Brapi Free; períodos além de três meses aparecem como parciais. Isso não reconstrói o patrimônio histórico da carteira.
 - **Relatórios:** explore aportes, composição e movimentações com filtros; imprima pelo navegador ou salve como PDF.
 - **Simulador:** compare cenários hipotéticos com aportes, prazos, taxas editáveis e inflação opcional.
 - **Metas:** acompanhe progresso manual ou por custo/principal investido e planeje aportes. As metas ficam no navegador e não sincronizam entre dispositivos.
@@ -37,7 +38,7 @@ O projeto nasceu para reunir registros de investimentos e tornar suas bases mais
 
 - **Demonstração pública:** usa dados fictícios e foi projetada para funcionar separada da API privada.
 - **Área privada:** autenticação Supabase e autorização no backend; os registros são isolados por proprietário.
-- **Íris:** assistente opcional de educação financeira, disponível somente na área privada autenticada. Usa conhecimento estático, não recebe dados da carteira e não recomenda investimentos.
+- **Íris:** assistente opcional de educação financeira, disponível somente na área privada autenticada. Usa conhecimento estático, não recebe dados da carteira e não recomenda investimentos. As perguntas são enviadas à Groq; não inclua informações pessoais ou financeiras.
 - **Privacidade:** a demonstração não usa a carteira privada. O produto não oferece cadastro público irrestrito.
 
 ## Prévia do produto
@@ -55,15 +56,18 @@ Não há capturas de tela reais versionadas neste repositório neste momento. A 
 
 O backend concentra as regras financeiras e usa `Decimal` para cálculos monetários. A API valida a identidade, filtra dados por proprietário e trabalha com RLS no PostgreSQL. A rotina de CI executa testes de backend e frontend, integração em PostgreSQL descartável, build e auditoria de dependências.
 
+O botão de exportação gera um JSON de operações de ações. Ele não inclui renda fixa/CDB, observações, eventos financeiros ou metas e não substitui um backup.
+
 ## Próximas versões
 
-v1.1 e v2.0 seguem planejadas. A v1.2 está implementada localmente e aguarda aprovação para publicação:
+O planejamento atual separa as versões públicas das antigas etiquetas de fases técnicas:
 
-- **v1.1 — Desempenho histórico:** estudar snapshots e dados confiáveis para acompanhar a evolução patrimonial e, quando houver cobertura suficiente, avaliar rentabilidade e benchmarks.
-- **v1.2 — Íris:** assistente educacional com Groq Free opcional; integração e testes locais validados. Ainda não publicada; a inspeção visual autenticada em navegador continua pendente.
-- **v2.0 — Acesso por convite:** avaliar expansão controlada para outras pessoas, preservando o isolamento entre carteiras.
+- **v1.2.1 — Estabilização:** implementada localmente, ainda não publicada.
+- **v1.3 — Históricos gratuitos:** histórico individual e comparação com cobertura de até três meses; implementada localmente, opt-in no backend e ainda não publicada.
+- **v2.0 — Análise patrimonial:** planejada; snapshots somente se necessários, fluxos classificados, relatórios e benchmarks comparáveis.
+- **v3.0 — Expansão por convite:** planejada; multiusuário restrito, condicionado a testes de isolamento e recuperação.
 
-O escopo, as dependências e as limitações estão no [Master Plan v1 → v2](docs/INVESTMENT_DASHBOARD_MASTER_PLAN.md).
+O escopo, as dependências, os limites gratuitos e os critérios de aceite estão no [roadmap v2.0 e v3.0](docs/INVESTMENT_DASHBOARD_V2_ROADMAP.md). O [plano mestre](docs/INVESTMENT_DASHBOARD_MASTER_PLAN.md) preserva o histórico e aponta para essa fonte atual.
 
 ## Conheça o projeto
 

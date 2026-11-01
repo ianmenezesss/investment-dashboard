@@ -26,6 +26,12 @@ const unavailableMessage: Record<NonNullable<HistoryData['reason']>, string> = {
   provider_unavailable: 'A fonte de histórico está temporariamente indisponível. Tente novamente mais tarde.',
   ticker_not_found: 'A fonte não possui histórico disponível para este ativo.',
   invalid_provider_response: 'A fonte retornou dados inválidos. Nenhum preço foi exibido.',
+  provider_auth_error: 'A fonte recusou a autenticação. Verifique a configuração no backend.',
+  provider_forbidden: 'A fonte recusou esta consulta. Verifique o acesso ao endpoint e as permissões do plano; nenhum dado foi exibido.',
+  provider_rate_limited: 'A fonte atingiu o limite temporário de consultas gratuitas. Tente mais tarde.',
+  request_budget_exhausted: 'O limite local de consultas foi atingido. Tente depois do período de espera.',
+  plan_limit: 'No plano gratuito, o histórico é limitado a três meses. Períodos maiores mostram somente os preços recebidos; nenhum dado ausente foi inferido.',
+  source_coverage: 'A fonte não retornou todo o início do período. O gráfico mostra apenas datas com dados reais.',
 }
 
 export function preparePriceChartData(points: HistoryData['points']) {
@@ -46,7 +52,7 @@ export function isPriceHistoryContract(value: unknown): value is HistoryData {
     && (candidate.source === null || typeof candidate.source === 'string')
     && ['raw_close', 'adjusted_close', 'unknown'].includes(candidate.price_basis ?? '')
     && typeof candidate.period_end === 'string'
-    && ['available', 'disabled', 'unavailable', 'empty'].includes(candidate.availability ?? '')
+    && ['available', 'partial', 'disabled', 'unavailable', 'empty'].includes(candidate.availability ?? '')
     && validPoints
 }
 
@@ -71,7 +77,7 @@ export function IndividualEquityHistory({ repository, identity, tickers }: {
   const data = history.data
   const validData = isPriceHistoryContract(data)
   const chartData = useMemo(() => validData ? preparePriceChartData(data.points) : [], [data, validData])
-  const showChart = validData && data.availability === 'available' && chartData.length > 0
+  const showChart = validData && ['available', 'partial'].includes(data.availability) && chartData.length > 0
 
   return <article className="panel individual-equity-history" aria-label="Histórico individual de preços das ações">
     <div className="panel-heading">
@@ -99,6 +105,7 @@ export function IndividualEquityHistory({ repository, identity, tickers }: {
       </div> : data.availability === 'empty' || !data.points.length ? <div className="empty compact individual-history-state" role="status">
         <h4>Sem preços para o período</h4><p>A fonte não retornou fechamentos diários neste intervalo.</p>
       </div> : showChart ? <>
+        {data.availability === 'partial' && <p className="portfolio-coverage" role="status">{data.reason ? unavailableMessage[data.reason] : 'A cobertura é parcial; são exibidos apenas os preços retornados pela fonte.'}</p>}
         <div className="individual-history-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData} margin={{ top: 15, right: 20, left: 8, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="#222c33" strokeDasharray="3 5"/>
           <XAxis dataKey="date" tickFormatter={value => new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })} axisLine={false} tickLine={false}/>

@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from .brapi import valid_ticker
+from .request_gate import BrapiRequestGate, request_slot
 from .types import ProviderError
 
 PRICE_ENDPOINT = "https://brapi.dev/api/v2/stocks/historical"
@@ -36,6 +37,8 @@ class TickerHistory:
     prices: tuple[DailyPrice, ...] = ()
     share_events: tuple[ShareEvent, ...] = ()
     error: str | None = None
+    coverage_start: date | None = None
+    coverage_end: date | None = None
 
 
 def _safe_date(value) -> date:
@@ -67,31 +70,32 @@ class BrapiEquityHistoryProvider:
     distributions and is not an appropriate mark-to-market price for shares held.
     """
 
-    def __init__(self, client: httpx.AsyncClient, token: str):
-        self.client, self._token = client, token
+    def __init__(self, client: httpx.AsyncClient, token: str, request_gate: BrapiRequestGate | None = None):
+        self.client, self._token, self.request_gate = client, token, request_gate
 
     async def _request(self, endpoint: str, symbols: list[str], params: dict) -> dict:
         if not symbols or len(symbols) > MAX_SYMBOLS_PER_REQUEST or any(not valid_ticker(t) for t in symbols):
             raise ProviderError("invalid_symbols")
         try:
-            async with self.client.stream(
-                "GET", endpoint, params={"symbols": ",".join(symbols), **params},
-                headers={"Authorization": f"Bearer {self._token}"}, follow_redirects=False,
-                timeout=httpx.Timeout(connect=2, read=12, write=2, pool=1),
-            ) as response:
-                if response.status_code in (401, 403):
-                    raise ProviderError("provider_auth_error" if response.status_code == 401 else "raw_history_not_available", 900)
-                if response.status_code == 429:
-                    raise ProviderError("rate_limited", 300)
-                if response.status_code == 404:
-                    raise ProviderError("history_not_found")
-                if response.status_code != 200:
-                    raise ProviderError("provider_http_error")
-                body = bytearray()
-                async for chunk in response.aiter_bytes(chunk_size=8192):
-                    body.extend(chunk)
-                    if len(body) > MAX_RESPONSE_BYTES:
-                        raise ProviderError("response_too_large")
+            async with request_slot(self.request_gate):
+                async with self.client.stream(
+                    "GET", endpoint, params={"symbols": ",".join(symbols), **params},
+                    headers={"Authorization": f"Bearer {self._token}"}, follow_redirects=False,
+                    timeout=httpx.Timeout(connect=2, read=12, write=2, pool=1),
+                ) as response:
+                    if response.status_code in (401, 403):
+                        raise ProviderError("provider_auth_error" if response.status_code == 401 else "raw_history_not_available", 900)
+                    if response.status_code == 429:
+                        raise ProviderError("rate_limited", 300)
+                    if response.status_code == 404:
+                        raise ProviderError("history_not_found")
+                    if response.status_code != 200:
+                        raise ProviderError("provider_http_error")
+                    body = bytearray()
+                    async for chunk in response.aiter_bytes(chunk_size=8192):
+                        body.extend(chunk)
+                        if len(body) > MAX_RESPONSE_BYTES:
+                            raise ProviderError("response_too_large")
             payload = json.loads(body, parse_float=Decimal, parse_int=Decimal)
             if not isinstance(payload, dict) or not isinstance(payload.get("results"), list) or any(not isinstance(item, dict) for item in payload["results"]):
                 raise ProviderError("invalid_response")
@@ -148,7 +152,11 @@ class BrapiEquityHistoryProvider:
                 for ticker in group:
                     if ticker not in seen and ticker not in errors:
                         errors[ticker] = "history_not_found"
-                    result[ticker] = TickerHistory(tuple(sorted(by_ticker[ticker], key=lambda p: p.day)), error=errors.get(ticker))
+                    prices = tuple(sorted(by_ticker[ticker], key=lambda p: p.day))
+                    actual_days = [point.day for point in prices if point.raw_close is not None]
+                    result[ticker] = TickerHistory(prices, error=errors.get(ticker),
+                        coverage_start=min(actual_days) if actual_days else None,
+                        coverage_end=max(actual_days) if actual_days else None)
             except ProviderError as error:
                 for ticker in tickers[offset:]:
                     result[ticker] = TickerHistory(error=error.reason)
@@ -191,11 +199,12 @@ class BrapiEquityHistoryProvider:
                     if ticker not in seen_events and ticker not in event_errors:
                         event_errors[ticker] = "corporate_actions_unavailable"
                     result[ticker] = TickerHistory(prior.prices, tuple(sorted(events_by_ticker[ticker], key=lambda e: e.day)),
-                                                   prior.error or event_errors.get(ticker))
+                                                   prior.error or event_errors.get(ticker), prior.coverage_start, prior.coverage_end)
             except ProviderError as error:
                 for ticker in group:
                     prior = result[ticker]
-                    result[ticker] = TickerHistory(prior.prices, (), prior.error or error.reason)
+                    result[ticker] = TickerHistory(prior.prices, (), prior.error or error.reason,
+                                                   prior.coverage_start, prior.coverage_end)
                 for ticker in tickers[offset + len(group):]:
                     result[ticker] = TickerHistory(error=error.reason)
                 return result

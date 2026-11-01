@@ -10,7 +10,7 @@ let root: Root
 let client: QueryClient
 const data: EquityComparison = {
   tickers: ['BBAS3', 'ITUB4'], period: '1M', currency: 'BRL', source: 'provider-test-double', price_basis: 'raw_close',
-  period_start: '2026-09-29', period_end: '2026-10-29', common_start_date: '2026-10-01',
+  period_start: '2026-09-29', period_end: '2026-10-29', common_start_date: '2026-10-01', common_end_date: '2026-10-02',
   coverage: [
     { ticker: 'BBAS3', coverage_start: '2026-10-01', coverage_end: '2026-10-02', base_price: '20' },
     { ticker: 'ITUB4', coverage_start: '2026-10-01', coverage_end: '2026-10-03', base_price: '10' },
@@ -18,7 +18,6 @@ const data: EquityComparison = {
   points: [
     { date: '2026-10-01', values: { BBAS3: '100', ITUB4: '100' } },
     { date: '2026-10-02', values: { BBAS3: '110', ITUB4: null } },
-    { date: '2026-10-03', values: { BBAS3: null, ITUB4: '120' } },
   ], availability: 'available', reason: null,
 }
 const pause = () => new Promise(resolve => setTimeout(resolve, 30))
@@ -41,7 +40,7 @@ test('loads two selected assets and shows a responsive base-100 comparison with 
   await render(repository)
   expect(repository.equityComparison).toHaveBeenCalledWith(['BBAS3', 'ITUB4'], '1M', expect.any(AbortSignal))
   expect(host.textContent).toContain('Comparar ativos')
-  expect(host.textContent).toContain('Base comum: 01/10/2026')
+  expect(host.textContent).toContain('Período em comum: 01/10/2026 a 02/10/2026')
   expect(host.textContent).toContain('Fonte: provider-test-double')
   expect(host.textContent).toContain('fechamento sem ajustes')
   const chartData = prepareComparisonChartData(data)
@@ -65,15 +64,22 @@ test('loads two selected assets and shows a responsive base-100 comparison with 
 
 test('renders feature-disabled and no-common-date states without any chart values', async () => {
   await render({ equityComparison: async () => ({ ...data, currency: null, source: null, price_basis: null,
-    common_start_date: null, coverage: [], points: [], availability: 'disabled', reason: 'feature_disabled' }) })
+    common_start_date: null, common_end_date: null, coverage: [], points: [], availability: 'disabled', reason: 'feature_disabled' }) })
   expect(host.textContent).toContain('Nenhuma fonte externa foi habilitada')
   expect(host.querySelector('.recharts-wrapper')).toBeNull()
 
   client.clear()
   await render({ equityComparison: async () => ({ ...data, currency: null, source: null, price_basis: null,
-    common_start_date: null, coverage: [], points: [], availability: 'empty', reason: 'no_common_date' }) })
+    common_start_date: null, common_end_date: null, coverage: [], points: [], availability: 'empty', reason: 'no_common_date' }) })
   expect(host.textContent).toContain('Não há uma data com fechamento válido')
   expect(host.querySelector('.recharts-wrapper')).toBeNull()
+})
+
+test('renders comparison data with actual overlapping coverage and a partial marker', async () => {
+  await render({ equityComparison: async () => ({ ...data, period: '6M', availability: 'partial', reason: 'plan_limit' }) })
+  expect(host.querySelector('.equity-comparison-chart')).toBeTruthy()
+  expect(host.textContent).toContain('limitado a três meses')
+  expect(host.textContent).toContain('Período em comum: 01/10/2026 a 02/10/2026')
 })
 
 test('shows loading, transport-error and malformed-contract states', async () => {

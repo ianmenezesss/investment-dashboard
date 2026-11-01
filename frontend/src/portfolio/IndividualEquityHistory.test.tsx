@@ -79,6 +79,13 @@ test('empty portfolio never queries provider history', async () => {
   expect(repository.equityPriceHistory).not.toHaveBeenCalled()
 })
 
+test('exibe preços parciais com aviso explícito sobre o limite gratuito', async () => {
+  await render({ equityPriceHistory: async () => ({ ...data, period: '6M', availability: 'partial', reason: 'plan_limit' }) }, ['ITUB4'])
+  expect(host.querySelector('.individual-history-chart')).toBeTruthy()
+  expect(host.textContent).toContain('limitado a três meses')
+  expect(host.textContent).toContain('Pregões disponíveis')
+})
+
 test('malformed API payload renders a safe error state', async () => {
   await render({ equityPriceHistory: async () => [] as never }, ['ITUB4'])
   expect(isPriceHistoryContract([])).toBe(false)

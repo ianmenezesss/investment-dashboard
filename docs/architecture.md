@@ -1,6 +1,8 @@
 # Arquitetura e plano
 
-> Este documento mantém as decisões fundacionais e a arquitetura original. Para o estado atual da v1, história completa e roadmap v1.1/v1.2/v2.0, consulte o [plano mestre](INVESTMENT_DASHBOARD_MASTER_PLAN.md).
+> Este documento mantém as decisões fundacionais e a arquitetura original. Para a sequência atual v1.2.1/v1.3/v2.0/v3.0, consulte o [roadmap de versões públicas](INVESTMENT_DASHBOARD_V2_ROADMAP.md); o [plano mestre](INVESTMENT_DASHBOARD_MASTER_PLAN.md) preserva a história técnica.
+
+Atualização do candidato local v1.3.0 (31/10/2026; não publicado): histórico individual e comparação podem usar a Brapi Free com `adjustedClose`, uma chamada por ticker, cache de 30 minutos e um limitador de 12.000 chamadas/uma chamada simultânea **por processo**. O limitador não representa a cota da conta e não coordena outros workers, reinicializações ou aplicações; flags de dados de mercado permanecem desligadas até configuração explícita. Intervalos acima de 3 meses são parciais e a comparação só expõe datas cobertas por todos os ativos, sem preencher lacunas. `adjustedClose` não é usado para reconstruir valor histórico da carteira; o provider agregado que requer dados crus permanece desligado. A integração foi coberta por respostas simuladas, sem chamadas externas ou dados privados.
 
 Atualização v4.0.0 / Fase 4.3A (29/10/2026): `GET /api/dashboard/performance` é um
 snapshot privado somente de leitura que combina o ledger de ações, fluxos e projeção

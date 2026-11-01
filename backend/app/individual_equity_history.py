@@ -1,10 +1,12 @@
 """Provider-neutral, owner-scoped daily price history for one equity position.
 
-No external provider is configured in this phase. The service and response
-contract are deliberately independent of the existing quote and portfolio-history
-services so a later source can be added only after data and license validation.
+The provider remains opt-in. The response contract is independent of quote and
+portfolio-history services so adjusted individual prices cannot be confused with
+raw prices used for portfolio valuation.
 """
+import asyncio
 import calendar
+import time
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -23,7 +25,7 @@ from .models import Operation
 
 HistoryPeriod = Literal["1M", "3M", "6M", "1A", "MAX"]
 PriceBasis = Literal["raw_close", "adjusted_close", "unknown"]
-Availability = Literal["available", "disabled", "unavailable", "empty"]
+Availability = Literal["available", "partial", "disabled", "unavailable", "empty"]
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 MAX_DAILY_POINTS = 20_000
 
@@ -60,7 +62,9 @@ class IndividualEquityPriceHistory(BaseModel):
     availability: Availability
     reason: Literal[
         "feature_disabled", "provider_not_configured", "provider_unavailable",
-        "ticker_not_found", "invalid_provider_response",
+        "ticker_not_found", "invalid_provider_response", "provider_auth_error", "provider_forbidden",
+        "provider_rate_limited", "plan_limit", "source_coverage",
+        "request_budget_exhausted",
     ] | None = None
 
     @model_validator(mode="after")
@@ -93,6 +97,7 @@ class ProviderPriceHistory:
     currency: str
     price_basis: PriceBasis
     points: tuple[ProviderDailyPrice, ...]
+    partial: bool = False
 
 
 class PriceHistoryProvider(Protocol):
@@ -100,7 +105,10 @@ class PriceHistoryProvider(Protocol):
 
 
 class PriceHistoryUnavailable(Exception):
-    def __init__(self, reason: Literal["provider_unavailable", "ticker_not_found"]):
+    def __init__(self, reason: Literal[
+        "provider_unavailable", "ticker_not_found", "invalid_provider_response",
+        "provider_auth_error", "provider_forbidden", "provider_rate_limited", "request_budget_exhausted", "plan_limit",
+    ]):
         self.reason = reason
         super().__init__(reason)
 
@@ -119,10 +127,15 @@ def _period_start(period: HistoryPeriod, end: date) -> date | None:
 
 class EquityPriceHistoryService:
     def __init__(self, provider: PriceHistoryProvider | None, *, enabled: bool,
-                 today=lambda: datetime.now(SAO_PAULO).date()):
+                 today=lambda: datetime.now(SAO_PAULO).date(), clock=time.monotonic, ttl=1800, capacity=256):
         self.provider = provider
         self.enabled = enabled
         self.today = today
+        self.clock, self.ttl, self.capacity = clock, ttl, capacity
+        self.cache: dict[tuple, tuple[float, IndividualEquityPriceHistory]] = {}
+        self.lock = asyncio.Lock()
+        self.cooldown_until = 0.0
+        self.cooldown_reason = "provider_unavailable"
 
     async def get(self, ticker: str, period: HistoryPeriod) -> IndividualEquityPriceHistory:
         end = self.today()
@@ -133,17 +146,34 @@ class EquityPriceHistoryService:
         if self.provider is None:
             return IndividualEquityPriceHistory(ticker=ticker, period=period, period_start=start,
                 period_end=end, points=[], availability="unavailable", reason="provider_not_configured")
-        try:
-            history = await self.provider.fetch(ticker, start=start, end=end)
-        except PriceHistoryUnavailable as error:
-            return IndividualEquityPriceHistory(ticker=ticker, period=period, period_start=start,
-                period_end=end, points=[], availability="unavailable", reason=error.reason)
+        key = (ticker, start, end)
+        cached = self.cache.get(key)
+        if cached and cached[0] > self.clock():
+            return cached[1]
+        async with self.lock:
+            cached = self.cache.get(key)
+            if cached and cached[0] > self.clock():
+                return cached[1]
+            if self.cooldown_until > self.clock():
+                return self._unavailable(ticker, period, start, end, self.cooldown_reason)
+            try:
+                history = await self.provider.fetch(ticker, start=start, end=end)
+            except PriceHistoryUnavailable as error:
+                if error.reason in ("provider_rate_limited", "provider_forbidden", "request_budget_exhausted", "plan_limit"):
+                    waits = {"provider_rate_limited": 300, "provider_forbidden": 900,
+                             "request_budget_exhausted": 3600, "plan_limit": 3600}
+                    self.cooldown_until = self.clock() + waits[error.reason]
+                    self.cooldown_reason = "provider_rate_limited" if error.reason == "provider_rate_limited" else error.reason
+                result = self._unavailable(ticker, period, start, end, error.reason)
+                self.cache[key] = (self.clock() + min(self.ttl, 60), result)
+                return result
         if (not isinstance(history.ticker, str) or history.ticker != ticker
                 or not isinstance(history.source, str) or not history.source.strip()
                 or history.currency != "BRL" or history.price_basis not in ("raw_close", "adjusted_close", "unknown")
                 or not isinstance(history.points, (tuple, list))):
-            return IndividualEquityPriceHistory(ticker=ticker, period=period, period_start=start,
-                period_end=end, points=[], availability="unavailable", reason="invalid_provider_response")
+            result = self._unavailable(ticker, period, start, end, "invalid_provider_response")
+            self.cache[key] = (self.clock() + min(self.ttl, 60), result)
+            return result
         if len(history.points) > MAX_DAILY_POINTS:
             return IndividualEquityPriceHistory(ticker=ticker, period=period, period_start=start,
                 period_end=end, points=[], availability="unavailable", reason="invalid_provider_response")
@@ -158,12 +188,33 @@ class EquityPriceHistoryService:
                     raise ValueError("close must be Decimal")
                 points.append(DailyPricePoint(date=point.date, close=format(point.close, "f")))
         except (InvalidOperation, TypeError, ValueError, AttributeError):
-            return IndividualEquityPriceHistory(ticker=ticker, period=period, period_start=start,
-                period_end=end, points=[], availability="unavailable", reason="invalid_provider_response")
-        return IndividualEquityPriceHistory(ticker=ticker, period=period, currency=history.currency,
+            result = self._unavailable(ticker, period, start, end, "invalid_provider_response")
+            self.cache[key] = (self.clock() + min(self.ttl, 60), result)
+            return result
+        source_truncated = bool(points) and (
+            (start is not None and points[0].date > _add_days(start, 7))
+            or points[-1].date < _add_days(end, -7)
+        )
+        partial = bool(points) and (history.partial or source_truncated)
+        reason = "plan_limit" if history.partial else "source_coverage" if source_truncated else None
+        result = IndividualEquityPriceHistory(ticker=ticker, period=period, currency=history.currency,
             source=history.source, price_basis=history.price_basis, period_start=start, period_end=end,
             coverage_start=points[0].date if points else None, coverage_end=points[-1].date if points else None,
-            points=points, availability="available" if points else "empty")
+            points=points, availability="partial" if partial else "available" if points else "empty", reason=reason)
+        self.cache[key] = (self.clock() + (self.ttl if points else min(self.ttl, 60)), result)
+        while len(self.cache) > self.capacity:
+            self.cache.pop(next(iter(self.cache)))
+        return result
+
+    @staticmethod
+    def _unavailable(ticker, period, start, end, reason):
+        return IndividualEquityPriceHistory(ticker=ticker, period=period, period_start=start,
+            period_end=end, points=[], availability="unavailable", reason=reason)
+
+
+def _add_days(day: date, days: int) -> date:
+    from datetime import timedelta
+    return day + timedelta(days=days)
 
 
 router = APIRouter()

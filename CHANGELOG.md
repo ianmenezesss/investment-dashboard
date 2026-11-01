@@ -1,11 +1,31 @@
 # Changelog
 
-## v1.2 — Íris, assistente de educação financeira (implementação local)
+## v1.3.0 — históricos individuais de ações (implementada localmente; não publicada)
+
+- Adicionado provider histórico Brapi Free com `adjustedClose`, uma chamada por ticker, cache por janela efetiva e serialização/limite local por processo.
+- O período é limitado aos últimos três meses. 6M/1A/MAX são marcados parciais, com cobertura efetiva exibida; a comparação limita os pontos ao intervalo comum entre ativos e mantém lacunas sem interpolação.
+- Histórico agregado de patrimônio permanece indisponível pelo plano Free, que não fornece os campos originais `rawClose` exigidos pelo cálculo atual.
+- Validação local: backend 404 aprovados/1 ignorado, frontend 224 aprovados e build aprovado (2.382 módulos). Integrações externas foram mockadas.
+- Nenhuma chamada real à Brapi, alteração de `.env`, banco, commit, tag ou deploy foi feita nesta preparação.
+
+## v1.2.1 — estabilização (implementada localmente; não publicada)
+
+- Corrigida a semântica de cobertura histórica quando o provider encurta o intervalo solicitado.
+- Exportação identificada como operações de ações em JSON e acompanhada das exclusões; não é backup integral.
+- A Íris informa que as perguntas são enviadas à Groq e recomenda não incluir informações pessoais ou financeiras.
+- Estado sem pontos do histórico CDB orienta registrar observação datada e não presume valores anteriores.
+- Versões do frontend, pacote Python e FastAPI/OpenAPI alinhadas a `1.3.0`, que engloba as alterações locais da v1.2.1 e v1.3.
+
+## v1.2.0 — Íris, assistente de educação financeira (publicada segundo o proprietário)
 
 - Adicionada a Íris: chat educativo opcional na área privada autenticada, com chave somente no backend, conhecimento estático e sem acesso à carteira.
 - Demonstração pública sem assistente; indisponibilidade da chave/cota não bloqueia o dashboard.
-- Integração real local com Qwen via Groq e suítes automatizadas validadas; sem faturamento ou fallback pago.
-- Estado: não lançada. A inspeção visual autenticada em navegador e a configuração manual de produção continuam pendentes.
+- Integração Groq Free com `qwen/qwen3.8-27b`; chamadas reais foram validadas pelo proprietário. Sem faturamento ou fallback pago.
+- Publicação da v1.2.0 e operação em produção confirmadas pelo proprietário; os painéis e a sessão autenticada não foram reconsultados nesta atualização documental.
+- Validação local registrada antes da publicação: 393 testes backend aprovados (1 ignorado), 221 frontend aprovados e build de produção aprovado.
+- A Íris é restrita à área privada autenticada; a demonstração pública permanece offline, sem chat e sem chamada ao endpoint de IA.
+
+O roadmap para próximas versões está em [Investment Dashboard v2.0 e v3.0](docs/INVESTMENT_DASHBOARD_V2_ROADMAP.md). As versões públicas deste changelog não são as etiquetas internas das fases técnicas antigas.
 
 ## v1.0.1 — correção do runner de integração PostgreSQL
 

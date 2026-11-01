@@ -138,7 +138,7 @@ export function AssistantChat({ token }: { token: string }) {
           <ArrowUp size={18} aria-hidden="true"/>
         </button>
       </form>
-      <p className="iris-disclaimer">Respostas educativas. A Íris não acessa sua carteira.</p>
+      <p className="iris-disclaimer">Respostas educativas. Suas perguntas são enviadas à Groq para resposta; não inclua informações pessoais ou financeiras. A Íris não acessa sua carteira.</p>
     </section>}
     <button
       ref={launcherRef}

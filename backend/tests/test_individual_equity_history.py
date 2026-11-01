@@ -4,6 +4,7 @@ from decimal import Decimal as D
 from uuid import UUID
 
 import pytest
+import httpx
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -17,6 +18,8 @@ from app.individual_equity_history import (
 )
 from app.main import app
 from app.models import Operation
+from app.market_data.individual_history import BrapiIndividualHistoryProvider, ENDPOINT
+from app.market_data.request_gate import BrapiRequestGate
 
 A = UUID("11111111-1111-4111-8111-111111111111")
 B = UUID("22222222-2222-4222-8222-222222222222")
@@ -133,6 +136,20 @@ def test_unconfigured_and_empty_states_are_explicit():
     asyncio.run(run())
 
 
+def test_source_coverage_marks_truncated_start_and_end_as_partial():
+    cases = [
+        [ProviderDailyPrice(date(2026, 10, 10), D("10")), ProviderDailyPrice(date(2026, 10, 28), D("11"))],
+        [ProviderDailyPrice(date(2026, 9, 30), D("10")), ProviderDailyPrice(date(2026, 10, 15), D("11"))],
+    ]
+    async def run():
+        for points in cases:
+            result = await EquityPriceHistoryService(SimulatedProvider(points), enabled=True,
+                today=lambda: TODAY).get("ITUB4", "1M")
+            assert result.availability == "partial"
+            assert result.reason == "source_coverage"
+    asyncio.run(run())
+
+
 def test_max_period_uses_no_start_and_provider_errors_are_sanitized():
     class UnavailableProvider:
         async def fetch(self, ticker, *, start, end):
@@ -156,4 +173,113 @@ def test_invalid_or_duplicate_provider_values_never_become_prices():
             assert result.availability == "unavailable"
             assert result.reason == "invalid_provider_response"
             assert result.points == []
+    asyncio.run(run())
+
+
+def test_brapi_free_fetches_one_symbol_uses_adjusted_close_and_caps_window():
+    calls = []
+    async def handler(request):
+        calls.append(request)
+        assert request.url.path == "/api/v2/stocks/historical"
+        assert request.url.params["symbols"] == "ITUB4"
+        assert request.url.params["startDate"] == "2026-07-29"
+        assert request.url.params["endDate"] == TODAY.isoformat()
+        assert request.url.params["interval"] == "1d"
+        assert "includeRaw" not in request.url.params
+        assert request.headers["authorization"] == "Bearer token-for-test-only"
+        assert "token-for-test-only" not in str(request.url)
+        return httpx.Response(200, json={"results": [{"requestedSymbol": "ITUB4", "symbol": "ITUB4", "data": {
+            "historicalDataPrice": [
+                {"date": "2026-07-28", "rawClose": 777, "adjustedClose": 7},
+                {"date": "2026-07-29", "rawClose": 888, "adjustedClose": 10.25},
+                {"date": "2026-10-28", "rawClose": 999, "adjustedClose": 11},
+            ]}}]})
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler), trust_env=False) as client:
+            result = await BrapiIndividualHistoryProvider(client, "token-for-test-only").fetch(
+                "ITUB4", start=date(2026, 4, 29), end=TODAY)
+        assert result.price_basis == "adjusted_close"
+        assert result.partial is True
+        assert [(point.date, point.close) for point in result.points] == [
+            (date(2026, 7, 29), D("10.25")), (date(2026, 10, 28), D("11")),
+        ]
+    asyncio.run(run())
+    assert len(calls) == 1
+
+
+def test_brapi_individual_history_never_falls_back_to_raw_close():
+    async def handler(_request):
+        return httpx.Response(200, json={"results": [{"requestedSymbol": "ITUB4", "symbol": "ITUB4", "data": {
+            "historicalDataPrice": [{"date": "2026-10-28", "rawClose": 123.45}]}}]})
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler), trust_env=False) as client:
+            result = await BrapiIndividualHistoryProvider(client, "test").fetch("ITUB4", start=TODAY, end=TODAY)
+            displayed = await EquityPriceHistoryService(SimulatedProvider(result.points), enabled=True,
+                today=lambda: TODAY).get("ITUB4", "1M") if result.points else None
+        assert result.points == ()
+        assert displayed is None
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("status", "reason"), [(401, "provider_auth_error"), (403, "provider_forbidden"), (429, "provider_rate_limited")])
+def test_brapi_plan_and_rate_errors_are_sanitized(status, reason):
+    async def handler(_request):
+        return httpx.Response(status, text="provider token body must never escape")
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler), trust_env=False) as client:
+            provider = BrapiIndividualHistoryProvider(client, "test-token")
+            with pytest.raises(PriceHistoryUnavailable) as exc:
+                await provider.fetch("ITUB4", start=date(2026, 10, 1), end=TODAY)
+        assert exc.value.reason == reason
+        assert "test-token" not in str(exc.value)
+        assert "provider token body" not in str(exc.value)
+    asyncio.run(run())
+
+
+def test_brapi_free_window_is_reported_partial_and_cached():
+    calls = []
+    async def handler(request):
+        calls.append(request)
+        return httpx.Response(200, json={"results": [{"requestedSymbol": "ITUB4", "symbol": "ITUB4", "data": {
+            "historicalDataPrice": [
+                {"date": "2026-07-29", "adjustedClose": 9},
+                {"date": "2026-10-28", "adjustedClose": 10},
+            ]}}]})
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler), trust_env=False) as client:
+            service = EquityPriceHistoryService(BrapiIndividualHistoryProvider(client, "test"), enabled=True,
+                today=lambda: TODAY)
+            three_months = await service.get("ITUB4", "3M")
+            six_months = await service.get("ITUB4", "6M")
+            one_year = await service.get("ITUB4", "1A")
+            maximum = await service.get("ITUB4", "MAX")
+        assert three_months.availability == "available"
+        assert three_months.coverage_start == date(2026, 7, 29)
+        for result in (six_months, one_year, maximum):
+            assert result.availability == "partial" and result.reason == "plan_limit"
+            assert result.coverage_start == date(2026, 7, 29)
+    asyncio.run(run())
+    assert len(calls) == 1
+
+
+def test_brapi_gate_serializes_requests_and_stops_at_its_budget():
+    async def run():
+        gate = BrapiRequestGate(max_requests=2)
+        active = 0
+        maximum = 0
+        async def task():
+            nonlocal active, maximum
+            async with gate.request():
+                active += 1
+                maximum = max(maximum, active)
+                await asyncio.sleep(0)
+                active -= 1
+        await asyncio.gather(task(), task())
+        assert maximum == 1
+        exhausted = BrapiRequestGate(max_requests=1)
+        async with exhausted.request():
+            pass
+        with pytest.raises(Exception, match="request_budget_exhausted"):
+            async with exhausted.request():
+                raise AssertionError("exhausted budget must not enter")
     asyncio.run(run())

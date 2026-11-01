@@ -1,5 +1,11 @@
 # Fase 3.0.3 — histórico de ações
 
+**Atualização v1.3:** esta fase agregada continua bloqueada. Foi adicionado um provider
+separado para gráficos individuais e comparação usando `adjustedClose` da Brapi Free; ele
+não fornece `rawClose` nem resolve os requisitos de quantidade histórica e eventos desta
+fase. Consulte as fases [4.1](phase-4.1-individual-equity-history.md) e
+[4.2](phase-4.2-asset-comparison.md) para o status atual do provider opt-in.
+
 **Estado: integração histórica pendente; implementação existente preservada localmente e
 não publicada.** A Fase 3.0.3 não está resolvida porque ainda não foi validada uma fonte que
 atenda cobertura, campos necessários (`rawClose` e eventos societários), termos de uso e

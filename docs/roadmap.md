@@ -1,8 +1,8 @@
-# Roadmap mestre — Investment Dashboard
+# Roadmap histórico de fases técnicas — Investment Dashboard
 
-**Fonte central atualizada em 31/10/2026:** [INVESTMENT_DASHBOARD_MASTER_PLAN.md](INVESTMENT_DASHBOARD_MASTER_PLAN.md). Este arquivo preserva o roadmap anterior e as decisões originais; seu estado de branches/releases no cabeçalho das seções antigas é histórico. O checkout desta atualização está em `main`, commit `329ba67`; o master plan registra a evidência Git disponível e suas limitações. A v1.0.0 foi publicada conforme o proprietário e o hotfix v1.0.1 está no Git; painéis Vercel/Render e o banco de produção não foram consultados nesta tarefa. O restore do backup real segue pendente.
+**Registro histórico de fases técnicas.** Para versões públicas atuais, use o [roadmap v2.0/v3.0](INVESTMENT_DASHBOARD_V2_ROADMAP.md) e o [plano mestre/histórico](INVESTMENT_DASHBOARD_MASTER_PLAN.md). As etiquetas 3.0.4, 4.x e 5.x abaixo nomeiam fases técnicas antigas, não releases major semver. A v1.2.0 foi publicada segundo relato do proprietário; v1.2.1/v1.3 foram implementadas e testadas localmente, mas ainda não foram publicadas. Os estados da tabela abaixo preservam a sequência e a evidência da época.
 
-Consulte o master plan para histórico de ponta a ponta, estado comprovado por código, itens descartados/adiados, planejamento v1.1/v1.2/v2.0 e comandos de retomada. O roadmap abaixo é referência histórica complementar e não deve sobrepor os estados mais recentes registrados no master.
+Consulte o roadmap público atual para prioridades, dependências e critérios. As propostas e estados desta página são um registro histórico complementar e não devem sobrepor as versões atuais.
 
 ## Estados usados
 
@@ -20,13 +20,15 @@ Consulte o master plan para histórico de ponta a ponta, estado comprovado por c
 1. O produto deve funcionar **sem despesa obrigatória**, tanto para o proprietário como para a futura expansão restrita. Priorizar software aberto, planos gratuitos enquanto disponíveis e registros manuais. Serviço que exija pagamento nunca será requisito funcional.
 2. Planos gratuitos têm limites e podem mudar, suspender ou encerrar. Configurações devem ser reavaliadas antes de releases. Falha ou limite deve degradar para indisponibilidade explícita ou fluxo manual, sem ativar cobrança automática.
 3. Não há intenção atual de cobrança, assinatura, planos comerciais ou monetização.
-4. Não integrar APIs pagas, Open Finance pago, scraping ou fornecedor sem validação de cobertura, licença, privacidade e custo. Ideias condicionais permanecem documentadas como alternativas futuras.
-5. A expansão chamada provisoriamente **Investment Dashboard 2.0** será somente por convite ou aprovação explícita; não haverá cadastro público irrestrito.
+4. Não integrar APIs pagas, Open Finance pago, scraping ou fornecedor sem validação de cobertura, licença, privacidade e custo. Ideias fora do roadmap público estão excluídas e não representam tarefas futuras.
+5. A expansão multiusuário por convite fica proposta para **v3.0**; não haverá cadastro público irrestrito.
 6. Um administrador não recebe acesso automático às carteiras de convidados. Recrutadores devem usar a demonstração offline ou uma conta isolada com dados próprios, nunca a carteira real do proprietário.
 7. Demo pública, carteira privada do proprietário e carteiras de convidados são fronteiras separadas.
 8. Nenhum dado financeiro ou preço ausente será inventado. Estimativas, observações, fluxo e rentabilidade devem ter rótulos próprios.
 
 ## Estado das versões
+
+Esta tabela registra fases internas antigas. Ela não representa a numeração de releases públicas nem o status mais recente das próximas versões.
 
 | Área | Estado | Registro |
 |---|---|---|
@@ -39,7 +41,7 @@ Consulte o master plan para histórico de ponta a ponta, estado comprovado por c
 | v4.4 — Rentabilidade temporal completa | **Bloqueado / condicional** | Depende de fluxo externo classificado, eventos pertinentes e avaliações históricas comparáveis. |
 | 5.0A — Navegação responsiva e identidade dinâmica | **Concluído** | Menu mobile acessível, sidebar desktop recolhível, identidade visual derivada da sessão e testes; sem alteração de backend/migration. Revisão visual geral da v1.0 segue no checklist de aceitação. |
 | v1.0.0 / v1.0.1 | **Publicada segundo o proprietário e evidência Git** | v1.0.0 cobre 5.0A, 5.1, 5.3, 5.4 e 5.5A–C; v1.0.1 corrige import do runner PostgreSQL no CI (`329ba67`). 5.2A foi retirada e 5.2B suspensa; 5.6 não implementada. Consulte o master para distinguir validações pendentes. |
-| Investment Dashboard 2.0 | **Planejado, após estabilidade pessoal** | Expansão por convite, com isolamento rigoroso e operação sustentável sem despesa obrigatória. |
+| Proposta histórica multiusuário | **Reclassificada para v3.0** | O [roadmap atual](INVESTMENT_DASHBOARD_V2_ROADMAP.md) destina v2.0 a análise patrimonial e deixa expansão por convite para v3.0. |
 
 ## Escopo organizado por versão
 
@@ -51,13 +53,13 @@ Inclui demonstração com dados fictícios; área privada Supabase Auth; ações
 
 Começar pela auditoria de dados e proveniência. A Fase 5.6 (snapshots, evolução patrimonial, fluxos, TWR/MWR e benchmarks) só avança se existirem valores históricos consistentes, fluxos externos completos e fonte permitida; sem esses dados, o resultado permanece indisponível. Melhorias de UX/metas são opcionais. A proposta e os critérios estão no [master plan](INVESTMENT_DASHBOARD_MASTER_PLAN.md); não há autorização para implementação automática.
 
-### v1.2 — Íris, assistente de educação financeira (implementada localmente; não publicada)
+### v1.2.0 — Íris, assistente de educação financeira (registro anterior à publicação)
 
-Chat privado com Groq Free opcional, modelo `qwen/qwen3.8-27b`, contexto estático, sem dados financeiros pessoais, ferramentas ou histórico permanente. A demonstração permanece sem IA. Chamadas reais locais ao endpoint autenticado e testes automatizados foram validados; sem chave/cota, a Íris fica indisponível e o dashboard continua funcionando. A inspeção visual autenticada em navegador e a configuração manual no Render/Vercel continuam pendentes. Nenhuma publicação foi feita.
+Este trecho registra o estado anterior à publicação. O proprietário confirmou a publicação da v1.2.0; o estado atual e os próximos passos estão no [roadmap atual](INVESTMENT_DASHBOARD_V2_ROADMAP.md) e no [CHANGELOG](../CHANGELOG.md). A implementação usa Groq Free opcional, modelo `qwen/qwen3.8-27b`, contexto estático e não envia dados financeiros pessoais; a demo não oferece IA.
 
-### v2.0 — expansão controlada por convite (planejada)
+### Proposta anterior de expansão por convite — agora v3.0
 
-O [plano de expansão multiusuário](multiuser-expansion-plan.md) propõe convites expiráveis/revogáveis, provisionamento Supabase, isolamento forte e operação para um grupo pequeno após estabilidade pessoal. Cadastro irrestrito não faz parte do plano. Custos, privacidade, suporte, migrations e controles ainda exigem planejamento e aprovação. Não está implementado.
+O [plano de expansão multiusuário](multiuser-expansion-plan.md) mantém detalhes antigos, agora reclassificados para v3.0. O roadmap público reserva v2.0 para patrimônio/desempenho baseado em observações prospectivas.
 
 ### Backlog — propostas sem versão aprovada
 
@@ -130,7 +132,7 @@ A 5.0A, 5.1, 5.3, 5.4 e 5.5A–C estão implementadas na `main`. A importação 
 
 A conclusão do dashboard pessoal é um marco de qualidade do produto, não sinônimo da release v4 ou v5. Critérios mínimos estão em [critérios do dashboard pessoal](personal-dashboard-release-criteria.md). Sem provedor histórico aprovado, pode-se concluir e estabilizar o conjunto de funcionalidades que possui dados suficientes, mantendo explicitamente a 3.0.3/4.1/4.2 indisponíveis.
 
-A expansão para convidados só deve começar após backup/restauração ensaiados, isolamento verificado e release pessoal estável. Os critérios estão em [Investment Dashboard 2.0](multiuser-expansion-plan.md).
+A expansão para convidados só deve começar após backup/restauração ensaiados, isolamento verificado e release pessoal estável. Os critérios estão no [roadmap v3.0](INVESTMENT_DASHBOARD_V2_ROADMAP.md) e em [detalhes históricos da proposta](multiuser-expansion-plan.md).
 
 ## Dependências principais
 

@@ -29,13 +29,14 @@ DAY_2 = date(2026, 10, 2)
 DAY_3 = date(2026, 10, 3)
 
 
-def history(ticker, points, *, source="provider-test-double", currency="BRL", price_basis="raw_close"):
+def history(ticker, points, *, source="provider-test-double", currency="BRL", price_basis="raw_close", partial=False):
     return ProviderPriceHistory(
         ticker=ticker,
         source=source,
         currency=currency,
         price_basis=price_basis,
         points=tuple(ProviderDailyPrice(day, D(close)) for day, close in points),
+        partial=partial,
     )
 
 
@@ -97,11 +98,13 @@ def test_comparison_normalizes_on_shared_real_date_and_preserves_missing_days(ap
     payload = response.json()
     assert payload["tickers"] == ["ITUB4", "BBAS3"]
     assert payload["period"] == "1M"
-    assert payload["availability"] == "available"
+    assert payload["availability"] == "partial"
+    assert payload["reason"] == "source_coverage"
     assert payload["source"] == "provider-test-double"
     assert payload["currency"] == "BRL"
     assert payload["price_basis"] == "raw_close"
     assert payload["common_start_date"] == "2026-10-01"
+    assert payload["common_end_date"] == "2026-10-02"
     assert payload["coverage"] == [
         {"ticker": "ITUB4", "coverage_start": "2026-10-01", "coverage_end": "2026-10-03", "base_price": "10"},
         {"ticker": "BBAS3", "coverage_start": "2026-10-01", "coverage_end": "2026-10-02", "base_price": "20"},
@@ -109,7 +112,6 @@ def test_comparison_normalizes_on_shared_real_date_and_preserves_missing_days(ap
     assert payload["points"] == [
         {"date": "2026-10-01", "values": {"ITUB4": "100", "BBAS3": "100"}},
         {"date": "2026-10-02", "values": {"ITUB4": None, "BBAS3": "110"}},
-        {"date": "2026-10-03", "values": {"ITUB4": "120", "BBAS3": None}},
     ]
     assert [call[0] for call in provider.calls] == ["ITUB4", "BBAS3"]
 
@@ -118,7 +120,8 @@ def test_comparison_accepts_four_open_positions(api):
     client, _provider = api
     response = client.get(compare_url(("ITUB4", "BBAS3", "B3SA3", "VALE3")))
     assert response.status_code == 200
-    assert response.json()["availability"] == "available"
+    assert response.json()["availability"] == "partial"
+    assert response.json()["reason"] == "source_coverage"
     assert response.json()["tickers"] == ["ITUB4", "BBAS3", "B3SA3", "VALE3"]
 
 
@@ -171,6 +174,7 @@ def test_comparison_rejects_unsupported_period(api):
 
 def test_comparison_requires_compatible_currency_source_and_price_basis(api):
     client, provider = api
+    service = app.dependency_overrides[individual_equity_price_history_service]()
     provider.histories["BBAS3"] = history("BBAS3", [(DAY_1, "20")], source="other-source")
     response = client.get(compare_url())
     assert response.status_code == 200
@@ -178,17 +182,20 @@ def test_comparison_requires_compatible_currency_source_and_price_basis(api):
     assert response.json()["reason"] == "incompatible_data"
     assert response.json()["points"] == []
 
+    service.cache.clear()
     provider.histories["BBAS3"] = history("BBAS3", [(DAY_1, "20")], price_basis="adjusted_close")
     response = client.get(compare_url())
     assert response.json()["availability"] == "unavailable"
     assert response.json()["reason"] == "incompatible_data"
     assert response.json()["points"] == []
 
+    service.cache.clear()
     provider.histories["BBAS3"] = history("BBAS3", [(DAY_1, "20")], price_basis="unknown")
     response = client.get(compare_url())
     assert response.json()["availability"] == "unavailable"
     assert response.json()["reason"] == "incompatible_data"
 
+    service.cache.clear()
     provider.histories["BBAS3"] = history("BBAS3", [(DAY_1, "20")], currency="USD")
     response = client.get(compare_url())
     assert response.json()["availability"] == "unavailable"
@@ -203,6 +210,22 @@ def test_comparison_without_shared_observation_date_does_not_forward_fill(api):
     assert response.json()["availability"] == "empty"
     assert response.json()["reason"] == "no_common_date"
     assert response.json()["points"] == []
+
+
+def test_partial_comparison_keeps_only_observed_dates_and_marks_free_plan_limit(api):
+    client, provider = api
+    provider.histories["ITUB4"] = history("ITUB4", [(DAY_1, "10"), (DAY_3, "12")], partial=True)
+    response = client.get(compare_url(period="6M"))
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["availability"] == "partial"
+    assert payload["reason"] == "plan_limit"
+    assert payload["common_start_date"] == "2026-10-01"
+    assert payload["common_end_date"] == "2026-10-02"
+    assert payload["points"] == [
+        {"date": "2026-10-01", "values": {"ITUB4": "100", "BBAS3": "100"}},
+        {"date": "2026-10-02", "values": {"ITUB4": None, "BBAS3": "110"}},
+    ]
 
 
 def test_comparison_disabled_does_not_call_provider(api):

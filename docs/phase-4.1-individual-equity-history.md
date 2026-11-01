@@ -13,12 +13,14 @@
 - Componente na página `/acoes` com ativo, períodos, tooltip e estados de carregamento,
   erro, indisponibilidade, carteira vazia e período sem preços.
 
-## Fonte e habilitação
+## Fonte e habilitação — status v1.3
 
-Nenhuma integração externa é configurada nesta etapa. `INDIVIDUAL_EQUITY_HISTORY_ENABLED`
-é uma flag separada e permanece `false` por padrão. Mesmo se ativada sem provedor, a API
-responde `unavailable/provider_not_configured`; não gera, estima ou reutiliza cotações atuais
-como série histórica. A ativação depende de validação de cobertura, dados e licença.
+O candidato v1.3 adiciona integração opt-in com Brapi Free por `adjustedClose`, uma chamada
+por ticker, cache temporário e limite de 3 meses por resposta. `MARKET_DATA_ENABLED` e
+`INDIVIDUAL_EQUITY_HISTORY_ENABLED` permanecem `false` por padrão; sem configuração, a API
+continua `disabled`/`provider_not_configured`. Períodos maiores que a janela efetivamente
+retornada aparecem como parciais e sem preenchimento. O preço ajustado é destinado ao gráfico
+individual e não reconstrói o valor histórico da posição.
 
 ## Migrações
 

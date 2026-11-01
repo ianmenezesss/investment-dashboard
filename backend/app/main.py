@@ -19,6 +19,8 @@ from .auth import authenticate
 from .access import private_db
 from .market_data.brapi import BrapiProvider
 from .market_data.equity_history import BrapiEquityHistoryProvider, EquityHistoryService
+from .market_data.individual_history import BrapiIndividualHistoryProvider
+from .market_data.request_gate import BrapiRequestGate
 from .market_data.service import QuoteService
 from .valuation import PortfolioValuation, value_portfolio
 from .price_basis import purchase_price_basis
@@ -52,14 +54,15 @@ async def lifespan(app):
             httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as history_client, \
             httpx.AsyncClient(trust_env=False, limits=httpx.Limits(max_connections=1)) as rates_client:
         token = settings.brapi_token.get_secret_value().strip()
-        app.state.quote_service = QuoteService(BrapiProvider(market_client, token),
+        brapi_gate = BrapiRequestGate(max_requests=12_000)
+        app.state.quote_service = QuoteService(BrapiProvider(market_client, token, brapi_gate),
             enabled=settings.market_data_enabled, configured=bool(token))
         app.state.equity_history_service = EquityHistoryService(
-            BrapiEquityHistoryProvider(history_client, token),
+            BrapiEquityHistoryProvider(history_client, token, brapi_gate),
             enabled=settings.market_data_enabled and settings.equity_history_enabled, configured=bool(token))
-        # Nenhum provedor individual é configurado sem validação de dados/licença.
         app.state.individual_equity_price_history_service = EquityPriceHistoryService(
-            provider=None, enabled=settings.individual_equity_history_enabled)
+            provider=BrapiIndividualHistoryProvider(history_client, token, brapi_gate) if token else None,
+            enabled=settings.market_data_enabled and settings.individual_equity_history_enabled)
         app.state.bcb_rates_service = RateService(SGSProvider(rates_client))
         try:
             yield
@@ -70,7 +73,7 @@ async def lifespan(app):
             app.state.bcb_rates_service = None
 
 
-app = FastAPI(title="Investment Dashboard", version="0.1.5", lifespan=lifespan, docs_url=None if settings.environment == "production" else "/docs", redoc_url=None, openapi_url=None if settings.environment == "production" else "/openapi.json")
+app = FastAPI(title="Investment Dashboard", version="1.3.0", lifespan=lifespan, docs_url=None if settings.environment == "production" else "/docs", redoc_url=None, openapi_url=None if settings.environment == "production" else "/openapi.json")
 app.include_router(fixed_income_router)
 app.include_router(revision_router)
 app.include_router(bcb_rates_router)

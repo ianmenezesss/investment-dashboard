@@ -1,5 +1,13 @@
 # Validação do Investment Dashboard
 
+## Candidato v1.2.1/v1.3.0 — 31/10/2026 (local, não publicado)
+
+- Backend completo: **404 aprovados, 1 ignorado**, em Python 3.12 com configuração isolada; o ignorado é a integração PostgreSQL opt-in. Permaneceu um aviso de depreciação de `TestClient`/HTTPX.
+- Frontend completo: **224 aprovados em 29 arquivos**.
+- `npm run build`: aprovado (TypeScript + Vite, 2.382 módulos).
+- Os testes não carregaram arquivos dotenv, usaram SQLite em memória/local e mock de HTTP para Brapi; nenhuma chamada real à Brapi/Groq, conexão PostgreSQL remota, leitura/escrita de carteira real ou migração foi executada.
+- Não foi feito commit, push ou deploy. A demonstração pública tem teste automatizado de isolamento; a inspeção visual autenticada depende de sessão Supabase legítima e não foi feita.
+
 ## Hotfix v1.0.1 — 31/10/2026
 
 - O runner `backend/tests/run_postgres.py` foi corrigido para resolver `scripts.backup_archive` a partir do caminho absoluto do backend, mesmo quando iniciado de outro diretório. O teste de regressão exercita CWD arbitrário para evitar dependência do shell/CWD e dá suporte à execução em Windows e Linux.

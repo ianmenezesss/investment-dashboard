@@ -43,6 +43,8 @@ test('abre e fecha a conversa acessível com saudação e três sugestões', asy
   expect(panel.getAttribute('role')).toBe('dialog')
   expect(host.querySelector('#iris-chat-title')?.textContent).toBe('Íris')
   expect(host.textContent).toContain('Assistente de educação financeira')
+  expect(host.textContent).toContain('Suas perguntas são enviadas à Groq para resposta')
+  expect(host.textContent).toContain('não inclua informações pessoais ou financeiras')
   expect(host.textContent).toContain('Olá! Sou a Íris, sua assistente de educação financeira. Posso ajudar você a entender conceitos financeiros e utilizar as ferramentas do Investment Dashboard. O que gostaria de saber?')
   expect([...host.querySelectorAll('.iris-suggestions button')].map(button => button.textContent?.replace('↑', '').trim())).toEqual([
     'O que é CDB?', 'Como funciona o CDI?', 'Como usar o dashboard?',

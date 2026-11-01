@@ -45,12 +45,24 @@ test('shows loading, error and empty states', async () => {
   expect(host.querySelector('[role="status"]')?.textContent).toContain('Carregando')
   await act(async () => finish({ ...points, points: [] }))
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
-  expect(await host.textContent).toContain('Histórico patrimonial indisponível')
+  expect(await host.textContent).toContain('Não há dados suficientes para mostrar evolução patrimonial')
 
   client.clear()
   await act(async () => root.render(<QueryClientProvider client={client}><ObservedHistory id={7} identity="owner-b" load={async () => { throw new Error('offline') }}/></QueryClientProvider>))
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
   expect(await host.querySelector('[role="alert"]')?.textContent).toContain('Não foi possível carregar')
+})
+
+test('orienta a registrar uma nova observação sem criar histórico fictício', async () => {
+  const record = vi.fn()
+  await act(async () => root.render(<QueryClientProvider client={client}><ObservedHistory id={7} identity="owner-a"
+    load={async () => ({ ...points, points: [] })} onRecordObservation={record}/></QueryClientProvider>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
+  expect(host.textContent).toContain('Nenhuma observação anterior será presumida')
+  const button = [...host.querySelectorAll('button')].find(item => item.textContent === 'Registrar observação')!
+  expect(button).toBeTruthy()
+  await act(async () => button.click())
+  expect(record).toHaveBeenCalledOnce()
 })
 
 test('reports a malformed response as an error instead of dereferencing a missing points array', async () => {
