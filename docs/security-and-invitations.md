@@ -58,4 +58,17 @@ Variáveis já necessárias no Render: `ENVIRONMENT=production`, `AUTH_MODE=supa
 
 Ordem operacional: (1) verificar o head real e criar backup cifrado correspondente fora do repositório; (2) ensaiar restore em PostgreSQL descartável; (3) aplicar sequencialmente as migrations ainda ausentes até 012 usando a role DDL — ela precisa criar `investment_deletion_executor`, conceder-lhe privilégios temporários no schema para transferir ownership e depois deixar `CREATE` revogado; (4) conferir head, policies RLS/FORCE RLS, role, owner/EXECUTE das cinco funções e grants restritos do runtime; (5) publicar o backend e então os projetos Vercel privado e público, observando seus deploys automáticos; (6) verificar health, login por convite, isolamento e demonstração pública. Não rode downgrade 012. Se a role DDL do provedor não puder criar a role ou alterar os owners, pare: não conceda `BYPASSRLS` nem privilégios de DELETE ao runtime.
 
+Na migration 012, `ALTER FUNCTION ... OWNER TO investment_deletion_executor` exige que a sessão possa executar `SET ROLE` para o novo owner. A migration concede temporariamente essa capacidade ao próprio `CURRENT_USER`, transfere os cinco owners e revoga a concessão na mesma transação. Em PostgreSQL 16+, a membership temporária usa `SET TRUE, INHERIT FALSE`; em versões anteriores, usa as opções padrão da versão. O PostgreSQL pode manter a membership administrativa bootstrap (ADMIN, sem INHERIT/SET em 16+) que dá ao criador `CREATEROLE` controle sobre a role que criou; a migration permite apenas esse vínculo ao usuário DDL atual, nunca a runtime/anon/authenticated/service_role. O usuário de runtime nunca recebe `CREATEROLE`, associação ao executor nem DELETE nos ledgers. Se `alembic current` continuar em `010` após falha, a transação PostgreSQL normalmente reverte toda a 012; confirme antes de repetir, sem remover objetos manualmente:
+
+```sql
+SELECT version_num FROM alembic_version;
+SELECT rolname FROM pg_roles WHERE rolname = 'investment_deletion_executor';
+SELECT to_regclass('public.account_deletion_jobs') AS deletion_jobs,
+       to_regclass('public.account_deletion_audit') AS deletion_audit,
+       to_regclass('public.account_fixture_loads') AS fixture_loads;
+SELECT to_regprocedure('public.dashboard_account_deletion_state(uuid)') AS deletion_state_function;
+```
+
+Se a revisão for `010` e todos os objetos exclusivos da migration 012 forem inexistentes, use a role DDL aprovada para executar `python -m alembic upgrade head` novamente. Se houver qualquer role/objeto 012 apesar da revisão 010, ou a repetição falhar novamente, pare e investigue o estado com o administrador do projeto; não faça `DROP`, `GRANT` amplo nem alteração da role de runtime. Após sucesso, `alembic current` deve apontar `012` e a verificação de owner/RLS/grants deve passar.
+
 Backups disponíveis: `backend/scripts/backup_supabase_011.py` e `backend/scripts/backup_supabase_012.py`, conforme o head confirmado. O restore automatizado fornecido destina-se exclusivamente a PostgreSQL descartável. A migration aplicada em produção e a publicação exigem validação operacional separada; esta documentação não afirma que foram executadas.

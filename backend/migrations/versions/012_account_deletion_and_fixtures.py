@@ -191,6 +191,20 @@ def upgrade():
         RETURN true;
       END $$""")
 
+    # PostgreSQL requires the migration session to be able to SET ROLE to a new
+    # function owner. Creating the NOLOGIN executor does not grant that ability.
+    # The migration role created this role, so it can grant itself temporary,
+    # non-inheriting SET membership. Revoke it in the same transaction after all
+    # ownership changes. PostgreSQL retains the bootstrap ADMIN-only membership
+    # automatically granted to a CREATEROLE role's creator (SET/INHERIT false);
+    # the postcondition below permits only that non-runtime administrative row.
+    op.execute("""DO $$ BEGIN
+      IF current_setting('server_version_num')::integer >= 160000 THEN
+        GRANT investment_deletion_executor TO CURRENT_USER WITH SET TRUE, INHERIT FALSE;
+      ELSE
+        GRANT investment_deletion_executor TO CURRENT_USER;
+      END IF;
+    END $$""")
     for signature in (
         "dashboard_account_deletion_state(uuid)",
         "begin_dashboard_account_deletion(uuid,text)",
@@ -201,6 +215,7 @@ def upgrade():
         op.execute(f"ALTER FUNCTION public.{signature} OWNER TO investment_deletion_executor")
         op.execute(f"REVOKE ALL ON FUNCTION public.{signature} FROM PUBLIC, anon, authenticated, service_role")
         op.execute(f"GRANT EXECUTE ON FUNCTION public.{signature} TO investment_runtime")
+    op.execute("REVOKE investment_deletion_executor FROM CURRENT_USER")
     op.execute("REVOKE CREATE ON SCHEMA public FROM investment_deletion_executor")
 
     for table in APPEND_ONLY_TABLES:
@@ -218,7 +233,18 @@ def upgrade():
         OR NOT (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.account_deletion_audit'::regclass)
         OR NOT (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.account_fixture_loads'::regclass)
         OR (SELECT rolsuper OR rolcanlogin OR rolbypassrls OR rolcreaterole OR rolcreatedb FROM pg_roles WHERE rolname='investment_deletion_executor')
-        OR EXISTS (SELECT 1 FROM pg_auth_members WHERE roleid='investment_deletion_executor'::regrole OR member='investment_deletion_executor'::regrole) THEN
+        OR (current_setting('server_version_num')::integer >= 160000 AND EXISTS (
+          SELECT 1 FROM pg_auth_members m
+          WHERE m.roleid='investment_deletion_executor'::regrole
+            AND NOT (m.member=(SELECT oid FROM pg_roles WHERE rolname=current_user)
+              AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option)
+        ))
+        OR (current_setting('server_version_num')::integer < 160000 AND EXISTS (
+          SELECT 1 FROM pg_auth_members m
+          WHERE m.roleid='investment_deletion_executor'::regrole
+            AND m.member<>(SELECT oid FROM pg_roles WHERE rolname=current_user)
+        ))
+        OR EXISTS (SELECT 1 FROM pg_auth_members WHERE member='investment_deletion_executor'::regrole) THEN
         RAISE EXCEPTION 'Account-deletion executor or RLS configuration is unsafe';
       END IF;
       IF has_schema_privilege('investment_deletion_executor','public','CREATE') THEN

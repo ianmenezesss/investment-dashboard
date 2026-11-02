@@ -52,6 +52,31 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
     command.upgrade(Config("alembic.ini"), "head")
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "012"
+    # Supabase migrations commonly run as a privileged CREATEROLE role rather
+    # than a PostgreSQL superuser. Reproduce the function-owner transfer rules
+    # and verify temporary SET membership is removed immediately afterward.
+    with engine.begin() as connection:
+        connection.execute(text("CREATE ROLE investment_migration_probe NOLOGIN CREATEROLE NOBYPASSRLS"))
+        connection.execute(text("GRANT CREATE, USAGE ON SCHEMA public TO investment_migration_probe WITH GRANT OPTION"))
+        connection.execute(text("SET LOCAL ROLE investment_migration_probe"))
+        connection.execute(text("CREATE ROLE investment_owner_probe NOLOGIN NOBYPASSRLS"))
+        connection.execute(text("GRANT CREATE ON SCHEMA public TO investment_owner_probe"))
+        connection.execute(text("CREATE FUNCTION public.investment_owner_probe() RETURNS integer LANGUAGE sql AS 'SELECT 1'"))
+        connection.execute(text("GRANT investment_owner_probe TO CURRENT_USER WITH SET TRUE, INHERIT FALSE"))
+        connection.execute(text("ALTER FUNCTION public.investment_owner_probe() OWNER TO investment_owner_probe"))
+        connection.execute(text("REVOKE investment_owner_probe FROM CURRENT_USER"))
+        connection.execute(text("REVOKE CREATE ON SCHEMA public FROM investment_owner_probe"))
+        connection.execute(text("RESET ROLE"))
+        assert connection.scalar(text("SELECT pg_get_userbyid(proowner) FROM pg_proc WHERE oid='public.investment_owner_probe()'::regprocedure")) == "investment_owner_probe"
+        assert connection.scalar(text("""SELECT count(*) FROM pg_auth_members
+          WHERE roleid='investment_owner_probe'::regrole
+            AND NOT (member='investment_migration_probe'::regrole AND admin_option
+                     AND NOT inherit_option AND NOT set_option)""")) == 0
+        assert connection.scalar(text("SELECT count(*) FROM pg_auth_members WHERE member='investment_owner_probe'::regrole")) == 0
+        assert connection.scalar(text("SELECT count(*) FROM pg_auth_members WHERE roleid='investment_owner_probe'::regrole AND member='investment_migration_probe'::regrole AND set_option")) == 0
+        connection.execute(text("DROP FUNCTION public.investment_owner_probe()"))
+        connection.execute(text("REVOKE CREATE, USAGE ON SCHEMA public FROM investment_migration_probe"))
+        connection.execute(text("DROP ROLE investment_owner_probe, investment_migration_probe"))
     with engine.begin() as connection:
         connection.execute(text("INSERT INTO account_members(user_id,email,status) VALUES (:a,'a@example.test','active'),(:b,'b@example.test','active')"), {"a": UUID("11111111-1111-4111-8111-111111111111"), "b": UUID("22222222-2222-4222-8222-222222222222")})
         connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at) VALUES (:id,'invite@example.test',:admin,now(),now()+interval '7 days')"), {"id": UUID("33333333-3333-4333-8333-333333333333"), "admin": UUID("11111111-1111-4111-8111-111111111111")})
