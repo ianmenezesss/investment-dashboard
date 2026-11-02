@@ -1,6 +1,7 @@
 import { ArrowUpRight, ChartNoAxesCombined, ShieldCheck, Layers3, Fingerprint } from 'lucide-react'
 import { LoginPanel } from './LoginPanel'
 import './login.css'
+import { Link } from 'react-router-dom'
 
 type Props = {
   loading: boolean; error: string; onLogin: (email: string, password: string) => Promise<void>
@@ -18,6 +19,7 @@ export function LoginPage(props: Props) {
     </section>
     <main className="login-main"><div className="login-card"><div className="login-lock"><ShieldCheck size={24}/></div><p className="login-eyebrow">BEM-VINDO AO SEU PRÓXIMO PASSO</p><h2>Sua carteira começa aqui.</h2><p className="login-description">Entre para acompanhar seus investimentos<br/>com uma visão mais clara.</p>
       <LoginPanel loading={props.loading} error={props.error} onLogin={props.onLogin} local={props.local} onLocalLogin={props.onLocalLogin}/>
+      {!props.local && <Link className="login-access-request" to="/solicitar-acesso">Solicitar acesso de teste — 7 dias</Link>}
       {props.connected && <button className="login-other-account" onClick={props.onLogout}>Sair e usar outra conta</button>}
       <div className="login-divider"><span/>ou conheça primeiro<span/></div><button className="login-demo" onClick={props.onDemo}>Explorar demonstração <ArrowUpRight size={17}/></button><p className="login-demo-note">Sem login. Apenas dados fictícios.</p>
     </div><footer className="login-footer"><ShieldCheck size={13}/> Seu patrimônio é pessoal. Seu acesso também.</footer></main>

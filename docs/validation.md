@@ -2,11 +2,11 @@
 
 ## Candidata v3.0.0 — 01/11/2026 (local, não publicada)
 
-- Backend: **439 aprovados, 1 ignorado**. A suíte completa usou configurações de teste forçadas (`DATABASE_URL=sqlite://`, `AUTH_MODE=local`, token fictício e `TEST_DATABASE_URL` vazio); dotenv foi isolado pelo `conftest.py`. O aviso deprecado é o adaptador Starlette `TestClient`/HTTPX.
-- PostgreSQL 17 descartável: **1 teste de integração aprovado**; migrations 001–012, isolamento entre proprietários, grants do executor/runtime, exclusão própria retomável, rejeição de identidade cruzada, rollback de falha parcial, loader em conta vazia/não vazia e backup/restauração autenticados `IDBKP012` passaram. O restore comparou contagens, hashes, Alembic head, RLS/FORCE RLS, policies, grants, owners de funções e visibilidade entre contas.
-- Frontend: **232 testes aprovados em 33 arquivos**. Build TypeScript/Vite: aprovado, **2.387 módulos** transformados. JSDOM mantém avisos não bloqueantes de dimensões zero do Recharts e `act(...)`.
-- O teste visual do aviso da fixture usa mock de sessão/API; o teste da demonstração confirma que não consulta endpoint privado. Não houve login no Supabase real, chamada à Groq, execução do loader em conta real, exclusão real, leitura/escrita de dados, migration/backup de produção, push ou deploy. A interface autenticada não foi inspecionada em navegador com sessão Supabase real.
-- A migration e o backup/restore foram exercitados somente em containers PostgreSQL locais descartáveis. O candidato inclui controles de exclusão e fixture, mas a configuração, permissão DDL e publicação de produção ainda precisam ser verificadas no procedimento operacional.
+- Backend: **451 aprovados, 1 ignorado**. A suíte completa usou as configurações forçadas pelo `conftest.py` (`DATABASE_URL=sqlite://`, `AUTH_MODE=local`, token fictício e `TEST_DATABASE_URL` vazio); dotenv e credenciais Groq foram isolados. Permanece um aviso de depreciação do adaptador Starlette `TestClient`/HTTPX.
+- PostgreSQL 17 descartável: **1 integração aprovada**; migrations 001–013, limites globais/por IP sob RLS incluindo duplicatas, convite temporário versus permanente, isolamento entre proprietários e backup/restauração autenticados `IDBKP013` passaram. O restore comparou contagens, dados sintéticos, head Alembic, RLS/FORCE RLS, policies, grants, owners e visibilidade.
+- Frontend: **240 testes aprovados em 35 arquivos**. Build TypeScript/Vite aprovado, **2.390 módulos** transformados.
+- A nova página de solicitação e o painel admin foram exercitados com mocks; a demonstração pública foi testada sem endpoint de solicitação, administração ou IA. A expiração, exclusão após vencimento e falha de envio foram testadas sem conta Supabase real. Não houve chamada à Groq, envio real de convite, leitura/escrita de carteira, migration/backup de produção, push ou deploy. A inspeção visual em produção com sessão Supabase legítima continua manual.
+- As quotas da solicitação foram testadas em PostgreSQL local, compartilhadas entre chamadas no mesmo banco. Nenhum SMTP/notificador administrativo foi configurado; os pedidos ficam visíveis no painel. A migration e o backup/restore foram executados apenas em containers descartáveis locais.
 
 ## Release v2.0.0 — registro da validação local antes da publicação
 

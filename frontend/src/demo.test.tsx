@@ -48,7 +48,20 @@ test('chat do assistente não aparece na demonstração e nenhuma chamada ao end
     expect(host.querySelector('.account-deletion')).toBeNull()
     expect(host.querySelector('a.profile[href="/conta"]')).toBeNull()
     expect(host.textContent).not.toContain('Minha conta')
+    expect(host.querySelector('a[href="/solicitar-acesso"]')).toBeNull()
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/api/admin/invitations'))).toBe(false)
+  } finally { await act(async () => root.unmount()); client.clear(); host.remove() }
+})
+
+test('rota de solicitação é indisponível na demonstração pública', async () => {
+  const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock)
+  const host = document.createElement('div'); document.body.append(host)
+  const root = createRoot(host), client = new QueryClient()
+  try {
+    await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/solicitar-acesso']}><App/></MemoryRouter></QueryClientProvider>))
+    expect(host.querySelector('input[type="email"]')).toBeNull()
+    expect(host.textContent).toContain('Modo Demonstração')
+    expect(fetchMock).not.toHaveBeenCalled()
   } finally { await act(async () => root.unmount()); client.clear(); host.remove() }
 })
 

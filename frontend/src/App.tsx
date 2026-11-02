@@ -23,6 +23,7 @@ import { WorkspaceSidebar, workspaceNavItems } from './components/WorkspaceSideb
 import { MyAccountPage } from './accounts/MyAccountPage'
 import { loadGoals } from './goals/goalStorage'
 import { InvitePasswordPage } from './auth/InvitePasswordPage'
+import { AccessRequestPage } from './auth/AccessRequestPage'
 const FixedIncomePage = lazy(() => import('./fixed-income/FixedIncomePage').then(module => ({ default: module.FixedIncomePage })))
 const PortfolioInsights = lazy(() => import('./portfolio/PortfolioInsights').then(module => ({ default: module.PortfolioInsights })))
 const WealthEvolution = lazy(() => import('./portfolio/WealthEvolution').then(module => ({ default: module.WealthEvolution })))
@@ -86,9 +87,10 @@ export default function App() {
   useEffect(() => { setMobileNavigationOpen(false) }, [location.pathname])
   useEffect(() => { if (page === '/cdbs') setModal(false) }, [page])
   const routeTo = (path: string) => demo && !PUBLIC_DEMO ? '/demo' + (path === '/' ? '' : path) : path
-  const summary = useQuery({ queryKey: ['summary', identity], queryFn: ({ signal }) => privateRepository.summary(signal), enabled: connected && !demo && !accountPage, retry: false, staleTime: 30 * 60 * 1000, refetchInterval: false })
-  const operations = useQuery({ queryKey: ['operations', identity], queryFn: ({ signal }) => privateRepository.list(signal), enabled: connected && !demo && !accountPage, retry: false })
-  const fixtureStatus = useQuery({ queryKey: ['fixture-status', identity], queryFn: ({ signal }) => privateRepository.fixtureStatus(signal), enabled: connected && !demo && SUPABASE_AUTH && !accountPage, retry: false, staleTime: 30 * 60 * 1000 })
+  const financialAccess = connected && auth.accessStatus !== 'trial_expired'
+  const summary = useQuery({ queryKey: ['summary', identity], queryFn: ({ signal }) => privateRepository.summary(signal), enabled: financialAccess && !demo && !accountPage, retry: false, staleTime: 30 * 60 * 1000, refetchInterval: false })
+  const operations = useQuery({ queryKey: ['operations', identity], queryFn: ({ signal }) => privateRepository.list(signal), enabled: financialAccess && !demo && !accountPage, retry: false })
+  const fixtureStatus = useQuery({ queryKey: ['fixture-status', identity], queryFn: ({ signal }) => privateRepository.fixtureStatus(signal), enabled: financialAccess && !demo && SUPABASE_AUTH && !accountPage, retry: false, staleTime: 30 * 60 * 1000 })
   const data = demo ? demoState?.summary : connected ? summary.data : undefined
   const ops = demo ? demoState?.operations ?? [] : connected ? operations.data ?? [] : []
   const busy = summary.isFetching || operations.isFetching
@@ -98,7 +100,8 @@ export default function App() {
     || summary.error || operations.error
   useEffect(() => {
     if (SUPABASE_AUTH && apiError instanceof ApiError && apiError.status === 401) auth.expire()
-  }, [apiError, auth.expire])
+    if (SUPABASE_AUTH && apiError instanceof ApiError && apiError.status === 403 && apiError.message.includes('período de teste terminou')) auth.markTrialExpired()
+  }, [apiError, auth.expire, auth.markTrialExpired])
   useEffect(() => {
     if (connected && SUPABASE_AUTH) { void client.invalidateQueries({ queryKey: ['summary', identity] }); void client.invalidateQueries({ queryKey: ['operations', identity] }) }
   }, [activeToken, connected, identity, client])
@@ -147,6 +150,8 @@ export default function App() {
     } finally { setConfirmBusy(false) }
   }
   if (PUBLIC_DEMO && location.pathname === '/login') return <DemoAccessPage/>
+  if (demo && location.pathname === '/solicitar-acesso') return <Navigate to={routeTo('/')} replace/>
+  if (!demo && location.pathname === '/solicitar-acesso') return <AccessRequestPage/>
   if (demo && accountPage) return <Navigate to={routeTo('/')} replace/>
   if (!demo && location.pathname === '/invite/accept') {
     if (auth.status === 'loading') return <main className="session-gate" role="status">Validando convite…</main>
@@ -154,8 +159,9 @@ export default function App() {
     return <InvitePasswordPage onComplete={() => navigate('/', { replace: true })}/>
   }
   const accessDenied = apiError instanceof ApiError && (apiError.status === 401 || apiError.status === 403)
-  const authorized = connected && (accountPage && SUPABASE_AUTH ? auth.status === 'authenticated' : summary.data !== undefined && operations.data !== undefined) && !accessDenied
+  const authorized = connected && (accountPage && SUPABASE_AUTH ? auth.status === 'authenticated' : auth.accessStatus === 'trial_expired' ? false : summary.data !== undefined && operations.data !== undefined) && (!accessDenied || auth.accessStatus === 'trial_expired' && accountPage)
   const logout = () => { clearPrivate(); setConnected(false); setToken(''); if (SUPABASE_AUTH) void auth.logout(); navigate('/login', { replace: true }) }
+  if (!demo && SUPABASE_AUTH && auth.status === 'authenticated' && auth.accessStatus === 'trial_expired' && !accountPage) return <Navigate to="/conta" replace/>
   if (!demo && ((SUPABASE_AUTH && auth.status === 'loading') || (connected && !authorized && !accessDenied))) {
     return <main className="session-gate" aria-label="Verificando acesso à carteira"><ShieldCheck size={28}/><h1>Investment Dashboard</h1><p role={apiError ? 'alert' : 'status'}>{apiError ? (apiError as Error).message : 'Verificando acesso à carteira…'}</p>{apiError && <div><Button onClick={() => { void refresh() }}>Tentar novamente</Button><button onClick={logout}>Sair</button></div>}</main>
   }
@@ -169,12 +175,12 @@ export default function App() {
   const displayName = demo ? 'Demonstração' : sessionDisplay.name
   const avatarInitial = demo ? 'D' : sessionDisplay.initial
   return <div className={`shell${sidebarCollapsed ? ' sidebar-is-collapsed' : ''}`} data-navigation-collapsed={sidebarCollapsed}>
-    {!demo && SUPABASE_AUTH && auth.session?.access_token && <AssistantChat token={auth.session.access_token} context={assistantContext}/>}
+    {!demo && SUPABASE_AUTH && auth.accessStatus !== 'trial_expired' && auth.session?.access_token && <AssistantChat token={auth.session.access_token} context={assistantContext}/>}
     <WorkspaceSidebar demo={demo} routeTo={routeTo} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed(value => !value)} displayName={displayName} avatarInitial={avatarInitial}/>
     <main><header><div className="mobile-header-brand"><span className="brand-icon"><ChartNoAxesCombined size={20}/></span>investment<span className="brand-dot">.</span></div><Dialog.Root open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}><Dialog.Trigger asChild><button type="button" className="mobile-menu-trigger" aria-label="Abrir menu de navegação" aria-controls="mobile-navigation-panel"><Menu size={20}/></button></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="mobile-nav-overlay" onClick={() => setMobileNavigationOpen(false)}/><Dialog.Content id="mobile-navigation-panel" className="mobile-nav-content"><Dialog.Title className="sr-only">Menu de navegação</Dialog.Title><button type="button" className="mobile-nav-close" aria-label="Fechar menu de navegação" onPointerDown={() => setMobileNavigationOpen(false)} onClick={() => setMobileNavigationOpen(false)}><X size={19}/></button><WorkspaceSidebar demo={demo} routeTo={routeTo} mobile onNavigate={() => setMobileNavigationOpen(false)} displayName={displayName} avatarInitial={avatarInitial}/></Dialog.Content></Dialog.Portal></Dialog.Root><div className="breadcrumb">Workspace <ChevronRight size={13}/> <span>{accountPage ? 'Minha conta' : workspaceNavItems.find(n => n.to === page)?.label ?? 'Investment Dashboard'}</span></div><span className="local-badge"><span className="status-dot"/> {demo ? 'Modo Demonstração' : 'Ambiente pessoal'}</span></header>
 
-    <section className="page-title"><div><p className="eyebrow">{accountPage ? 'SEU ACESSO E SUAS PREFERÊNCIAS' : 'CLAREZA PARA O SEU PRÓXIMO PASSO'}</p><h1>{accountPage ? 'Minha conta' : workspaceNavItems.find(n => n.to === page)?.label ?? 'Página não encontrada'}</h1><p>{accountPage ? 'Gerencie sua identidade, convites e privacidade.' : 'Acompanhe suas escolhas. Construa seu amanhã.'}</p></div>{!accountPage && <div className="actions">{page !== '/cdbs' && <Button variant="outline" onClick={exportData} disabled={!demo && !connected} title={demo ? 'JSON com operações fictícias da demonstração.' : 'JSON com registros financeiros deste usuário; metas locais também são incluídas. Não é uma cópia de configuração do Supabase.'} aria-label={demo ? 'Exportar operações fictícias da demonstração em JSON' : 'Exportar registros financeiros da minha conta em JSON'}><Download size={16}/> {demo ? 'Exportar operações' : 'Exportar meus dados'}</Button>}{page !== '/metas' && <Button onClick={() => page === '/cdbs' ? setFixedNewRequest(value => value + 1) : setModal(true)} disabled={!demo && !connected || demo && page === '/cdbs'}><Plus size={17}/> Nova operação</Button>}</div>}</section>
-      {accountPage ? (auth.session && SUPABASE_AUTH ? <MyAccountPage name={displayName} email={auth.session.user.email ?? ''} isAdmin={invitationAdmins.includes(auth.session.user.id)} status={authorized ? 'Ativa' : 'Autenticada'} identity={identity} token={auth.session.access_token} reauthenticate={auth.reauthenticate} onDeleted={async () => { clearPrivate(); await auth.logout(); navigate('/login', { replace: true }) }}/> : <div className="panel account-card">As informações da conta Supabase não estão disponíveis nesta sessão.</div>) : <>
+    <section className="page-title"><div><p className="eyebrow">{accountPage ? 'SEU ACESSO E SUAS PREFERÊNCIAS' : 'CLAREZA PARA O SEU PRÓXIMO PASSO'}</p><h1>{accountPage ? 'Minha conta' : workspaceNavItems.find(n => n.to === page)?.label ?? 'Página não encontrada'}</h1><p>{accountPage ? 'Gerencie sua identidade, convites e privacidade.' : 'Acompanhe suas escolhas. Construa seu amanhã.'}</p></div>{!accountPage && <div className="actions">{page !== '/cdbs' && <Button variant="outline" onClick={exportData} disabled={!demo && !connected} title={demo ? 'JSON com operações fictícias da demonstração.' : 'JSON com registros financeiros deste usuário; metas locais também são incluídas. Não é uma cópia de configuração do Supabase.'} aria-label={demo ? 'Exportar operações fictícias da demonstração em JSON' : 'Exportar meus dados JSON'}><Download size={16}/> {demo ? 'Exportar operações' : 'Exportar meus dados'}</Button>}{page !== '/metas' && <Button onClick={() => page === '/cdbs' ? setFixedNewRequest(value => value + 1) : setModal(true)} disabled={!demo && !connected || demo && page === '/cdbs'}><Plus size={17}/> Nova operação</Button>}</div>}</section>
+      {accountPage ? (auth.session && SUPABASE_AUTH ? <>{auth.accessStatus === 'trial_expired' && <div className="fixture-warning" role="status">Seu período de teste terminou. Seus dados foram preservados; você ainda pode gerenciar a privacidade e excluir sua conta.</div>}<MyAccountPage name={displayName} email={auth.session.user.email ?? ''} isAdmin={invitationAdmins.includes(auth.session.user.id)} status={auth.accessStatus === 'trial_expired' ? 'Teste expirado' : authorized ? 'Ativa' : 'Autenticada'} identity={identity} token={auth.session.access_token} reauthenticate={auth.reauthenticate} onDeleted={async () => { clearPrivate(); await auth.logout(); navigate('/login', { replace: true }) }}/></> : <div className="panel account-card">As informações da conta Supabase não estão disponíveis nesta sessão.</div>) : <>
       <section className={demo ? 'mode-banner demo-banner' : 'mode-banner private-banner'} aria-label={demo ? 'Modo demonstração' : 'Conta conectada'}>
         <div className="mode-summary"><span className="mode-icon">{demo ? <DemoIcon size={20}/> : <ShieldCheck size={20}/>}</span><div><strong>{demo ? 'Modo demonstração' : 'Carteira conectada'}</strong><p>{demo ? 'Dados fictícios armazenados neste navegador' : auth.session?.user.email ?? 'Desenvolvimento local'}</p></div></div>
         <div className="mode-actions">{demo ? <><Button variant="outline" onClick={resetDemo}><RotateCcw size={16}/> Restaurar</Button><Button variant="outline" onClick={() => { void toggleDemo() }}><LogIn size={16}/> Entrar</Button></> : <><Button variant="outline" onClick={() => { void toggleDemo() }}><DemoIcon size={16}/> Explorar demonstração</Button><Button variant="outline" onClick={logout}><LogOut size={16}/> Sair</Button></>}</div>

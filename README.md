@@ -39,6 +39,7 @@ O projeto nasceu para reunir registros de investimentos e tornar suas bases mais
 
 - **Demonstração pública:** usa dados fictícios e foi projetada para funcionar separada da API privada.
 - **Área privada:** autenticação Supabase e autorização no backend; os registros são isolados por proprietário.
+- **Acesso de teste:** visitantes podem pedir acesso por e-mail; um administrador decide se envia o convite. A ativação libera sete dias, sem criar conta automaticamente e sem cadastro público irrestrito.
 - **Íris:** assistente opcional de educação financeira, disponível somente na área privada autenticada. Combina conhecimento estático com o nome permitido da tela atual; não recebe valores, posições, operações, filtros nem outros dados da carteira. As perguntas são enviadas à Groq; não inclua informações pessoais ou financeiras.
 - **Privacidade:** a demonstração não usa a carteira privada. O produto não oferece cadastro público irrestrito.
 
@@ -61,7 +62,7 @@ Na área privada, **Exportar meus dados** gera um JSON com os dados financeiros 
 
 ## Estado das versões
 
-`v2.0.0` é a última versão publicada. A candidata local `v3.0.0` acrescenta acesso por convite, carteiras isoladas por proprietário, exclusão de conta retomável e loader administrativo explícito para dados inteiramente fictícios. A validação local cobre backend, frontend, build e PostgreSQL descartável até a migration 012. A v3.0 ainda não foi publicada; migration e configuração de produção seguem o checklist operacional, sem cadastro público.
+`v2.0.0` é a última versão publicada. A candidata local `v3.0.0` acrescenta convites, solicitação de teste por aprovação, acesso temporário de sete dias, carteiras isoladas por proprietário, exclusão própria retomável e loader administrativo de dados fictícios. O período começa na ativação da conta; após o vencimento, as rotas financeiras são bloqueadas e a exclusão continua disponível. A candidata ainda não foi publicada; migration e configuração de produção seguem o checklist operacional.
 
 ## Conheça o projeto
 

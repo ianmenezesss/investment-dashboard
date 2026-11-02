@@ -4,6 +4,8 @@
 
 - Acesso Supabase por convite, sem cadastro público, membership ativo e confirmação server-side do e-mail antes de ativar novas contas.
 - Convites administrativos limitados, expirados e revogáveis; contas isoladas por proprietário com RLS/FORCE RLS e quotas persistentes da Íris (5/minuto e 50/dia).
+- Solicitação pública de teste somente por e-mail, com resposta neutra contra enumeração, cotas compartilhadas no PostgreSQL e decisão manual no painel administrativo; aprovar envia convite de teste sem criar conta automaticamente.
+- Membership de teste expira sete dias após a ativação efetiva. A API bloqueia o acesso financeiro depois do vencimento sem remover dados; Minha conta e a exclusão própria permanecem acessíveis. Convites manuais existentes continuam permanentes.
 - Exportação privada schema 3 inclui registros owner-scoped e metadados básicos de conta; metas locais são anexadas pelo navegador.
 - Comparador de CDI/Ibovespa/IPCA removido da UI/API; a série CDI/Selic necessária à renda fixa permanece.
 - Exclusão própria com confirmação textual e autenticação recente; as fases financeiras, identidade Supabase e finalização são retomáveis. Ledgers continuam append-only para runtime; o executor SQL é NOLOGIN, sem BYPASSRLS e sem membership em outras roles.

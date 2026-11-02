@@ -95,7 +95,7 @@ def test_jwt_signature_issuer_audience_expiry_and_invited_member_authorization(m
         verify_jwt(token(claims, other), private.public_key())
     assert error.value.status_code == 401
     assert verify_jwt(token(dict(claims, sub=str(B))), private.public_key()).user_id == B
-    monkeypatch.setattr(auth, "account_is_active", lambda user_id: user_id == A)
+    monkeypatch.setattr(auth, "account_access_state", lambda user_id: "active" if user_id == A else None)
     assert auth.require_active_account(Principal(A)).user_id == A
     with pytest.raises(HTTPException) as error:
         auth.require_active_account(Principal(B))

@@ -1,13 +1,16 @@
 """Invite-only account lifecycle. Admins can manage access, never financial rows."""
 from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
+import ipaddress
 import re
 import time
 from uuid import UUID, uuid4
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import BigInteger, DateTime, Integer, String, Uuid, func, select, text
+from sqlalchemy import BigInteger, DateTime, Integer, SmallInteger, String, Uuid, func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -21,6 +24,7 @@ class AccountMember(Base):
     email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    access_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AccountInvitation(Base):
@@ -32,6 +36,27 @@ class AccountInvitation(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     accepted_user_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    access_duration_days: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+
+
+class AccountAccessRequest(Base):
+    __tablename__ = "account_access_requests"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    ip_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_by: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    invitation_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    processing_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AccountAccessRequestLimit(Base):
+    __tablename__ = "account_access_request_limits"
+    scope_key: Mapped[str] = mapped_column(String(72), primary_key=True)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attempts: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
 
 class AccountDeletionJob(Base):
@@ -72,8 +97,14 @@ class InvitationInput(BaseModel):
     expires_in_days: int = Field(default=7, ge=1, le=7)
 
 
+class AccessRequestInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    email: str = Field(min_length=3, max_length=320)
+
+
 router = APIRouter(tags=["accounts"])
 admin_router = APIRouter(prefix="/api/admin", tags=["account-invitations"])
+access_request_response = {"message": "Se sua solicitação puder ser processada, ela será analisada. Caso seja aprovada, você receberá um convite por e-mail."}
 
 
 def _admin(principal: Principal):
@@ -87,6 +118,70 @@ def _email(value: str):
     if len(normalized) > 320 or not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+", normalized):
         raise HTTPException(422, "Informe um e-mail válido")
     return normalized
+
+
+def _request_ip(request: Request) -> str:
+    if settings.environment == "production":
+        raw_ip = request.headers.get("cf-connecting-ip", "").strip()
+    else:
+        raw_ip = request.client.host if request.client else ""
+    try:
+        return str(ipaddress.ip_address(raw_ip))
+    except ValueError:
+        raise HTTPException(503, "Proteção contra abuso indisponível") from None
+
+
+def _request_ip_hash(ip: str) -> str:
+    key = settings.supabase_service_role_key.get_secret_value().strip().encode()
+    if not key:
+        key = settings.api_token.get_secret_value().strip().encode()
+    if not key:
+        raise HTTPException(503, "Proteção contra abuso não configurada")
+    return hmac.new(key, b"dashboard-trial-access-v1:" + ip.encode(), hashlib.sha256).hexdigest()
+
+
+def _increment_local_request_limit(db: Session, scope_key: str, now: datetime) -> int:
+    row = db.get(AccountAccessRequestLimit, scope_key)
+    if row is None:
+        row = AccountAccessRequestLimit(scope_key=scope_key, window_started_at=now, attempts=1)
+        db.add(row)
+        db.flush()
+        return 1
+    window_start = row.window_started_at
+    if window_start.tzinfo is None:
+        window_start = window_start.replace(tzinfo=timezone.utc)
+    if window_start + timedelta(hours=24) <= now:
+        row.window_started_at = now
+        row.attempts = 1
+    else:
+        row.attempts += 1
+    return row.attempts
+
+
+@router.post("/api/access-requests", status_code=202)
+def submit_access_request(body: AccessRequestInput, request: Request, db: Session = Depends(get_db)):
+    email = _email(body.email)
+    ip_hash = _request_ip_hash(_request_ip(request))
+    try:
+        if db.bind.dialect.name == "postgresql":
+            db.execute(text("SELECT set_config('app.access_request_submit','true',true)"))
+            db.execute(text("SELECT public.submit_dashboard_trial_access_request(:email,:ip_hash)"),
+                       {"email": email, "ip_hash": ip_hash})
+        else:
+            now = datetime.now(timezone.utc)
+            total = _increment_local_request_limit(db, "global", now)
+            if total <= 100:
+                from_ip = _increment_local_request_limit(db, "ip:" + ip_hash, now)
+                duplicate = db.scalar(select(AccountAccessRequest.id).where(AccountAccessRequest.email == email,
+                    AccountAccessRequest.status.in_(("pending", "approving", "approved"))).limit(1))
+                if from_ip <= 3 and duplicate is None:
+                    db.add(AccountAccessRequest(id=uuid4(), email=email, ip_hash=ip_hash, status="pending", requested_at=now))
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(503, "Não foi possível registrar a solicitação") from None
+    # Identical response for new, duplicate, and rate-limited e-mails prevents enumeration.
+    return access_request_response
 
 
 def _admin_context(db: Session, admin_id: UUID):
@@ -245,10 +340,16 @@ def activate_account(principal: Principal = Depends(authenticate_identity), db: 
     email = _email(principal.email)
     if db.bind.dialect.name == "postgresql":
         db.execute(text("SELECT set_config('app.user_id', :user_id, true)"), {"user_id": str(principal.user_id)})
-    existing_status = db.scalar(select(AccountMember.status).where(AccountMember.user_id == principal.user_id))
-    if existing_status == "active":
+    existing_member = db.execute(select(AccountMember.status, AccountMember.access_expires_at)
+                                  .where(AccountMember.user_id == principal.user_id)).first()
+    if existing_member and existing_member.status == "active":
+        expiry = existing_member.access_expires_at
+        if expiry is not None and expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
         db.rollback()
-        return {"status": "active"}
+        if expiry and expiry <= datetime.now(timezone.utc):
+            return {"status": "trial_expired"}
+        return {"status": "active", **({"trial_expires_at": expiry.isoformat()} if expiry else {})}
     db.rollback()
     _verify_supabase_email(principal, email)
 
@@ -264,17 +365,23 @@ def activate_account(principal: Principal = Depends(authenticate_identity), db: 
         if invite:
             invite.accepted_user_id = principal.user_id
             member = db.get(AccountMember, principal.user_id)
+            access_expires_at = now + timedelta(days=7) if invite.access_duration_days == 7 else None
             if member is None:
-                db.add(AccountMember(user_id=principal.user_id, email=invite.email, status="active", created_at=now))
+                db.add(AccountMember(user_id=principal.user_id, email=invite.email, status="active", created_at=now,
+                                     access_expires_at=access_expires_at))
             else:
                 member.email = invite.email
                 member.status = "active"
+                member.access_expires_at = access_expires_at
             accepted = True
         else:
             accepted = False
     if accepted:
+        expiry = db.scalar(select(AccountMember.access_expires_at).where(AccountMember.user_id == principal.user_id))
+        if expiry is not None and expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
         db.commit()
-        return {"status": "active"}
+        return {"status": "active", **({"trial_expires_at": expiry.isoformat()} if expiry else {})}
     db.rollback()
     raise HTTPException(403, "Convite ausente, expirado, revogado ou já utilizado")
 
@@ -285,6 +392,122 @@ def list_invitations(principal: Principal = Depends(authenticate), db: Session =
     _admin_context(db, admin_id)
     rows = db.scalars(select(AccountInvitation).order_by(AccountInvitation.created_at.desc()).limit(100))
     return [_serialize(row) for row in rows]
+
+
+def _serialize_access_request(row: AccountAccessRequest):
+    return {"id": str(row.id), "email": row.email, "requested_at": row.requested_at.isoformat(),
+            "status": "pending" if row.status == "approving" else row.status,
+            "processing": row.status == "approving"}
+
+
+@admin_router.get("/access-requests")
+def list_access_requests(principal: Principal = Depends(authenticate), db: Session = Depends(get_db)):
+    admin_id = _admin(principal)
+    _admin_context(db, admin_id)
+    rows = db.scalars(select(AccountAccessRequest).order_by(AccountAccessRequest.requested_at.desc()))
+    return [_serialize_access_request(row) for row in rows]
+
+
+async def _send_supabase_invitation(email: str) -> None:
+    service_key = settings.supabase_service_role_key.get_secret_value().strip()
+    if not service_key or not settings.app_public_url:
+        raise RuntimeError("invitation_not_configured")
+    async with httpx.AsyncClient(trust_env=False, timeout=httpx.Timeout(8, connect=3)) as client:
+        response = await client.post(f"{settings.supabase_url}/auth/v1/invite",
+            params={"redirect_to": f"{settings.app_public_url}/invite/accept"},
+            headers={"apikey": service_key, "Authorization": f"Bearer {service_key}",
+                     "Content-Type": "application/json"}, json={"email": email})
+    if response.status_code not in (200, 201):
+        raise RuntimeError("supabase_invite_failed")
+
+
+@admin_router.post("/access-requests/{request_id}/approve")
+async def approve_access_request(request_id: UUID, principal: Principal = Depends(authenticate), db: Session = Depends(get_db)):
+    admin_id = _admin(principal)
+    if not settings.supabase_service_role_key.get_secret_value().strip() or not settings.app_public_url:
+        raise HTTPException(503, "Convites não estão configurados")
+    now = datetime.now(timezone.utc)
+    _admin_context(db, admin_id)
+    if db.bind.dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+                   {"key": f"dashboard-trial-approval:{request_id}"})
+    item = db.scalar(select(AccountAccessRequest).where(AccountAccessRequest.id == request_id).with_for_update())
+    if item is None:
+        db.rollback()
+        raise HTTPException(404, "Solicitação não encontrada")
+    if item.status != "pending":
+        db.rollback()
+        raise HTTPException(409, "A solicitação já está sendo processada ou já foi decidida")
+    email = item.email
+    # Reserve the request and the exact seven-day invitation before sending.
+    item.status = "approving"; item.processing_at = now
+    expired = db.scalars(select(AccountInvitation).where(AccountInvitation.email == email,
+        AccountInvitation.accepted_user_id.is_(None), AccountInvitation.revoked_at.is_(None),
+        AccountInvitation.expires_at <= now)).all()
+    for previous in expired:
+        previous.revoked_at = now
+    recent = db.scalar(select(func.count()).select_from(AccountInvitation).where(
+        AccountInvitation.invited_by == admin_id, AccountInvitation.created_at >= now - timedelta(days=1))) or 0
+    active_pending = db.scalar(select(func.count()).select_from(AccountInvitation).where(
+        AccountInvitation.invited_by == admin_id, AccountInvitation.revoked_at.is_(None),
+        AccountInvitation.accepted_user_id.is_(None), AccountInvitation.expires_at > now)) or 0
+    if recent >= 10 or active_pending >= 10:
+        db.rollback()
+        raise HTTPException(429, "Limite diário ou de convites pendentes atingido")
+    invitation = AccountInvitation(id=uuid4(), email=email, invited_by=admin_id, created_at=now,
+        expires_at=now + timedelta(days=7), access_duration_days=7)
+    item.invitation_id = invitation.id
+    db.add(invitation)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(409, "A solicitação não pôde ser reservada para aprovação") from None
+    try:
+        await _send_supabase_invitation(email)
+    except (httpx.HTTPError, RuntimeError):
+        try:
+            _admin_context(db, admin_id)
+            item = db.get(AccountAccessRequest, request_id)
+            invitation = db.get(AccountInvitation, invitation.id)
+            if item and item.status == "approving" and item.invitation_id == invitation.id:
+                invitation.revoked_at = datetime.now(timezone.utc)
+                item.status = "pending"; item.processing_at = None; item.invitation_id = None
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+        raise HTTPException(502, "O convite não foi confirmado pelo Supabase; a solicitação permanece pendente") from None
+    _admin_context(db, admin_id)
+    item = db.get(AccountAccessRequest, request_id)
+    if item is None or item.status != "approving" or item.invitation_id != invitation.id:
+        db.rollback()
+        raise HTTPException(503, "O convite foi enviado, mas a decisão precisa de reconciliação administrativa")
+    item.status = "approved"; item.reviewed_at = datetime.now(timezone.utc); item.reviewed_by = admin_id; item.processing_at = None
+    db.commit()
+    return {"status": "approved"}
+
+
+@admin_router.post("/access-requests/{request_id}/reject")
+def reject_access_request(request_id: UUID, principal: Principal = Depends(authenticate), db: Session = Depends(get_db)):
+    admin_id = _admin(principal)
+    _admin_context(db, admin_id)
+    if db.bind.dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+                   {"key": f"dashboard-trial-approval:{request_id}"})
+    item = db.scalar(select(AccountAccessRequest).where(AccountAccessRequest.id == request_id).with_for_update())
+    if item is None:
+        db.rollback()
+        raise HTTPException(404, "Solicitação não encontrada")
+    if item.status not in ("pending", "approving"):
+        db.rollback()
+        raise HTTPException(409, "A solicitação já foi decidida")
+    if item.status == "approving" and item.invitation_id:
+        invitation = db.get(AccountInvitation, item.invitation_id)
+        if invitation and invitation.accepted_user_id is None:
+            invitation.revoked_at = datetime.now(timezone.utc)
+    item.status = "rejected"; item.reviewed_at = datetime.now(timezone.utc); item.reviewed_by = admin_id; item.processing_at = None
+    db.commit()
+    return {"status": "rejected"}
 
 
 @admin_router.post("/invitations", status_code=201)
@@ -320,14 +543,7 @@ async def create_invitation(body: InvitationInput, principal: Principal = Depend
         db.rollback()
         raise HTTPException(409, "Já existe convite pendente para esse e-mail") from None
     try:
-        async with httpx.AsyncClient(trust_env=False, timeout=httpx.Timeout(8, connect=3)) as client:
-            response = await client.post(f"{settings.supabase_url}/auth/v1/invite",
-                params={"redirect_to": f"{settings.app_public_url}/invite/accept"},
-                headers={"apikey": settings.supabase_service_role_key.get_secret_value(),
-                         "Authorization": f"Bearer {settings.supabase_service_role_key.get_secret_value()}",
-                         "Content-Type": "application/json"}, json={"email": email})
-        if response.status_code not in (200, 201):
-            raise RuntimeError("supabase_invite_failed")
+        await _send_supabase_invitation(email)
     except (httpx.HTTPError, RuntimeError):
         _admin_context(db, admin_id)
         row.revoked_at = now

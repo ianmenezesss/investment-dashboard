@@ -12,7 +12,7 @@ from uuid import uuid4
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from backup_archive import MAGIC, MAGIC_010, MAGIC_011, MAGIC_012, SUPPORTED_MAGICS, decrypt_stream, sha256_file
+from backup_archive import MAGIC, MAGIC_010, MAGIC_011, MAGIC_012, MAGIC_013, SUPPORTED_MAGICS, decrypt_stream, sha256_file
 
 
 REQUIRED_TABLES_009 = {
@@ -23,8 +23,10 @@ REQUIRED_TABLES_009 = {
 REQUIRED_TABLES_010 = REQUIRED_TABLES_009 | {"portfolio_valuation_observations"}
 REQUIRED_TABLES_011 = REQUIRED_TABLES_010 | {"account_members", "account_invitations"}
 REQUIRED_TABLES_012 = REQUIRED_TABLES_011 | {"account_deletion_jobs", "account_deletion_audit", "account_fixture_loads"}
+REQUIRED_TABLES_013 = REQUIRED_TABLES_012 | {"account_access_requests", "account_access_request_limits"}
 VERSIONS = {MAGIC: ("009", REQUIRED_TABLES_009), MAGIC_010: ("010", REQUIRED_TABLES_010),
-            MAGIC_011: ("011", REQUIRED_TABLES_011), MAGIC_012: ("012", REQUIRED_TABLES_012)}
+            MAGIC_011: ("011", REQUIRED_TABLES_011), MAGIC_012: ("012", REQUIRED_TABLES_012),
+            MAGIC_013: ("013", REQUIRED_TABLES_013)}
 EVENTS = {"financial_events", "financial_event_revisions"}
 
 
@@ -67,7 +69,7 @@ def validate_backup(path, expected_hash=None):
             raise RuntimeError("SHA-256 do arquivo criptografado não confere")
     with backup.open("rb") as source:
         if source.read(len(MAGIC)) not in VERSIONS:
-            raise RuntimeError("Cabeçalho do backup não corresponde a IDBKP009, IDBKP010, IDBKP011 ou IDBKP012")
+            raise RuntimeError("Cabeçalho do backup não corresponde a um formato IDBKP009–IDBKP013 suportado")
     return backup
 
 
@@ -191,7 +193,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
                    input_data=roles_sql, env=env)
         # Keep GRANT/REVOKE entries from the archive; ownership is recreated by the disposable superuser.
         docker("exec", name, "pg_restore", "--exit-on-error", "--schema=public", "--no-owner", "-d", database, "/restore/input.dump")
-        if version == "012":
+        if version in ("012", "013"):
             for signature in (
                 "dashboard_account_deletion_state(uuid)", "begin_dashboard_account_deletion(uuid,text)",
                 "purge_dashboard_account_data(uuid)", "mark_dashboard_auth_identity_deleted(uuid)",
@@ -200,7 +202,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
                 psql(f"ALTER FUNCTION public.{signature} OWNER TO investment_deletion_executor")
         psql("GRANT SELECT ON public.financial_events, public.financial_event_revisions "
              "TO investment_test_runtime")
-        if version in ("010", "011", "012"):
+        if version in ("010", "011", "012", "013"):
             psql("GRANT SELECT ON public.portfolio_valuation_observations TO investment_test_runtime")
 
         restored_version = psql("SELECT version_num FROM public.alembic_version")
@@ -223,7 +225,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
             ("public.financial_event_revisions", "public.financial_event_revisions_id_seq"),
             ("public.fixed_income_application_revisions", "public.fixed_income_application_revisions_id_seq"),
         ]
-        if version in ("010", "011", "012"):
+        if version in ("010", "011", "012", "013"):
             grant_targets.append(("public.portfolio_valuation_observations", "public.portfolio_valuation_observations_id_seq"))
         for table, sequence in grant_targets:
             grants = psql("SELECT has_table_privilege('investment_runtime', '" + table + "', 'SELECT') || '|' || "
@@ -242,7 +244,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
                              "SELECT count(*) FROM public.financial_events WHERE owner_id <> current_setting('app.user_id')::uuid; ROLLBACK;")
             if not isolation.splitlines()[-2].endswith("0"):
                 raise RuntimeError("Falha no teste RLS sintético por proprietário")
-            if version in ("010", "011", "012"):
+            if version in ("010", "011", "012", "013"):
                 wealth = psql("BEGIN; SET LOCAL ROLE investment_test_runtime; "
                     "SELECT set_config('app.auth_mode','supabase',true); "
                     f"SELECT set_config('app.user_id','{owner}',true); "

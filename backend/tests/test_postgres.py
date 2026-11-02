@@ -51,7 +51,13 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
           ('fixed_income_investments','fixed_income_lots','fixed_income_movements')}
     command.upgrade(Config("alembic.ini"), "head")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "012"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "013"
+        access_request_table = connection.scalar(text("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.account_access_requests'::regclass"))
+        assert access_request_table is True
+        assert connection.scalar(text("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.account_access_request_limits'::regclass")) is True
+        assert connection.scalar(text("SELECT has_table_privilege('investment_runtime','public.account_access_requests','DELETE')")) is False
+        assert connection.scalar(text("SELECT has_table_privilege('investment_runtime','public.account_access_requests','TRUNCATE')")) is False
+        assert connection.scalar(text("SELECT has_table_privilege('investment_runtime','public.account_access_request_limits','DELETE')")) is False
     # Supabase migrations commonly run as a privileged CREATEROLE role rather
     # than a PostgreSQL superuser. Reproduce the function-owner transfer rules
     # and verify temporary SET membership is removed immediately afterward.
@@ -94,14 +100,39 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
         assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is False
         connection.execute(text("SELECT set_config('app.user_email','invitee@example.test',true)"))
         assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is True
+        assert connection.scalar(text("SELECT access_expires_at IS NULL FROM account_members WHERE user_id=:user_id"), {"user_id": invitee}) is True
         assert connection.scalar(text("SELECT public.revoke_dashboard_account(:user_id,:admin_id)"), {"user_id": invitee, "admin_id": admin}) is True
-        connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at) VALUES (:id,'invitee@example.test',:admin,now(),now()+interval '7 days')"), {"id": UUID("66666666-6666-4666-8666-666666666666"), "admin": admin})
+        connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at,access_duration_days) VALUES (:id,'invitee@example.test',:admin,now(),now()+interval '7 days',7)"), {"id": UUID("66666666-6666-4666-8666-666666666666"), "admin": admin})
         assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is True
         assert connection.scalar(text("SELECT status FROM account_members WHERE user_id=:user_id"), {"user_id": invitee}) == "active"
+        assert connection.scalar(text("SELECT access_expires_at BETWEEN now()+interval '6 days 23 hours' AND now()+interval '7 days 1 second' FROM account_members WHERE user_id=:user_id"), {"user_id": invitee}) is True
         connection.execute(text("SELECT set_config('app.user_id',:user_id,true)"), {"user_id": str(admin)})
         assert all(connection.scalar(text("SELECT public.consume_dashboard_assistant_quota(:user_id)"), {"user_id": admin}) is True for _ in range(5))
         assert connection.scalar(text("SELECT public.consume_dashboard_assistant_quota(:user_id)"), {"user_id": admin}) is False
         assert connection.scalar(text("SELECT public.consume_dashboard_assistant_quota(:user_id)"), {"user_id": UUID("22222222-2222-4222-8222-222222222222")}) is False
+    # Public submission is mediated by one PostgreSQL function. Its quotas and
+    # duplicate suppression are shared across application instances.
+    with engine.begin() as connection:
+        connection.execute(text("SET LOCAL ROLE investment_runtime"))
+        connection.execute(text("SELECT set_config('app.access_request_submit','true',true)"))
+        digest = "a" * 64
+        assert connection.scalar(text("SELECT public.submit_dashboard_trial_access_request('one@example.test',:ip)"), {"ip": digest}) is True
+        assert connection.scalar(text("SELECT public.submit_dashboard_trial_access_request('one@example.test',:ip)"), {"ip": digest}) is False
+        assert connection.scalar(text("SELECT public.submit_dashboard_trial_access_request('two@example.test',:ip)"), {"ip": digest}) is True
+        assert connection.scalar(text("SELECT public.submit_dashboard_trial_access_request('three@example.test',:ip)"), {"ip": digest}) is False
+        assert connection.scalar(text("SELECT public.submit_dashboard_trial_access_request('four@example.test',:ip)"), {"ip": digest}) is False
+        connection.execute(text("SELECT set_config('app.admin_id',:admin,true)"), {"admin": str(admin)})
+        assert connection.scalar(text("SELECT count(*) FROM public.account_access_requests WHERE ip_hash=:ip"), {"ip": digest}) == 2
+        connection.execute(text("SELECT set_config('app.admin_id','',true)"))
+        for index in range(95):
+            unique_ip = f"{index + 1:064x}"
+            assert connection.scalar(text("SELECT public.submit_dashboard_trial_access_request(:email,:ip)"),
+                                     {"email": f"global{index}@example.test", "ip": unique_ip}) is True
+        assert connection.scalar(text("SELECT public.submit_dashboard_trial_access_request('global-over@example.test',:ip)"),
+                                 {"ip": "f" * 64}) is False
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT has_table_privilege('authenticated','public.account_access_requests','SELECT')")) is False
+        assert connection.scalar(text("SELECT has_table_privilege('anon','public.account_access_requests','SELECT')")) is False
     with engine.connect() as connection:
         for table, rows in original.items():
             assert list(connection.execute(text(f'SELECT * FROM {table} ORDER BY id'))) == rows

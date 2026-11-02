@@ -1,4 +1,4 @@
-"""Executa integração 001–012 e ensaio pg_dump/restore em containers efêmeros."""
+"""Executa integração 001–013 e ensaio pg_dump/restore em containers efêmeros."""
 import os
 import io
 from pathlib import Path
@@ -195,18 +195,18 @@ def main():
         if result.returncode:
             return result.returncode
 
-        print("INTEGRACAO_POSTGRESQL_001_012=PASSOU")
+        print("INTEGRACAO_POSTGRESQL_001_013=PASSOU")
         print("Criando backup lógico fictício e iniciando servidor de restore independente...")
         dump = subprocess.run([docker, "exec", "-e", f"PGPASSWORD={password}", name, "pg_dump", "-h", "127.0.0.1", "-p", "5432",
                                "-U", "postgres", "-Fc", source_db], capture_output=True)
         if dump.returncode:
             detail = (dump.stderr or b"Falha sem diagnostico").decode(errors="replace").replace(password, "[redacted]")[:2000]
             raise RuntimeError(f"pg_dump falhou: {detail}")
-        from scripts.backup_archive import MAGIC_012, decrypt_stream, encrypt_stream
+        from scripts.backup_archive import MAGIC_013, decrypt_stream, encrypt_stream
         synthetic_passphrase = "Synthetic-only-passphrase-2026"
         fd, backup_path = tempfile.mkstemp(prefix=f"investment-dashboard-{run_id}-", suffix=".idbackup", dir=temp_root)
         with os.fdopen(fd, "wb") as backup_file:
-            encrypted_size, encrypted_hash = encrypt_stream(io.BytesIO(dump.stdout), backup_file, synthetic_passphrase, magic=MAGIC_012)
+            encrypted_size, encrypted_hash = encrypt_stream(io.BytesIO(dump.stdout), backup_file, synthetic_passphrase, magic=MAGIC_013)
         decrypted = io.BytesIO()
         with open(backup_path, "rb") as encrypted_file:
             decrypted_size, decrypted_hash = decrypt_stream(encrypted_file, decrypted, synthetic_passphrase)
@@ -245,8 +245,8 @@ ALTER FUNCTION public.finish_dashboard_account_deletion(uuid) OWNER TO investmen
         if source_snapshot != restored_snapshot:
             raise RuntimeError("Snapshot de contagens, RLS/grants ou isolamento divergiu após restore")
         print(f"BACKUP_RESTORE=PASSOU; encrypted_bytes={encrypted_size}; encrypted_sha256={encrypted_hash}; plaintext_sha256={decrypted_hash}")
-        print("BACKUP_ENCRYPTION=AES-256-GCM; AUTHENTICATED_DECRYPTION=PASS; format=IDBKP012")
-        print("RESTORE_HEAD=012; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
+        print("BACKUP_ENCRYPTION=AES-256-GCM; AUTHENTICATED_DECRYPTION=PASS; format=IDBKP013")
+        print("RESTORE_HEAD=013; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
         return 0
     finally:
         # Only containers created by this invocation are stopped; no volumes are mounted or removed.

@@ -9,7 +9,7 @@ TABLES = (
     "fixed_income_investment_archives", "fixed_income_application_revisions",
     "financial_events", "financial_event_revisions", "portfolio_valuation_observations",
     "account_members", "account_invitations", "account_deletion_jobs",
-    "account_deletion_audit", "account_fixture_loads",
+    "account_deletion_audit", "account_fixture_loads", "account_access_requests", "account_access_request_limits",
 )
 OWNERS = (
     "11111111-1111-4111-8111-111111111111",
@@ -22,15 +22,16 @@ def snapshot(url: str) -> dict:
     try:
         with engine.connect() as connection:
             result = {"head": connection.scalar(text("SELECT version_num FROM alembic_version"))}
-            if result["head"] != "012":
-                raise AssertionError("Banco restaurado não está no Alembic head 012")
+            if result["head"] != "013":
+                raise AssertionError("Banco restaurado não está no Alembic head 013")
             result["counts"] = {
                 table: connection.scalar(text(f'SELECT count(*) FROM public."{table}"'))
                 for table in TABLES
             }
             result["data_sha256"] = {}
             for table in TABLES:
-                key = "user_id" if table in ("account_members", "account_deletion_jobs", "account_fixture_loads") else "id"
+                key = ("user_id" if table in ("account_members", "account_deletion_jobs", "account_fixture_loads")
+                       else "scope_key" if table == "account_access_request_limits" else "id")
                 rows = connection.execute(text(f'SELECT row_to_json(t)::text FROM (SELECT * FROM public."{table}" ORDER BY {key}) AS t')).scalars()
                 digest = hashlib.sha256()
                 for row in rows:

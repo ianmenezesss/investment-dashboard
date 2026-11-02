@@ -82,7 +82,10 @@ def require_active_account(principal: Principal) -> Principal:
     from sqlalchemy.exc import SQLAlchemyError
     from .database import SessionLocal
     try:
-        if not account_is_active(principal.user_id):
+        state = account_access_state(principal.user_id)
+        if state == "trial_expired":
+            raise HTTPException(403, "Seu período de teste terminou. Seus dados foram preservados; acesse Minha conta para gerenciar sua privacidade.")
+        if state != "active":
             raise HTTPException(403, "Conta não autorizada")
     except HTTPException:
         raise
@@ -92,10 +95,17 @@ def require_active_account(principal: Principal) -> Principal:
 
 
 def account_is_active(user_id: UUID) -> bool:
+    return account_access_state(user_id) == "active"
+
+
+def account_access_state(user_id: UUID) -> str | None:
     from sqlalchemy import text
     from .database import SessionLocal
     with SessionLocal() as db:
         if db.bind.dialect.name == "postgresql":
             db.execute(text("SELECT set_config('app.user_id', :user_id, true)"), {"user_id": str(user_id)})
-        return db.scalar(text("SELECT status = 'active' FROM account_members WHERE user_id = :user_id"),
-                         {"user_id": user_id}) is True
+        return db.scalar(text("""SELECT CASE
+            WHEN status <> 'active' THEN 'inactive'
+            WHEN access_expires_at IS NOT NULL AND access_expires_at <= CURRENT_TIMESTAMP THEN 'trial_expired'
+            ELSE 'active' END
+            FROM account_members WHERE user_id = :user_id"""), {"user_id": user_id})
