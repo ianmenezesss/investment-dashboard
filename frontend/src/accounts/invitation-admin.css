@@ -1,2 +1,29 @@
 .account-invitation-admin{margin-top:18px;padding:18px 22px;border-color:#2b3d42;background:#0f171d}.account-invitation-admin summary{cursor:pointer;font-weight:650;color:#dce8e2}.account-invitation-admin summary:focus-visible{outline:2px solid #73d9ad;outline-offset:4px;border-radius:3px}.account-invitation-admin form{display:grid;grid-template-columns:minmax(180px,1fr) auto;gap:8px 12px;margin-top:16px;align-items:end}.account-invitation-admin form label{grid-column:1/-1;color:#b9c5cc}.account-invitation-admin input{min-width:0;min-height:42px;border:1px solid #33434b;border-radius:8px;background:#111a20;color:#edf3f4;padding:10px;font:inherit}.account-invitation-admin button{min-height:38px;border:1px solid #528f78;border-radius:8px;background:#19352d;color:#c5f5e1;padding:8px 12px;cursor:pointer;font:inherit;font-size:11px}.account-invitation-admin button:focus-visible{outline:2px solid #73d9ad;outline-offset:3px}.account-invitation-admin button:disabled{opacity:.55;cursor:wait}.account-invitation-admin ul{display:grid;gap:8px;list-style:none;padding:0;margin:14px 0 0}.account-invitation-admin li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid #26353d;border-radius:8px;background:#111a20;color:#b9c5cc;font-size:11px;line-height:1.65;overflow-wrap:anywhere}.account-invitation-admin li strong{color:#dce8e2}.account-invitation-admin [role=alert]{color:#ffaaa4}.member-access-admin,.invitation-history-admin{margin-top:22px;padding-top:18px;border-top:1px solid #25343a}.member-access-admin h3,.invitation-history-admin h3{margin:0;color:#dce8e2;font-size:14px}.member-access-admin>p,.invitation-history-admin>p{color:#91a19f;font-size:11px;line-height:1.6}
 @media(max-width:600px){.account-invitation-admin{padding:15px}.account-invitation-admin form{grid-template-columns:minmax(0,1fr)}.account-invitation-admin form label{grid-column:auto}.account-invitation-admin form button{width:100%}.account-invitation-admin li{align-items:flex-start;flex-direction:column}.account-invitation-admin li>button{width:100%}}
+.account-invitation-admin .admin-tabs{display:flex;gap:8px;overflow-x:auto;margin:16px 0 12px;padding:0 0 7px;border-bottom:1px solid #25343a}
+.account-invitation-admin .admin-tabs button{flex:0 0 auto;display:flex;align-items:center;gap:8px;min-height:40px;border-color:transparent;background:transparent;color:#aab8bd;font-size:12px}
+.account-invitation-admin .admin-tabs button[aria-current=page]{border-color:#528f78;background:#19352d;color:#c5f5e1}
+.account-invitation-admin .admin-tabs button span{min-width:20px;padding:1px 6px;border-radius:999px;background:#26353d;color:#dce8e2;text-align:center;font-size:10px}
+.account-invitation-admin .admin-filters{display:grid;grid-template-columns:auto minmax(160px,1fr) auto minmax(130px,.5fr);align-items:center;gap:8px 10px;margin:14px 0;color:#b9c5cc;font-size:11px}
+.account-invitation-admin .admin-filters input,.account-invitation-admin .admin-filters select{width:100%;min-width:0;min-height:40px;border:1px solid #33434b;border-radius:8px;background:#111a20;color:#edf3f4;padding:8px 10px;font:inherit}
+.account-invitation-admin .admin-filters input:focus-visible,.account-invitation-admin .admin-filters select:focus-visible{outline:2px solid #73d9ad;outline-offset:2px}
+.account-invitation-admin .admin-tab-panel h3{margin:10px 0;color:#dce8e2;font-size:14px}
+.account-invitation-admin .admin-message,.account-invitation-admin .admin-note,.account-invitation-admin .admin-empty{font-size:11px;line-height:1.6}
+.account-invitation-admin .admin-message{padding:10px 12px;border-radius:8px}
+.account-invitation-admin .admin-message.error{border:1px solid #633d3d;background:#291a1c;color:#ffb7b0}
+.account-invitation-admin .admin-message.success{border:1px solid #35634f;background:#14251f;color:#b7f1d2}
+.account-invitation-admin .admin-note{color:#9eacae}
+.account-invitation-admin .admin-empty{padding:14px;border:1px dashed #33434b;border-radius:8px;color:#aab8bd}
+.account-invitation-admin .admin-row-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px;align-items:center}
+.account-invitation-admin .admin-row-actions button{font-size:10px}
+.account-invitation-admin .send-history{margin-top:5px}
+.account-invitation-admin .send-history summary{font-size:10px;color:#a8c8b8}
+.account-invitation-admin .send-history ol{padding-left:18px}
+.account-invitation-admin .admin-invite-form{margin:14px 0;padding:12px;border:1px solid #26353d;border-radius:9px;background:#111a20}
+.account-invitation-admin .admin-resend-confirm{flex:1 1 100%;padding:10px 12px;border:1px solid #70572d;border-radius:8px;background:#251f15;color:#f0d6a1;font-size:11px;line-height:1.6}
+.account-invitation-admin .admin-resend-confirm p{margin:0 0 8px}
+.account-invitation-admin .admin-resend-confirm button{margin-right:7px;border-color:#806630;background:#3a2d18;color:#ffe3a5}
+.account-invitation-admin .admin-pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px;color:#aab8bd;font-size:11px}
+.account-invitation-admin .admin-pagination>div{display:flex;align-items:center;gap:8px}
+.account-invitation-admin .admin-pagination button{min-height:34px;padding:6px 10px}
+@media(max-width:600px){.account-invitation-admin .admin-filters{grid-template-columns:1fr}.account-invitation-admin .admin-row-actions{justify-content:flex-start;width:100%}.account-invitation-admin .admin-row-actions button{flex:1 1 100%}.account-invitation-admin .admin-pagination{align-items:stretch;flex-direction:column}.account-invitation-admin .admin-pagination>div{justify-content:space-between}.account-invitation-admin .admin-pagination button{flex:1}}

@@ -10,6 +10,8 @@
 - Comparador de CDI/Ibovespa/IPCA removido da UI/API; a série CDI/Selic necessária à renda fixa permanece.
 - Exclusão própria com confirmação textual e autenticação recente; as fases financeiras, identidade Supabase e finalização são retomáveis. Ledgers continuam append-only para runtime; o executor SQL é NOLOGIN, sem BYPASSRLS e sem membership em outras roles.
 - Loader CLI sem rota HTTP: UUIDs explícitos, admin allowlist, projeto Supabase/DB coincidente, membership ativo, carteira vazia, validação do cenário, observações por data e transação atômica. Registros e fontes ficam identificados como fictícios; alvos não vazios ou já usados são recusados.
+- Painel administrativo separado em Contas, Convites e Solicitações, com paginação e filtros no backend, status de acesso confiáveis, tratamento seguro de memberships legadas e fluxo separado para revogar convites pendentes ou acessos ativos.
+- Migration 015 adiciona auditoria restrita de envios ao Supabase Auth e atualização segura da revogação; limites de reenvio são aplicados no PostgreSQL compartilhado. O status aceito pelo provedor não é apresentado como confirmação de entrega.
 - Validação local da candidata final: resultados registrados em [validation.md](docs/validation.md); a integração PostgreSQL usa exclusivamente containers descartáveis.
 - Não houve exclusão de conta real, execução da fixture em conta real, migration de produção, push ou deploy.
 

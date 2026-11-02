@@ -40,6 +40,7 @@ O projeto nasceu para reunir registros de investimentos e tornar suas bases mais
 - **Demonstração pública:** usa dados fictícios e foi projetada para funcionar separada da API privada.
 - **Área privada:** autenticação Supabase e autorização no backend; os registros são isolados por proprietário.
 - **Acesso de teste:** visitantes podem pedir acesso por e-mail; um administrador decide se envia o convite. A ativação libera sete dias, sem criar conta automaticamente e sem cadastro público irrestrito.
+- **Administração de acesso:** painel privado com contas, convites e solicitações paginados, filtros por status/e-mail e ações auditadas de revogação e reenvio. O painel não afirma entrega do e-mail quando o Supabase apenas aceita a solicitação.
 - **Íris:** assistente opcional de educação financeira, disponível somente na área privada autenticada. Combina conhecimento estático com o nome permitido da tela atual; não recebe valores, posições, operações, filtros nem outros dados da carteira. As perguntas são enviadas à Groq; não inclua informações pessoais ou financeiras.
 - **Privacidade:** a demonstração não usa a carteira privada. O produto não oferece cadastro público irrestrito.
 

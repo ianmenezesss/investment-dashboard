@@ -24,6 +24,10 @@ def _seed(engine):
                  ('77777777-7777-4777-8777-000000000002','pending-' || :owner_email,:admin,now(),now()+interval '7 days',NULL),
                  ('88888888-8888-4888-8888-000000000001',:other_email,:admin,now(),now()+interval '7 days',:other)"""),
           {"owner_email": OWNER_EMAIL, "other_email": OTHER_EMAIL, "admin": ADMIN, "owner": OWNER, "other": OTHER})
+        connection.execute(text("""INSERT INTO public.account_invitation_send_attempts
+          (invitation_id,requested_by,attempted_at,outcome,method,http_status)
+          VALUES ('77777777-7777-4777-8777-000000000001',:admin,now(),'requested','invite',200)"""),
+          {"admin": ADMIN})
         for user_id, ticker in ((OWNER, "ABCD3"), (OTHER, "WXYZ3")):
             connection.execute(text("""INSERT INTO public.operations
               (owner_id,ticker,kind,date,quantity,price,fees,created_at)
@@ -129,6 +133,7 @@ def verify_account_deletion_postgres(engine, runtime_engine):
         assert connection.scalar(text("SELECT count(*) FROM public.account_members WHERE user_id=:owner"), {"owner": OWNER}) == 1
         assert connection.scalar(text("SELECT count(*) FROM public.account_members WHERE user_id=:other"), {"other": OTHER}) == 1
         assert connection.scalar(text("SELECT count(*) FROM public.account_invitations WHERE email=:email OR accepted_user_id=:owner OR invited_by=:owner"), {"email": OWNER_EMAIL, "owner": OWNER}) == 0
+        assert connection.scalar(text("SELECT count(*) FROM public.account_invitation_send_attempts WHERE invitation_id='77777777-7777-4777-8777-000000000001'")) == 0
         for table in ("operations", "fixed_income_investments", "fixed_income_lots", "fixed_income_movements",
                       "fixed_income_observations", "fixed_income_investment_archives", "fixed_income_application_revisions",
                       "financial_events", "financial_event_revisions", "portfolio_valuation_observations", "account_fixture_loads"):

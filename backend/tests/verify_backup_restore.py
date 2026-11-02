@@ -10,6 +10,7 @@ TABLES = (
     "financial_events", "financial_event_revisions", "portfolio_valuation_observations",
     "account_members", "account_invitations", "account_deletion_jobs",
     "account_deletion_audit", "account_fixture_loads", "account_access_requests", "account_access_request_limits",
+    "account_invitation_send_attempts",
 )
 OWNERS = (
     "11111111-1111-4111-8111-111111111111",
@@ -22,8 +23,8 @@ def snapshot(url: str) -> dict:
     try:
         with engine.connect() as connection:
             result = {"head": connection.scalar(text("SELECT version_num FROM alembic_version"))}
-            if result["head"] != "014":
-                raise AssertionError("Banco restaurado não está no Alembic head 014")
+            if result["head"] != "015":
+                raise AssertionError("Banco restaurado não está no Alembic head 015")
             result["counts"] = {
                 table: connection.scalar(text(f'SELECT count(*) FROM public."{table}"'))
                 for table in TABLES
@@ -53,7 +54,7 @@ def snapshot(url: str) -> dict:
                 row[0]: (row[1], row[2]) for row in connection.execute(text("""
                 SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class
                 WHERE relnamespace='public'::regnamespace AND relkind IN ('r','p')
-                  AND (relname='operations' OR relname LIKE 'fixed_income_%' OR relname LIKE 'financial_event%' OR relname IN ('portfolio_valuation_observations','account_members','account_invitations','account_deletion_jobs','account_deletion_audit','account_fixture_loads'))
+                  AND (relname='operations' OR relname LIKE 'fixed_income_%' OR relname LIKE 'financial_event%' OR relname IN ('portfolio_valuation_observations','account_members','account_invitations','account_deletion_jobs','account_deletion_audit','account_fixture_loads','account_invitation_send_attempts'))
                 ORDER BY relname
             """)).all()
             }
@@ -105,6 +106,26 @@ def snapshot(url: str) -> dict:
             """)).one()
             if result["account_grants"] != (True, False, False, True, True, True, False, True, True, True):
                 raise AssertionError("Grants do runtime de convites/membership estão excessivos ou incompletos")
+            result["invitation_send_grants"] = connection.execute(text("""
+                SELECT has_table_privilege('investment_runtime','public.account_invitation_send_attempts','SELECT'),
+                       has_table_privilege('investment_runtime','public.account_invitation_send_attempts','INSERT'),
+                       has_table_privilege('investment_runtime','public.account_invitation_send_attempts','DELETE'),
+                       has_table_privilege('investment_runtime','public.account_invitation_send_attempts','TRUNCATE'),
+                       has_column_privilege('investment_runtime','public.account_invitation_send_attempts','outcome','UPDATE'),
+                       has_table_privilege('anon','public.account_invitation_send_attempts','SELECT'),
+                       has_table_privilege('authenticated','public.account_invitation_send_attempts','SELECT')
+            """)).one()
+            if result["invitation_send_grants"] != (True, True, False, False, True, False, False):
+                raise AssertionError("Grants da auditoria de envio de convites estão incorretos")
+            result["invitation_send_sequence_grants"] = connection.execute(text("""
+                SELECT has_sequence_privilege('investment_runtime','public.account_invitation_send_attempts_id_seq','USAGE'),
+                       has_sequence_privilege('investment_runtime','public.account_invitation_send_attempts_id_seq','SELECT'),
+                       has_sequence_privilege('anon','public.account_invitation_send_attempts_id_seq','USAGE'),
+                       has_sequence_privilege('authenticated','public.account_invitation_send_attempts_id_seq','USAGE'),
+                       has_sequence_privilege('service_role','public.account_invitation_send_attempts_id_seq','USAGE')
+            """)).one()
+            if result["invitation_send_sequence_grants"] != (True, True, False, False, False):
+                raise AssertionError("Grants da sequence de auditoria de envio estão incorretos")
             result["deletion_security"] = connection.execute(text("""
                 SELECT has_function_privilege('investment_runtime','public.dashboard_account_deletion_state(uuid)','EXECUTE'),
                        has_function_privilege('investment_runtime','public.begin_dashboard_account_deletion(uuid,text)','EXECUTE'),

@@ -112,14 +112,15 @@ def test_only_admin_can_list_or_process_requests(monkeypatch):
     access_settings(monkeypatch)
     engine = database()
     with Session(engine) as db:
-        with pytest.raises(HTTPException) as error:
-            accounts.list_access_requests(Principal(USER), db)
-        assert error.value.status_code == 403
+        for endpoint in (accounts.list_members, accounts.list_invitations, accounts.list_access_requests):
+            with pytest.raises(HTTPException) as error:
+                endpoint(principal=Principal(USER), db=db)
+            assert error.value.status_code == 403
         with pytest.raises(HTTPException) as error:
             run_immediate(accounts.approve_access_request(uuid4(), Principal(USER), db))
         assert error.value.status_code == 403
         with pytest.raises(HTTPException) as error:
-            accounts.list_access_requests(Principal(None), db)
+            accounts.list_access_requests(principal=Principal(None), db=db)
         assert error.value.status_code == 403
     engine.dispose()
 
@@ -146,10 +147,11 @@ def test_admin_approval_creates_seven_day_invite_and_records_status(monkeypatch)
             status="pending", requested_at=now))
         db.commit()
     sent = []
-    async def send(email, invitation_id): sent.append((email, invitation_id))
+    async def send(email, invitation_id): sent.append((email, invitation_id)); return "invite", 200
     monkeypatch.setattr(accounts, "_send_supabase_invitation", send)
     with Session(engine) as db:
-        assert run_immediate(accounts.approve_access_request(item_id, Principal(ADMIN), db)) == {"status": "approved"}
+        assert run_immediate(accounts.approve_access_request(item_id, Principal(ADMIN), db)) == {
+            "status": "approved", "email_send_status": "requested", "delivery_confirmed": False}
     with Session(engine) as db:
         item = db.get(accounts.AccountAccessRequest, item_id)
         invite = db.scalar(select(accounts.AccountInvitation))
@@ -157,6 +159,9 @@ def test_admin_approval_creates_seven_day_invite_and_records_status(monkeypatch)
         assert invite.access_duration_days == 7
         assert invite.expires_at - invite.created_at == timedelta(days=7)
     assert sent == [("person@example.test", invite.id)]
+    with Session(engine) as db:
+        attempt = db.scalar(select(accounts.AccountInvitationSendAttempt))
+        assert attempt.outcome == "requested" and attempt.http_status == 200
     engine.dispose()
 
 
@@ -177,6 +182,8 @@ def test_failed_supabase_invite_reverts_request_and_revokes_pending_invite(monke
         invite = db.scalar(select(accounts.AccountInvitation))
         assert item.status == "pending" and item.invitation_id is None
         assert invite.revoked_at is not None
+        attempt = db.scalar(select(accounts.AccountInvitationSendAttempt))
+        assert attempt.outcome == "failed" and attempt.provider_code == "not_configured"
     engine.dispose()
 
 

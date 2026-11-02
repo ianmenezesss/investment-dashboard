@@ -2,7 +2,7 @@
 
 > Este documento mantém as decisões fundacionais e a arquitetura original. Para o estado local v3.0.0, use o [registro atual de versões](INVESTMENT_DASHBOARD_V2_ROADMAP.md) e a [checklist de validação](v3-launch-checklist.md); as fases antigas abaixo são histórico, não backlog aprovado.
 
-Atualização da candidata local v3.0.0 (02/11/2026; não publicada): migrations 011–014 adicionam membership/convites, solicitações públicas aprovadas manualmente, expiração de trial, exclusão própria retomável, proveniência do loader fictício e ativação vinculada a convite de uso único. A reativação é uma concessão administrativa direcionada à identidade Auth e inicia 168 horas somente na aceitação. O JWT Supabase é verificado, cada rota privada exige membership ativo não expirado e registros financeiros mantêm RLS/FORCE RLS por UUID proprietário. A role dedicada de exclusão é NOLOGIN e sem BYPASSRLS; o runtime mantém os ledgers append-only. A fixture só é carregada pela CLI administrativa, em carteira vazia e numa única transação. A demonstração pública permanece sem API privada, convite e Íris.
+Atualização da candidata local v3.0.0 (02/11/2026; não publicada): migrations 011–015 adicionam membership/convites, solicitações públicas aprovadas manualmente, expiração de trial, exclusão própria retomável, proveniência do loader fictício, ativação vinculada a convite de uso único e auditoria de tentativas de e-mail. A reativação é uma concessão administrativa direcionada à identidade Auth e inicia 168 horas somente na aceitação. O painel administrativo separa contas, convites e solicitações com filtros e paginação no backend; revogar uma membership bloqueia imediatamente as rotas privadas sem apagar dados. O JWT Supabase é verificado, cada rota privada exige membership ativo não expirado e registros financeiros mantêm RLS/FORCE RLS por UUID proprietário. A role dedicada de exclusão é NOLOGIN e sem BYPASSRLS; o runtime mantém os ledgers append-only. A fixture só é carregada pela CLI administrativa, em carteira vazia e numa única transação. A demonstração pública permanece sem API privada, convite e Íris.
 
 O histórico individual Brapi usa `adjustedClose`, uma chamada por ticker, cache de 30 minutos e limitador de 12.000 chamadas/uma chamada simultânea **por processo**. O limitador não representa a cota da conta e não coordena outros workers, reinicializações ou aplicações; flags continuam opt-in. Intervalos acima de três meses são parciais. Nenhuma chamada externa foi feita nesta implementação local.
 
@@ -51,7 +51,7 @@ backend/
 compose.yaml     PostgreSQL local
 ```
 
-O head local da cadeia é a migration `014_bound_invitation_reactivation.py`, após `013_trial_access_requests.py`. Ela registra a ativação da conta, liga uma aceitação a um convite específico e a um claim temporário de uso único, e dá suporte à reativação administrativa direcionada a uma identidade existente. Novos prazos de 168 horas só começam após a aceitação transacional. A migration e a integração são validadas em PostgreSQL descartável. Nenhum estado de schema remoto é consultado por essa validação local.
+O head local da candidata é `015_admin_invitation_audit.py`, após `014_bound_invitation_reactivation.py`. A migration cria auditoria restrita de solicitações de envio ao Supabase Auth e atualiza a função de revogação para também tratar memberships legadas sem convite. A tabela tem RLS/FORCE RLS e grants mínimos; o histórico acompanha a exclusão autorizada da linha de convite por FK `ON DELETE CASCADE`. A cadeia e a integração são validadas em PostgreSQL descartável. Nenhum estado de schema remoto é consultado por essa validação local.
 
 ## Fases e critérios do plano inicial (histórico)
 
@@ -70,7 +70,7 @@ Cada fase deve ser validada antes de expandir o escopo. A navegação da demo oc
 - Frontend React, React Router, TanStack Query, Recharts, Lucide, Tailwind 4 e componentes locais no padrão shadcn/Radix.
 - Valores entram como strings decimais, persistem em NUMERIC(20,8) e são calculados com Decimal. A API devolve valores monetários como strings. O frontend converte apenas para exibição e gráficos aproximados.
 - O modo local conserva token apenas em memória; o modo privado usa Supabase Auth, membership ativo e filtro por proprietário. Segredos administrativos Supabase permanecem no backend e nunca em `VITE_*`.
-- As mutações preservam validação cronológica, isolamento owner-scoped e RLS. A candidata v3 exige integração PostgreSQL descartável 001–014 antes de qualquer alegação de prontidão multiusuário.
+- As mutações preservam validação cronológica, isolamento owner-scoped e RLS. A candidata v3 exige integração PostgreSQL descartável 001–015 antes de qualquer alegação de prontidão multiusuário.
 - Data e ID definem a ordem de operações do mesmo dia. Uma compra inserida depois de uma venda no mesmo dia não passa retroativamente à frente dela.
 - Não há caixa contábil nesta fase. Compras não equivalem a aportes externos; receita de vendas não equivale a resgate. Por isso não são mostrados patrimônio consolidado, capital líquido aportado nem retorno percentual.
 - Dividendos, CDBs, CDI, IPCA, Ibovespa e cotações não são inferidos ou inventados. Nenhuma credencial externa é necessária para a Fase 1.

@@ -195,7 +195,7 @@ def test_revoked_member_can_rejoin_only_after_a_new_invitation():
         # This unit path models the API's already-authenticated admin authorization.
         from unittest.mock import patch
         with patch.object(accounts, "settings", monkeypatch_settings):
-            assert accounts.revoke_invitation(first_id, Principal(ADMIN), db) == {"status": "revoked"}
+            assert accounts.revoke_member(INVITEE, Principal(ADMIN), db) == {"status": "revoked", "user_id": str(INVITEE)}
         second_id = uuid4()
         db.add(accounts.AccountInvitation(id=second_id, email="person@example.com", invited_by=ADMIN,
             created_at=now + timedelta(minutes=1), expires_at=now + timedelta(days=8),
@@ -258,13 +258,38 @@ def test_admin_invitation_is_sent_server_side_limited_and_revocable(monkeypatch)
         assert request["headers"]["Authorization"] == "Bearer fake-test-admin-key"
         assert request["json"] == {"email": "person@example.com"}
         assert request["params"]["redirect_to"] == f"https://private.example/invite/accept?invitation_id={result['id']}"
-        assert accounts.revoke_invitation(UUID(result["id"]), Principal(ADMIN), db) == {"status": "revoked"}
+        attempt = db.query(accounts.AccountInvitationSendAttempt).one()
+        assert attempt.outcome == "requested" and attempt.http_status == 200
+        attempt.attempted_at = datetime.now(timezone.utc) - timedelta(seconds=61)
+        db.commit()
+        resent = run_mocked(accounts.resend_invitation(UUID(result["id"]), Principal(ADMIN), db))
+        assert resent["status"] == "requested" and resent["delivery_confirmed"] is False
+        assert len(captured) == 2
+        assert result["delivery_confirmed"] is False
+        with pytest.raises(HTTPException) as cooldown:
+            run_mocked(accounts.resend_invitation(UUID(result["id"]), Principal(ADMIN), db))
+        assert cooldown.value.status_code == 429 and "60 segundos" in cooldown.value.detail
+        attempts = db.query(accounts.AccountInvitationSendAttempt).order_by(accounts.AccountInvitationSendAttempt.attempted_at).all()
+        attempts[0].attempted_at = datetime.now(timezone.utc) - timedelta(hours=2)
+        attempts[1].attempted_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        db.commit()
+        third = run_mocked(accounts.resend_invitation(UUID(result["id"]), Principal(ADMIN), db))
+        assert third["status"] == "requested" and len(captured) == 3
+        latest = db.query(accounts.AccountInvitationSendAttempt).order_by(accounts.AccountInvitationSendAttempt.attempted_at.desc()).first()
+        latest.attempted_at = datetime.now(timezone.utc) - timedelta(seconds=61)
+        db.commit()
+        with pytest.raises(HTTPException) as cap:
+            run_mocked(accounts.resend_invitation(UUID(result["id"]), Principal(ADMIN), db))
+        assert cap.value.status_code == 429 and "3 tentativas" in cap.value.detail
+        assert accounts.revoke_invitation(UUID(result["id"]), Principal(ADMIN), db) == {"status": "invitation_revoked"}
         assert db.query(accounts.AccountInvitation).one().revoked_at is not None
+        assert db.query(accounts.AccountInvitationSendAttempt).count() == 3
     engine.dispose()
 
 
 def test_invitation_for_existing_confirmed_auth_identity_uses_recovery_for_same_invite(monkeypatch):
     captured = []
+    recovery_status = {"code": 200}
     class Response:
         def __init__(self, status_code, body=None):
             self.status_code = status_code
@@ -278,9 +303,10 @@ def test_invitation_for_existing_confirmed_auth_identity_uses_recovery_for_same_
             captured.append((url, kwargs))
             if url.endswith("/invite"):
                 return Response(422, {"code": "user_already_exists"})
-            return Response(200)
+            return Response(recovery_status["code"], {"code": "over_email_send_rate_limit"} if recovery_status["code"] != 200 else {})
     monkeypatch.setattr(accounts.httpx, "AsyncClient", Client)
     monkeypatch.setattr(accounts, "settings", SimpleNamespace(
+        invitation_admin_ids=[ADMIN],
         supabase_service_role_key=SecretStr("fictional-admin-test-key"),
         supabase_url="https://project.example", app_public_url="https://private.example"))
     invite_id = uuid4()
@@ -290,6 +316,91 @@ def test_invitation_for_existing_confirmed_auth_identity_uses_recovery_for_same_
                f"https://private.example/invite/accept?invitation_id={invite_id}"
                for _, req in captured)
     assert all(req["json"] == {"email": "person@example.com"} for _, req in captured)
+    recovery_status["code"] = 429
+    engine = setup_db()
+    with Session(engine) as db:
+        db.add(accounts.AccountInvitation(id=invite_id, email="person@example.com", invited_by=ADMIN,
+            created_at=datetime.now(timezone.utc), expires_at=datetime.now(timezone.utc) + timedelta(days=7)))
+        db.commit()
+        with pytest.raises(HTTPException) as error:
+            run_mocked(accounts.resend_invitation(invite_id, Principal(ADMIN), db))
+        assert error.value.status_code == 502
+        attempt = db.query(accounts.AccountInvitationSendAttempt).one()
+        assert (attempt.outcome, attempt.method, attempt.http_status, attempt.provider_code) == (
+            "failed", "recovery", 429, "over_email_send_rate_limit")
+    engine.dispose()
+
+
+def test_admin_lists_are_filtered_searched_and_paginated_with_safe_legacy_identity(monkeypatch):
+    engine = setup_db()
+    monkeypatch.setattr(accounts, "settings", SimpleNamespace(
+        auth_mode="local", invitation_admin_ids=[ADMIN], supabase_service_role_key=SecretStr("")))
+    now = datetime.now(timezone.utc)
+    with Session(engine) as db:
+        for index in range(7):
+            db.add(accounts.AccountMember(user_id=UUID(f"00000000-0000-4000-8000-{index+1:012d}"),
+                email=None if index == 1 else f"member{index}@example.test", status="active",
+                created_at=now - timedelta(minutes=index),
+                access_expires_at=now - timedelta(days=1) if index == 2 else None,
+                activated_at=None if index == 1 else now - timedelta(days=3)))
+        db.add(accounts.AccountMember(user_id=ADMIN, email="admin@example.test", status="active", created_at=now))
+        for index in range(7):
+            db.add(accounts.AccountInvitation(id=uuid4(), email=f"invite{index}@example.test", invited_by=ADMIN,
+                created_at=now - timedelta(minutes=index), expires_at=now + timedelta(days=2)))
+            db.add(accounts.AccountAccessRequest(id=uuid4(), email=f"request{index}@example.test", ip_hash="a"*64,
+                status="pending", requested_at=now - timedelta(minutes=index)))
+        db.commit()
+        members = accounts.list_members(page=1, page_size=5, search="", status="all", principal=Principal(ADMIN), db=db)
+        assert len(members["items"]) == 5 and members["total"] == 8 and members["total_pages"] == 2
+        missing = accounts.list_members(page=1, page_size=5, search="000000000002", status="all", principal=Principal(ADMIN), db=db)
+        legacy = missing["items"][0]
+        assert missing["total"] == 1
+        assert legacy["account_label"].startswith("Conta · ") and legacy["email_source"] == "unavailable"
+        assert legacy["activated_at"] is None
+        filtered = accounts.list_members(page=1, page_size=5, search="member2@", status="expired", principal=Principal(ADMIN), db=db)
+        assert filtered["total"] == 1 and filtered["items"][0]["status"] == "expired"
+        escaped = accounts.list_members(page=1, page_size=5, search="%", status="all", principal=Principal(ADMIN), db=db)
+        assert escaped["total"] == 0
+        invites = accounts.list_invitations(page=2, page_size=5, search="invite", status="pending", principal=Principal(ADMIN), db=db)
+        assert len(invites["items"]) == 2 and invites["total"] == 7 and invites["page"] == 2
+        requests = accounts.list_access_requests(page=1, page_size=5, search="request6", status="pending", principal=Principal(ADMIN), db=db)
+        assert requests["total"] == 1 and requests["items"][0]["email"] == "request6@example.test"
+    engine.dispose()
+
+
+def test_membership_revocation_is_separate_from_invitation_revocation_and_protects_admin(monkeypatch):
+    engine = setup_db()
+    monkeypatch.setattr(accounts, "settings", SimpleNamespace(invitation_admin_ids=[ADMIN]))
+    now = datetime.now(timezone.utc)
+    member_id = UUID("33333333-3333-4333-8333-333333333333")
+    legacy_id = UUID("44444444-4444-4444-8444-444444444444")
+    invite_id = uuid4()
+    with Session(engine) as db:
+        db.add(accounts.AccountMember(user_id=member_id, email="member@example.test", status="active", created_at=now))
+        db.add(accounts.AccountMember(user_id=legacy_id, email=None, status="active", created_at=now))
+        db.add(accounts.AccountInvitation(id=invite_id, email="member@example.test", invited_by=ADMIN,
+            created_at=now, expires_at=now+timedelta(days=2), accepted_user_id=member_id))
+        db.commit()
+        with pytest.raises(HTTPException) as protected:
+            accounts.revoke_member(ADMIN, Principal(ADMIN), db)
+        assert protected.value.status_code == 403
+        with pytest.raises(HTTPException) as wrong_state:
+            accounts.revoke_invitation(invite_id, Principal(ADMIN), db)
+        assert wrong_state.value.status_code == 409
+        assert db.get(accounts.AccountMember, member_id).status == "active"
+        assert accounts.revoke_member(member_id, Principal(ADMIN), db) == {"status": "revoked", "user_id": str(member_id)}
+        assert db.get(accounts.AccountMember, member_id).status == "revoked"
+        assert db.get(accounts.AccountInvitation, invite_id).revoked_at is not None
+        assert accounts.revoke_member(legacy_id, Principal(ADMIN), db) == {"status": "revoked", "user_id": str(legacy_id)}
+        assert db.query(accounts.AccountInvitation).count() == 1
+        assert db.get(accounts.AccountMember, legacy_id).status == "revoked"
+    from app import auth, database as database_module
+    from sqlalchemy.orm import sessionmaker
+    monkeypatch.setattr(database_module, "SessionLocal", sessionmaker(engine))
+    with pytest.raises(HTTPException) as blocked_session:
+        auth.require_active_account(Principal(legacy_id, "legacy@example.test"))
+    assert blocked_session.value.status_code == 403
+    engine.dispose()
 
 
 def test_admin_reactivation_targets_existing_auth_identity_and_starts_no_period_before_acceptance(monkeypatch):
@@ -323,7 +434,7 @@ def test_admin_reactivation_targets_existing_auth_identity_and_starts_no_period_
             created_at=now - timedelta(days=14), activated_at=now - timedelta(days=14), access_expires_at=now - timedelta(days=7)))
         db.commit()
         result = run_mocked(accounts.reactivate_member(INVITEE, Principal(ADMIN), db))
-        assert result["status"] == "reactivation_email_sent"
+        assert result["status"] == "reactivation_email_requested" and result["delivery_confirmed"] is False
         invite = db.query(accounts.AccountInvitation).one()
         assert invite.invited_by == ADMIN and invite.target_user_id == INVITEE
         assert invite.access_duration_days == 7 and invite.accepted_user_id is None

@@ -124,7 +124,7 @@ def main():
             conn.execute("GRANT SELECT, INSERT, DELETE ON public.operations TO investment_runtime")
             conn.execute("GRANT USAGE ON SEQUENCE public.operations_id_seq TO investment_runtime")
             version = conn.execute("SELECT version_num FROM public.alembic_version").fetchone()[0]
-            if version != "014":
+            if version != "015":
                 raise RuntimeError("Schema descartável não chegou à migration 013")
         # Import only after the local runtime URL and genuine Auth settings are installed.
         os.environ.update({k: env[k] for k in ("ENVIRONMENT", "AUTH_MODE", "SUPABASE_URL",

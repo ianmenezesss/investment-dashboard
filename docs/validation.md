@@ -2,11 +2,11 @@
 
 ## Candidata v3.0.0 — 02/11/2026 (local, não publicada)
 
-- Backend: **456 aprovados, 1 ignorado**. A suíte completa usou as configurações forçadas pelo `conftest.py` (`DATABASE_URL=sqlite://`, `AUTH_MODE=local`, token fictício e `TEST_DATABASE_URL` vazio); dotenv e credenciais Groq foram isolados. Permanece um aviso de depreciação do adaptador Starlette `TestClient`/HTTPX.
-- PostgreSQL 17 descartável: migrations 001–014, claim/aceitação/revogação, reativação de membership e prazo de 168 horas passaram. O ciclo sintético de backup cifrado/restauração também passou em servidor separado; head 014, contagens, RLS/FORCE RLS, policies, grants e isolamento foram comparados.
-- Frontend: **245 testes aprovados em 36 arquivos**. Build TypeScript/Vite aprovado, **2.392 módulos** transformados.
-- O fluxo de senha e convite existente foi testado com mocks; não houve chamada ao Supabase, envio real de e-mail, Groq, leitura/escrita de carteira, migration/backup de produção, push ou deploy. A inspeção visual autenticada com sessão legítima continua manual.
-- Os containers PostgreSQL e a rede temporária foram encerrados pelo runner; o arquivo de backup sintético e a pasta temporária foram removidos. O usuário não alterou nenhuma conta real.
+- Backend: **459 aprovados, 1 ignorado**. A suíte completa usou as configurações forçadas pelo `conftest.py` (`DATABASE_URL=sqlite://`, `AUTH_MODE=local`, token fictício e `TEST_DATABASE_URL` vazio); dotenv e credenciais Groq foram isolados. Permanece um aviso de depreciação do adaptador Starlette `TestClient`/HTTPX.
+- PostgreSQL 17 descartável: migrations 001–015, revogação de memberships incluindo registros legados, RLS/FORCE RLS e isolamento passaram. O ciclo sintético de backup cifrado/restauração também passou em servidor separado; head 015, contagens, grants e isolamento foram comparados.
+- Frontend: **248 testes aprovados em 36 arquivos**. Build TypeScript/Vite aprovado, **2.392 módulos** transformados. Permanecem avisos de `act(...)` e dimensões zero de gráficos no JSDOM.
+- O painel administrativo e os fluxos de convite foram testados com fixtures/mocks; não houve chamada ao Supabase, envio real de e-mail, Groq, leitura/escrita de carteira, migration/backup de produção, push ou deploy. A inspeção visual autenticada com sessão legítima continua manual.
+- Os containers PostgreSQL e a rede temporária foram encerrados pelo runner; o backup sintético e o diretório pytest temporário foram removidos. Nenhuma conta real foi alterada.
 
 ## Release v2.0.0 — registro da validação local antes da publicação
 

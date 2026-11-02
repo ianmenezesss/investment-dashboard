@@ -1,10 +1,26 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { apiBase } from '../runtime'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import './invitation-admin.css'
 
-type Invitation = { id: string; email: string; expires_at: string; accepted: boolean; revoked: boolean }
+type PageData<T> = { items: T[]; page: number; page_size: number; total: number; total_pages: number }
+type Invitation = {
+  id: string; email: string; created_at: string; expires_at: string; status: 'pending' | 'accepted' | 'expired' | 'revoked'
+  email_send_status: 'not_requested' | 'started' | 'requested' | 'failed' | 'uncertain'; email_send_attempts: number
+  send_history: { attempted_at: string; outcome: string; method: string; http_status: number | null; provider_code?: string | null }[]
+}
 type AccessRequest = { id: string; email: string; requested_at: string; status: 'pending' | 'approved' | 'rejected'; processing?: boolean }
-type Membership = { user_id: string; email: string | null; status: 'active' | 'expired' | 'revoked'; access_type: 'trial' | 'permanent'; activated_at: string | null; trial_expires_at: string | null; can_reactivate: boolean }
+type Membership = {
+  user_id: string; email: string | null; account_label: string; email_source: string
+  status: 'active' | 'expired' | 'revoked'; access_type: 'trial' | 'permanent'
+  activated_at: string | null; trial_expires_at: string | null
+  can_reactivate: boolean; can_revoke: boolean; protected_admin: boolean
+}
+type Tab = 'accounts' | 'invitations' | 'requests'
+type RevokeTarget = { id: string; label: string }
+
+const PAGE_SIZE = 5
+const endpoint = `${apiBase()}/api/admin`
 
 function dateTime(value: string | null) {
   if (!value) return 'Não registrado'
@@ -12,88 +28,247 @@ function dateTime(value: string | null) {
   return Number.isNaN(date.getTime()) ? 'Não registrado' : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
+function statusLabel(status: string) {
+  return ({ active: 'Ativa', expired: 'Expirada', revoked: 'Revogada', pending: 'Pendente', accepted: 'Aceito', approved: 'Aprovada', rejected: 'Recusada' } as Record<string, string>)[status] ?? status
+}
+
+function sendStatusLabel(status: string) {
+  return ({
+    not_requested: 'Envio ainda não solicitado',
+    started: 'Solicitação de envio em andamento',
+    requested: 'Solicitação aceita pelo Supabase · entrega não confirmada',
+    failed: 'Envio recusado pelo Supabase',
+    uncertain: 'Resultado incerto · confirme com o destinatário antes de reenviar',
+  } as Record<string, string>)[status] ?? status
+}
+
+async function errorMessage(response: Response, fallback: string) {
+  try {
+    const payload = await response.json() as { detail?: string }
+    return typeof payload.detail === 'string' ? payload.detail : fallback
+  } catch { return fallback }
+}
+
 export function InvitationAdmin({ token }: { token: string }) {
-  const [items, setItems] = useState<Invitation[]>([])
-  const [members, setMembers] = useState<Membership[]>([])
-  const [requests, setRequests] = useState<AccessRequest[]>([])
+  const [activeTab, setActiveTab] = useState<Tab>('accounts')
+  const [members, setMembers] = useState<PageData<Membership>>({ items: [], page: 1, page_size: PAGE_SIZE, total: 0, total_pages: 0 })
+  const [invitations, setInvitations] = useState<PageData<Invitation>>({ items: [], page: 1, page_size: PAGE_SIZE, total: 0, total_pages: 0 })
+  const [requests, setRequests] = useState<PageData<AccessRequest>>({ items: [], page: 1, page_size: PAGE_SIZE, total: 0, total_pages: 0 })
+  const [pages, setPages] = useState<Record<Tab, number>>({ accounts: 1, invitations: 1, requests: 1 })
+  const [statusFilters, setStatusFilters] = useState<Record<Tab, string>>({ accounts: 'all', invitations: 'all', requests: 'all' })
+  const [search, setSearch] = useState('')
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState('')
-  const endpoint = `${apiBase()}/api/admin/invitations`
-  const requestsEndpoint = `${apiBase()}/api/admin/access-requests`
-  const membersEndpoint = `${apiBase()}/api/admin/members`
-  async function load() {
-    const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } })
-    if (!response.ok) throw new Error('Não foi possível carregar os convites.')
-    setItems(await response.json())
+  const [loadError, setLoadError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [revokeTarget, setRevokeTarget] = useState<RevokeTarget | null>(null)
+  const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null)
+  const [dialogBusy, setDialogBusy] = useState(false)
+  const [dialogError, setDialogError] = useState('')
+  const [confirmResendInvitationId, setConfirmResendInvitationId] = useState<string | null>(null)
+  const currentPage = pages[activeTab]
+
+  useEffect(() => {
+    let active = true
+    const controller = new AbortController()
+    const query = (tab: Tab) => {
+      const params = new URLSearchParams({ page: String(pages[tab]), page_size: String(PAGE_SIZE), search: search.trim(), status: statusFilters[tab] })
+      return params.toString()
+    }
+    const get = async <T,>(path: string, tab: Tab): Promise<PageData<T>> => {
+      const response = await fetch(`${endpoint}/${path}?${query(tab)}`, {
+        headers: { Authorization: `Bearer ${token}` }, signal: controller.signal,
+      })
+      if (!response.ok) throw new Error(await errorMessage(response, 'Não foi possível carregar os dados administrativos.'))
+      return response.json() as Promise<PageData<T>>
+    }
+    setLoading(true); setLoadError('')
+    void Promise.all([
+      get<Membership>('members', 'accounts'), get<Invitation>('invitations', 'invitations'),
+      get<AccessRequest>('access-requests', 'requests'),
+    ]).then(([nextMembers, nextInvitations, nextRequests]) => {
+      if (!active) return
+      setMembers(nextMembers); setInvitations(nextInvitations); setRequests(nextRequests)
+      setPages(current => {
+        const next = {
+          accounts: Math.min(current.accounts, Math.max(1, nextMembers.total_pages)),
+          invitations: Math.min(current.invitations, Math.max(1, nextInvitations.total_pages)),
+          requests: Math.min(current.requests, Math.max(1, nextRequests.total_pages)),
+        }
+        return next.accounts === current.accounts && next.invitations === current.invitations && next.requests === current.requests
+          ? current : next
+      })
+    }).catch(cause => {
+      if (active && (cause as Error).name !== 'AbortError') setLoadError((cause as Error).message || 'Não foi possível carregar os dados administrativos.')
+    }).finally(() => { if (active) setLoading(false) })
+    return () => { active = false; controller.abort() }
+  }, [token, pages, search, statusFilters, reloadKey])
+
+  function changeTab(tab: Tab) {
+    setActiveTab(tab); setSuccess(''); setError('')
   }
-  async function loadRequests() {
-    const response = await fetch(requestsEndpoint, { headers: { Authorization: `Bearer ${token}` } })
-    if (!response.ok) throw new Error('Não foi possível carregar as solicitações.')
-    setRequests(await response.json())
+  function updatePage(page: number) { setPages(current => ({ ...current, [activeTab]: page })) }
+  function updateStatusFilter(status: string) {
+    setStatusFilters(current => ({ ...current, [activeTab]: status }))
+    setPages(current => ({ ...current, [activeTab]: 1 }))
   }
-  async function loadMembers() {
-    const response = await fetch(membersEndpoint, { headers: { Authorization: `Bearer ${token}` } })
-    if (!response.ok) throw new Error('Não foi possível carregar os status de acesso.')
-    setMembers(await response.json())
+
+  async function mutate(path: string, method: string, body: unknown, successText: string, fallback: string) {
+    if (busy) return
+    setBusy(true); setError(''); setSuccess('')
+    try {
+      const response = await fetch(`${endpoint}/${path}`, {
+        method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      })
+      if (!response.ok) throw new Error(await errorMessage(response, fallback))
+      setSuccess(successText)
+      setReloadKey(value => value + 1)
+      return true
+    } catch (cause) {
+      setError((cause as Error).message || fallback)
+      setReloadKey(value => value + 1)
+      return false
+    } finally { setBusy(false) }
   }
-  async function reload() { await Promise.all([load(), loadRequests(), loadMembers()]) }
-  useEffect(() => { void reload().catch(() => setError('Não foi possível carregar os dados administrativos.')) }, [token])
+
   async function create(event: FormEvent) {
-    event.preventDefault(); if (busy) return
-    setBusy(true); setError('')
-    try {
-      const response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, expires_in_days: 7 }) })
-      if (!response.ok) throw new Error('Não foi possível enviar o convite. Verifique o limite e a configuração do Supabase.')
-      setEmail(''); await reload()
-    } catch (reason) { setError((reason as Error).message) } finally { setBusy(false) }
+    event.preventDefault()
+    const result = await mutate('invitations', 'POST', { email, expires_in_days: 7 },
+      'O Supabase aceitou a solicitação de envio. A entrega do e-mail não é confirmada por este sistema.',
+      'Não foi possível criar/enviar o convite.')
+    if (result) setEmail('')
   }
-  async function revoke(id: string) {
-    setBusy(true); setError('')
-    try {
-      const response = await fetch(`${endpoint}/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
-      if (!response.ok) throw new Error('Não foi possível revogar o convite/acesso.')
-      await reload()
-    } catch (reason) { setError((reason as Error).message) } finally { setBusy(false) }
-  }
+
   async function decideRequest(id: string, decision: 'approve' | 'reject') {
-    if (busy) return
-    setBusy(true); setError('')
-    try {
-      const response = await fetch(`${requestsEndpoint}/${encodeURIComponent(id)}/${decision}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
-      if (!response.ok) throw new Error(decision === 'approve' ? 'Não foi possível aprovar. Verifique o envio do convite e atualize a lista.' : 'Não foi possível recusar a solicitação.')
-      await reload()
-    } catch (reason) { setError((reason as Error).message) } finally { setBusy(false) }
+    await mutate(`access-requests/${encodeURIComponent(id)}/${decision}`, 'POST', undefined,
+      decision === 'approve' ? 'A solicitação foi aprovada e o pedido de envio foi aceito pelo Supabase; entrega não confirmada.' : 'A solicitação foi recusada.',
+      decision === 'approve' ? 'A aprovação ou o envio não foi confirmado.' : 'Não foi possível recusar a solicitação.')
   }
+
   async function reactivate(userId: string) {
-    if (busy) return
-    setBusy(true); setError('')
-    try {
-      const response = await fetch(`${membersEndpoint}/${encodeURIComponent(userId)}/reactivate`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
-      if (!response.ok) throw new Error('Não foi possível conceder novo período. Verifique o status da conta e atualize a lista.')
-      await reload()
-    } catch (reason) { setError((reason as Error).message) } finally { setBusy(false) }
+    await mutate(`members/${encodeURIComponent(userId)}/reactivate`, 'POST', undefined,
+      'O Supabase aceitou a solicitação do link de reativação; entrega não confirmada.',
+      'Não foi possível solicitar a reativação.')
   }
-  return <details className="panel account-invitation-admin"><summary>Administração de convites</summary>
-    <form onSubmit={create}><label htmlFor="invite-email">E-mail para convite permanente · o link expira em até 7 dias</label><input id="invite-email" type="email" required maxLength={320} value={email} onChange={event => setEmail(event.target.value)} disabled={busy}/><button type="submit" disabled={busy}>{busy ? 'Processando…' : 'Enviar convite permanente'}</button></form>
-    {error && <p role="alert">{error}</p>}
-    <section aria-labelledby="member-access-title" className="member-access-admin">
-      <h3 id="member-access-title">Contas e status de acesso</h3>
-      {!members.length ? <p>Nenhuma membership registrada.</p> : <ul>{members.map(member => <li key={member.user_id}>
-        <span><strong>{member.email ?? 'E-mail indisponível'}</strong><br/>{member.access_type === 'trial' ? 'Teste de 7 dias' : 'Acesso permanente'} · {member.status === 'active' ? 'Ativa' : member.status === 'expired' ? 'Expirada' : 'Revogada'}<br/>Ativada em: {dateTime(member.activated_at)}{member.trial_expires_at && <><br/>{member.status === 'expired' ? 'Expirou em: ' : 'Expira em: '}{dateTime(member.trial_expires_at)}</>}</span>
-        {member.can_reactivate && <button type="button" disabled={busy} onClick={() => void reactivate(member.user_id)}>{busy ? 'Processando…' : 'Conceder novo teste (7 dias)'}</button>}
-      </li>)}</ul>}
-    </section>
-    <section aria-labelledby="invite-history-title" className="invitation-history-admin"><h3 id="invite-history-title">Histórico de convites</h3>
-      {!items.length ? <p>Nenhum convite registrado.</p> : <ul>{items.map(item => <li key={item.id}><span><strong>{item.email}</strong><br/>{item.revoked ? 'Revogado' : item.accepted ? 'Aceito' : new Date(item.expires_at).getTime() <= Date.now() ? 'Expirado' : `Pendente · link até ${dateTime(item.expires_at)}`}</span>{!item.revoked && !item.accepted && <button type="button" disabled={busy} onClick={() => void revoke(item.id)}>Revogar convite</button>}</li>)}</ul>}
-    </section>
-    <section aria-labelledby="access-requests-title" className="access-requests-admin">
-      <h3 id="access-requests-title">Solicitações de acesso</h3>
-      <p>Os pedidos ficam visíveis aqui mesmo sem notificação por e-mail.</p>
-      {!requests.length ? <p>Nenhuma solicitação registrada.</p> : <ul>{requests.map(item => <li key={item.id}>
-        <span><strong>{item.email}</strong><br/><time dateTime={item.requested_at}>{new Date(item.requested_at).toLocaleString('pt-BR')}</time><br/>Status: {item.status === 'pending' ? item.processing ? 'aprovação em andamento' : 'pendente' : item.status === 'approved' ? 'aprovado' : 'recusado'}</span>
-        {item.status === 'pending' && <span><button type="button" disabled={busy || item.processing} onClick={() => void decideRequest(item.id, 'approve')}>Aprovar e enviar convite</button> <button type="button" disabled={busy} onClick={() => void decideRequest(item.id, 'reject')}>{item.processing ? 'Cancelar aprovação' : 'Recusar'}</button></span>}
-      </li>)}</ul>}
-    </section>
-  </details>
+
+  async function resend(invitation: Invitation) {
+    if (invitation.email_send_status === 'uncertain' && confirmResendInvitationId !== invitation.id) {
+      setConfirmResendInvitationId(invitation.id)
+      return
+    }
+    const label = invitation.email_send_status === 'requested' ? 'Reenvio solicitado ao Supabase; entrega não confirmada.' : 'Nova tentativa solicitada ao Supabase; entrega não confirmada.'
+    const result = await mutate(`invitations/${encodeURIComponent(invitation.id)}/resend`, 'POST', undefined, label,
+      'Não foi possível solicitar novo envio. Verifique o histórico e os limites do Supabase.')
+    if (result) setConfirmResendInvitationId(null)
+  }
+
+  function askRevoke(target: RevokeTarget) {
+    setReturnFocus(document.activeElement as HTMLElement)
+    setDialogError(''); setError(''); setSuccess(''); setRevokeTarget(target)
+  }
+
+  async function confirmRevoke() {
+    if (!revokeTarget || dialogBusy) return
+    setDialogBusy(true); setDialogError('')
+    try {
+      const response = await fetch(`${endpoint}/members/${encodeURIComponent(revokeTarget.id)}/revoke`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error(await errorMessage(response, 'Não foi possível revogar o acesso.'))
+      setRevokeTarget(null); setError(''); setSuccess('Acesso financeiro revogado. Os dados e a identidade Supabase foram preservados.')
+      setReloadKey(value => value + 1)
+    } catch (cause) { setSuccess(''); setDialogError((cause as Error).message || 'Não foi possível revogar o acesso.'); setReloadKey(value => value + 1) }
+    finally { setDialogBusy(false) }
+  }
+
+  const pageData = activeTab === 'accounts' ? members : activeTab === 'invitations' ? invitations : requests
+  const hasItems = pageData.items.length > 0
+  const label = activeTab === 'accounts' ? 'contas' : activeTab === 'invitations' ? 'convites' : 'solicitações'
+
+  return <>
+    <details className="panel account-invitation-admin"><summary>Administração</summary>
+      <nav className="admin-tabs" aria-label="Seções de administração">
+        <button id="admin-tab-accounts" type="button" aria-current={activeTab === 'accounts' ? 'page' : undefined} onClick={() => changeTab('accounts')}>Contas <span>{members.total}</span></button>
+        <button id="admin-tab-invitations" type="button" aria-current={activeTab === 'invitations' ? 'page' : undefined} onClick={() => changeTab('invitations')}>Convites <span>{invitations.total}</span></button>
+        <button id="admin-tab-requests" type="button" aria-current={activeTab === 'requests' ? 'page' : undefined} onClick={() => changeTab('requests')}>Solicitações <span>{requests.total}</span></button>
+      </nav>
+
+      {loadError && <p role="alert" className="admin-message error">{loadError}</p>}
+      {error && <p role="alert" className="admin-message error">{error}</p>}
+      {success && <p role="status" className="admin-message success">{success}</p>}
+      <div className="admin-filters">
+        <label htmlFor="admin-search">Buscar por e-mail</label>
+        <input id="admin-search" type="search" value={search} maxLength={320} onChange={event => { setSearch(event.target.value); setPages({ accounts: 1, invitations: 1, requests: 1 }) }} placeholder="nome@exemplo.com"/>
+        <label htmlFor="admin-status">Status</label>
+        <select id="admin-status" value={statusFilters[activeTab]} onChange={event => updateStatusFilter(event.target.value)}>
+          <option value="all">Todos</option>
+          {activeTab === 'accounts' && <><option value="active">Ativa</option><option value="expired">Expirada</option><option value="revoked">Revogada</option></>}
+          {activeTab === 'invitations' && <><option value="pending">Pendente</option><option value="accepted">Aceito</option><option value="expired">Expirado</option><option value="revoked">Revogado</option></>}
+          {activeTab === 'requests' && <><option value="pending">Pendente</option><option value="approved">Aprovada</option><option value="rejected">Recusada</option></>}
+        </select>
+      </div>
+
+      {activeTab === 'accounts' && <section id="admin-panel-accounts" aria-label="Contas" className="admin-tab-panel">
+        <h3>Contas</h3>
+        {loading ? <p role="status">Carregando contas…</p> : !hasItems ? <p className="admin-empty">Nenhuma conta corresponde aos filtros.</p> : <ul>{members.items.map(member => <li key={member.user_id}>
+          <span><strong>{member.account_label}</strong>{!member.email && <><br/><small>E-mail não confirmado ou indisponível no Supabase · ID final {member.user_id.slice(-8)}</small></>}<br/>
+            {member.access_type === 'trial' ? 'Teste de 7 dias' : 'Acesso permanente'} · {statusLabel(member.status)}<br/>
+            Ativada em: {dateTime(member.activated_at)}{member.trial_expires_at && <><br/>{member.status === 'expired' ? 'Expirou em: ' : 'Expira em: '}{dateTime(member.trial_expires_at)}</>}
+          </span>
+          <span className="admin-row-actions">
+            {member.protected_admin && <small>Conta administrativa protegida</small>}
+            {member.can_revoke && <button type="button" disabled={busy} onClick={() => askRevoke({ id: member.user_id, label: member.account_label })}>Revogar acesso</button>}
+            {member.can_reactivate && <button type="button" disabled={busy} onClick={() => void reactivate(member.user_id)}>Conceder novo teste (7 dias)</button>}
+          </span>
+        </li>)}</ul>}
+      </section>}
+
+      {activeTab === 'invitations' && <section id="admin-panel-invitations" aria-label="Convites" className="admin-tab-panel">
+        <h3>Convites</h3>
+        <form onSubmit={create} className="admin-invite-form"><label htmlFor="invite-email">Enviar convite permanente · validade do link de até 7 dias</label>
+          <input id="invite-email" type="email" required maxLength={320} value={email} onChange={event => setEmail(event.target.value)} disabled={busy}/>
+          <button type="submit" disabled={busy}>{busy ? 'Processando…' : 'Enviar convite'}</button>
+        </form>
+        {loading ? <p role="status">Carregando convites…</p> : !hasItems ? <p className="admin-empty">Nenhum convite corresponde aos filtros.</p> : <ul>{invitations.items.map(invitation => <li key={invitation.id}>
+          <span><strong>{invitation.email}</strong><br/>{statusLabel(invitation.status)} · Link até {dateTime(invitation.expires_at)}<br/>
+            Estado do e-mail: {sendStatusLabel(invitation.email_send_status)} · tentativas {invitation.email_send_attempts}/3
+            {invitation.send_history.length > 0 && <details className="send-history"><summary>Histórico de envio</summary><ol>{invitation.send_history.map((attempt, index) => <li key={`${attempt.attempted_at}-${index}`}>
+              {dateTime(attempt.attempted_at)} · {sendStatusLabel(attempt.outcome)} · {attempt.method === 'recovery' ? 'recovery' : 'convite'}{attempt.http_status ? ` · HTTP ${attempt.http_status}` : ''}{attempt.provider_code ? ` · ${attempt.provider_code}` : ''}
+            </li>)}</ol></details>}
+          </span>
+          <span className="admin-row-actions">
+            {invitation.status === 'pending' && invitation.email_send_status !== 'started' && invitation.email_send_attempts < 3 && <button type="button" disabled={busy} onClick={() => void resend(invitation)}>{invitation.email_send_status === 'requested' ? 'Reenviar e-mail' : 'Tentar envio novamente'}</button>}
+            {invitation.status === 'pending' && <button type="button" disabled={busy || invitation.email_send_status === 'started'} onClick={() => void mutate(`invitations/${encodeURIComponent(invitation.id)}`, 'DELETE', undefined, 'Convite pendente revogado.', 'Não foi possível revogar o convite.')}>Revogar convite</button>}
+          </span>
+          {confirmResendInvitationId === invitation.id && <div className="admin-resend-confirm" role="group" aria-label="Confirmar reenvio de resultado incerto">
+            <p>O pedido anterior teve resultado incerto. Confirme com a pessoa antes de solicitar outro e-mail, pois o primeiro pode ter sido enviado.</p>
+            <button type="button" disabled={busy} onClick={() => void resend(invitation)}>Confirmar nova tentativa</button>
+            <button type="button" disabled={busy} onClick={() => setConfirmResendInvitationId(null)}>Cancelar</button>
+          </div>}
+        </li>)}</ul>}
+        <p className="admin-note">“Solicitação aceita” confirma resposta do Supabase, não entrega. O plano padrão limita o projeto a 2 e-mails por hora; respeitamos o limite conservador no backend.</p>
+      </section>}
+
+      {activeTab === 'requests' && <section id="admin-panel-requests" aria-label="Solicitações de acesso" className="admin-tab-panel">
+        <h3>Solicitações de acesso</h3>
+        <p className="admin-note">Os pedidos ficam visíveis aqui mesmo sem notificação por e-mail.</p>
+        {loading ? <p role="status">Carregando solicitações…</p> : !hasItems ? <p className="admin-empty">Nenhuma solicitação corresponde aos filtros.</p> : <ul>{requests.items.map(item => <li key={item.id}>
+          <span><strong>{item.email}</strong><br/><time dateTime={item.requested_at}>{dateTime(item.requested_at)}</time><br/>Status: {item.processing ? 'aprovação em andamento' : statusLabel(item.status)}</span>
+          <span className="admin-row-actions">{item.status === 'pending' && <><button type="button" disabled={busy || item.processing} onClick={() => void decideRequest(item.id, 'approve')}>Aprovar e enviar convite</button><button type="button" disabled={busy} onClick={() => void decideRequest(item.id, 'reject')}>{item.processing ? 'Cancelar aprovação' : 'Recusar'}</button></>}</span>
+        </li>)}</ul>}
+      </section>}
+
+      <nav className="admin-pagination" aria-label={`Paginação de ${label}`}>
+        <span>{pageData.total === 0 ? '0 registros' : `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, pageData.total)} de ${pageData.total}`}</span>
+        <div><button type="button" disabled={loading || currentPage <= 1} onClick={() => updatePage(currentPage - 1)}>Anterior</button><span>Página {pageData.total_pages ? pageData.page : 0} de {pageData.total_pages}</span><button type="button" disabled={loading || currentPage >= pageData.total_pages} onClick={() => updatePage(currentPage + 1)}>Próxima</button></div>
+      </nav>
+    </details>
+    <ConfirmDialog open={revokeTarget !== null} onClose={() => setRevokeTarget(null)} onConfirm={confirmRevoke}
+      title="Revogar acesso à plataforma?" description={`${revokeTarget?.label ?? 'Esta conta'} perderá o acesso financeiro imediatamente, inclusive em uma sessão ainda válida. Os dados financeiros e a identidade Supabase serão preservados.`}
+      confirmLabel="Revogar acesso" kind="delete" busy={dialogBusy} error={dialogError} returnFocus={returnFocus}/>
+  </>
 }

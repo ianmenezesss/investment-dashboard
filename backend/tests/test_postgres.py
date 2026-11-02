@@ -61,13 +61,30 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
         legacy_members = dict(connection.execute(text("SELECT user_id,created_at FROM account_members")).all())
     command.upgrade(Config("alembic.ini"), "head")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "014"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "015"
         for user_id, created_at in legacy_members.items():
             assert connection.scalar(text("SELECT activated_at IS NULL AND created_at=:created_at FROM account_members WHERE user_id=:user_id"),
                                      {"user_id": user_id, "created_at": created_at}) is True
         access_request_table = connection.scalar(text("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.account_access_requests'::regclass"))
         assert access_request_table is True
         assert connection.scalar(text("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.account_access_request_limits'::regclass")) is True
+        assert connection.scalar(text("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.account_invitation_send_attempts'::regclass")) is True
+        assert connection.scalar(text("SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='account_invitation_send_attempts' AND policyname='invitation_send_admin'")) == 1
+        assert connection.scalar(text("SELECT delete_rule FROM information_schema.referential_constraints WHERE constraint_name='account_invitation_send_attempts_invitation_id_fkey'")) == "CASCADE"
+        send_grants = connection.execute(text("""SELECT
+          has_table_privilege('investment_runtime','public.account_invitation_send_attempts','SELECT'),
+          has_table_privilege('investment_runtime','public.account_invitation_send_attempts','INSERT'),
+          has_column_privilege('investment_runtime','public.account_invitation_send_attempts','outcome','UPDATE'),
+          has_column_privilege('investment_runtime','public.account_invitation_send_attempts','requested_by','UPDATE'),
+          has_table_privilege('investment_runtime','public.account_invitation_send_attempts','DELETE'),
+          has_table_privilege('investment_runtime','public.account_invitation_send_attempts','TRUNCATE'),
+          has_table_privilege('anon','public.account_invitation_send_attempts','SELECT'),
+          has_table_privilege('authenticated','public.account_invitation_send_attempts','SELECT'),
+          has_table_privilege('service_role','public.account_invitation_send_attempts','SELECT'),
+          has_sequence_privilege('anon','public.account_invitation_send_attempts_id_seq','USAGE'),
+          has_sequence_privilege('authenticated','public.account_invitation_send_attempts_id_seq','USAGE'),
+          has_sequence_privilege('service_role','public.account_invitation_send_attempts_id_seq','USAGE')""")).one()
+        assert send_grants == (True, True, True, False, False, False, False, False, False, False, False, False)
         assert connection.scalar(text("SELECT has_table_privilege('investment_runtime','public.account_access_requests','DELETE')")) is False
         assert connection.scalar(text("SELECT has_table_privilege('investment_runtime','public.account_access_requests','TRUNCATE')")) is False
         assert connection.scalar(text("SELECT has_table_privilege('investment_runtime','public.account_access_request_limits','DELETE')")) is False
@@ -103,8 +120,17 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
     invitee = UUID("44444444-4444-4444-8444-444444444444")
     with engine.begin() as connection:
         connection.execute(text("SET LOCAL ROLE investment_runtime"))
+        assert connection.scalar(text("SELECT count(*) FROM public.account_invitation_send_attempts")) == 0
         connection.execute(text("SELECT set_config('app.admin_id',:admin,true)"), {"admin": str(admin)})
         connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at,claim_user_id,claim_token_hash,claim_expires_at) VALUES (:id,'invitee@example.test',:admin,now(),now()+interval '7 days',:user_id,:hash,now()+interval '10 minutes')"), {"id": UUID("55555555-5555-4555-8555-555555555555"), "admin": admin, "user_id": invitee, "hash": "a"*64})
+        send_attempt_id = connection.scalar(text("""INSERT INTO public.account_invitation_send_attempts
+          (invitation_id,requested_by,attempted_at,outcome,method,http_status)
+          VALUES (:invite,:admin,now(),'requested','invite',200) RETURNING id"""),
+          {"invite": UUID("55555555-5555-4555-8555-555555555555"), "admin": admin})
+        assert connection.scalar(text("SELECT count(*) FROM public.account_invitation_send_attempts WHERE id=:id"), {"id": send_attempt_id}) == 1
+        connection.execute(text("SELECT set_config('app.admin_id','',true)"))
+        assert connection.scalar(text("SELECT count(*) FROM public.account_invitation_send_attempts")) == 0
+        connection.execute(text("SELECT set_config('app.admin_id',:admin,true)"), {"admin": str(admin)})
         connection.execute(text("SELECT set_config('app.user_id',:other,true),set_config('app.user_email','invitee@example.test',true)"), {"other": str(UUID("22222222-2222-4222-8222-222222222222"))})
         connection.execute(text("SELECT set_config('app.invitation_id',:id,true),set_config('app.claim_user_id',:user_id,true),set_config('app.claim_token_hash',:hash,true)"), {"id": str(UUID("55555555-5555-4555-8555-555555555555")), "user_id": str(invitee), "hash": "a"*64})
         assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is False
@@ -115,6 +141,14 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
         assert connection.scalar(text("SELECT activated_at IS NOT NULL FROM account_members WHERE user_id=:user_id"), {"user_id": invitee}) is True
         assert connection.scalar(text("SELECT access_expires_at IS NULL FROM account_members WHERE user_id=:user_id"), {"user_id": invitee}) is True
         assert connection.scalar(text("SELECT public.revoke_dashboard_account(:user_id,:admin_id)"), {"user_id": invitee, "admin_id": admin}) is True
+        # Legacy membership rows may have no matching invitation. Revocation
+        # still needs to immediately block the identity without deleting data.
+        legacy_member = UUID("22222222-2222-4222-8222-222222222222")
+        assert connection.scalar(text("SELECT public.revoke_dashboard_account(:user_id,:admin_id)"), {"user_id": legacy_member, "admin_id": admin}) is True
+        assert connection.scalar(text("SELECT status FROM account_members WHERE user_id=:user_id"), {"user_id": legacy_member}) == "revoked"
+        assert connection.scalar(text("SELECT count(*) FROM account_invitations WHERE accepted_user_id=:user_id"), {"user_id": legacy_member}) == 0
+        assert connection.scalar(text("SELECT public.revoke_dashboard_account(:user_id,:admin_id)"), {"user_id": admin, "admin_id": admin}) is False
+        assert connection.scalar(text("SELECT public.revoke_dashboard_account(:user_id,:admin_id)"), {"user_id": invitee, "admin_id": legacy_member}) is False
         connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at,access_duration_days,target_user_id,claim_user_id,claim_token_hash,claim_expires_at) VALUES (:id,'invitee@example.test',:admin,now(),now()+interval '7 days',7,:user_id,:user_id,:hash,now()+interval '10 minutes')"), {"id": UUID("66666666-6666-4666-8666-666666666666"), "admin": admin, "user_id": invitee, "hash": "b"*64})
         connection.execute(text("SELECT set_config('app.invitation_id',:id,true),set_config('app.claim_token_hash',:hash,true)"), {"id": str(UUID("66666666-6666-4666-8666-666666666666")), "hash": "b"*64})
         assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is True
