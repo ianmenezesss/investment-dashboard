@@ -1,4 +1,4 @@
-"""Executa integração 001–015 e ensaio pg_dump/restore em containers efêmeros."""
+"""Executa integração 001–016 e ensaio pg_dump/restore em containers efêmeros."""
 import os
 import io
 from pathlib import Path
@@ -195,7 +195,7 @@ def main():
         if result.returncode:
             return result.returncode
 
-        print("INTEGRACAO_POSTGRESQL_001_015=PASSOU")
+        print("INTEGRACAO_POSTGRESQL_001_016=PASSOU")
         print("Criando backup lógico fictício e iniciando servidor de restore independente...")
         dump = subprocess.run([docker, "exec", "-e", f"PGPASSWORD={password}", name, "pg_dump", "-h", "127.0.0.1", "-p", "5432",
                                "-U", "postgres", "-Fc", source_db], capture_output=True)
@@ -246,7 +246,7 @@ ALTER FUNCTION public.finish_dashboard_account_deletion(uuid) OWNER TO investmen
             raise RuntimeError("Snapshot de contagens, RLS/grants ou isolamento divergiu após restore")
         print(f"BACKUP_RESTORE=PASSOU; encrypted_bytes={encrypted_size}; encrypted_sha256={encrypted_hash}; plaintext_sha256={decrypted_hash}")
         print("BACKUP_ENCRYPTION=AES-256-GCM; AUTHENTICATED_DECRYPTION=PASS; format=IDBKP015")
-        print("RESTORE_HEAD=015; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
+        print("RESTORE_HEAD=016; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
         return 0
     finally:
         # Only containers created by this invocation are stopped; no volumes are mounted or removed.

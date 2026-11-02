@@ -23,8 +23,8 @@ def snapshot(url: str) -> dict:
     try:
         with engine.connect() as connection:
             result = {"head": connection.scalar(text("SELECT version_num FROM alembic_version"))}
-            if result["head"] != "015":
-                raise AssertionError("Banco restaurado não está no Alembic head 015")
+            if result["head"] != "016":
+                raise AssertionError("Banco restaurado não está no Alembic head 016")
             result["counts"] = {
                 table: connection.scalar(text(f'SELECT count(*) FROM public."{table}"'))
                 for table in TABLES
@@ -106,6 +106,22 @@ def snapshot(url: str) -> dict:
             """)).one()
             if result["account_grants"] != (True, False, False, True, True, True, False, True, True, True):
                 raise AssertionError("Grants do runtime de convites/membership estão excessivos ou incompletos")
+            result["admin_function_security"] = connection.execute(text("""
+                SELECT r.prosecdef, pg_get_userbyid(r.proowner),
+                       has_function_privilege('investment_runtime','public.revoke_dashboard_account(uuid,uuid)','EXECUTE'),
+                       has_function_privilege('anon','public.revoke_dashboard_account(uuid,uuid)','EXECUTE'),
+                       a.prosecdef, pg_get_userbyid(a.proowner),
+                       has_function_privilege('investment_runtime','public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)','EXECUTE'),
+                       has_function_privilege('anon','public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)','EXECUTE'),
+                       has_table_privilege('investment_runtime','public.account_members','UPDATE'),
+                       has_table_privilege('investment_runtime','public.account_members','DELETE')
+                FROM pg_proc r, pg_proc a
+                WHERE r.oid='public.revoke_dashboard_account(uuid,uuid)'::regprocedure
+                  AND a.oid='public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)'::regprocedure
+            """)).one()
+            if result["admin_function_security"] != (True, "investment_deletion_executor", True, False,
+                                                       True, "investment_deletion_executor", True, False, False, False):
+                raise AssertionError("Fronteira SECURITY DEFINER ou grants administrativos divergiu no restore")
             result["invitation_send_grants"] = connection.execute(text("""
                 SELECT has_table_privilege('investment_runtime','public.account_invitation_send_attempts','SELECT'),
                        has_table_privilege('investment_runtime','public.account_invitation_send_attempts','INSERT'),

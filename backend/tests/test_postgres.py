@@ -56,12 +56,27 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
     admin = UUID("11111111-1111-4111-8111-111111111111")
     member_b = UUID("22222222-2222-4222-8222-222222222222")
     with engine.begin() as connection:
-        connection.execute(text("INSERT INTO account_members(user_id,email,status) VALUES (:a,'a@example.test','active'),(:b,'b@example.test','active')"), {"a": admin, "b": member_b})
+        connection.execute(text("INSERT INTO account_members(user_id,email,status) VALUES (:a,'a@example.test','active'),(:b,'b@example.test','active'),('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','c@example.test','revoked')"), {"a": admin, "b": member_b})
     with engine.connect() as connection:
         legacy_members = dict(connection.execute(text("SELECT user_id,created_at FROM account_members")).all())
     command.upgrade(Config("alembic.ini"), "head")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "015"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "016"
+        revoke_acl = connection.execute(text("""SELECT p.prosecdef,
+          has_function_privilege('investment_runtime','public.revoke_dashboard_account(uuid,uuid)','EXECUTE'),
+          has_table_privilege('investment_runtime','public.account_members','UPDATE'),
+          has_table_privilege('investment_runtime','public.account_members','DELETE')
+          FROM pg_proc p WHERE p.oid='public.revoke_dashboard_account(uuid,uuid)'::regprocedure""")).one()
+        assert revoke_acl == (True, True, False, False)
+        reactivation_acl = connection.execute(text("""SELECT p.prosecdef,
+          has_function_privilege('investment_runtime','public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)','EXECUTE'),
+          has_function_privilege('anon','public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)','EXECUTE'),
+          pg_get_userbyid(p.proowner),
+          has_table_privilege('investment_runtime','public.account_members','UPDATE'),
+          has_table_privilege('investment_runtime','public.account_members','DELETE')
+          FROM pg_proc p WHERE p.oid='public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)'::regprocedure""")).one()
+        assert reactivation_acl == (True, True, False, "investment_deletion_executor", False, False)
+        assert connection.scalar(text("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.account_members'::regclass")) is True
         for user_id, created_at in legacy_members.items():
             assert connection.scalar(text("SELECT activated_at IS NULL AND created_at=:created_at FROM account_members WHERE user_id=:user_id"),
                                      {"user_id": user_id, "created_at": created_at}) is True
@@ -149,6 +164,21 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
         assert connection.scalar(text("SELECT count(*) FROM account_invitations WHERE accepted_user_id=:user_id"), {"user_id": legacy_member}) == 0
         assert connection.scalar(text("SELECT public.revoke_dashboard_account(:user_id,:admin_id)"), {"user_id": admin, "admin_id": admin}) is False
         assert connection.scalar(text("SELECT public.revoke_dashboard_account(:user_id,:admin_id)"), {"user_id": invitee, "admin_id": legacy_member}) is False
+        # The actual runtime role can reserve a reactivation through the
+        # restricted executor function, without UPDATE on account_members.
+        reactivation_id = UUID("99999999-9999-4999-8999-999999999991")
+        assert connection.scalar(text("SELECT public.reserve_dashboard_reactivation(:user_id,:admin_id,:invitation_id,:email)"),
+            {"user_id": legacy_member, "admin_id": legacy_member, "invitation_id": reactivation_id, "email": "b@example.test"}) is False
+        connection.execute(text("SELECT set_config('app.admin_id',:wrong_admin,true)"), {"wrong_admin": str(legacy_member)})
+        assert connection.scalar(text("SELECT public.reserve_dashboard_reactivation(:user_id,:admin_id,:invitation_id,:email)"),
+            {"user_id": legacy_member, "admin_id": admin, "invitation_id": reactivation_id, "email": "b@example.test"}) is False
+        connection.execute(text("SELECT set_config('app.admin_id',:admin,true)"), {"admin": str(admin)})
+        assert connection.scalar(text("SELECT public.reserve_dashboard_reactivation(:user_id,:admin_id,:invitation_id,:email)"),
+            {"user_id": legacy_member, "admin_id": admin, "invitation_id": reactivation_id, "email": "b@example.test"}) is True
+        assert connection.scalar(text("SELECT access_duration_days=7 AND target_user_id=:user_id AND expires_at BETWEEN now()+interval '6 days 23 hours' AND now()+interval '7 days 1 second' FROM account_invitations WHERE id=:id"),
+            {"user_id": legacy_member, "id": reactivation_id}) is True
+        assert connection.scalar(text("SELECT public.reserve_dashboard_reactivation(:user_id,:admin_id,:invitation_id,:email)"),
+            {"user_id": legacy_member, "admin_id": admin, "invitation_id": UUID("99999999-9999-4999-8999-999999999992"), "email": "b@example.test"}) is False
         connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at,access_duration_days,target_user_id,claim_user_id,claim_token_hash,claim_expires_at) VALUES (:id,'invitee@example.test',:admin,now(),now()+interval '7 days',7,:user_id,:user_id,:hash,now()+interval '10 minutes')"), {"id": UUID("66666666-6666-4666-8666-666666666666"), "admin": admin, "user_id": invitee, "hash": "b"*64})
         connection.execute(text("SELECT set_config('app.invitation_id',:id,true),set_config('app.claim_token_hash',:hash,true)"), {"id": str(UUID("66666666-6666-4666-8666-666666666666")), "hash": "b"*64})
         assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is True
@@ -158,6 +188,22 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
         assert all(connection.scalar(text("SELECT public.consume_dashboard_assistant_quota(:user_id)"), {"user_id": admin}) is True for _ in range(5))
         assert connection.scalar(text("SELECT public.consume_dashboard_assistant_quota(:user_id)"), {"user_id": admin}) is False
         assert connection.scalar(text("SELECT public.consume_dashboard_assistant_quota(:user_id)"), {"user_id": UUID("22222222-2222-4222-8222-222222222222")}) is False
+    concurrent_member = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    barrier = Barrier(2)
+    def reserve_concurrently(invitation_id):
+        with engine.begin() as connection:
+            connection.execute(text("SET LOCAL ROLE investment_runtime"))
+            connection.execute(text("SELECT set_config('app.admin_id',:admin,true)"), {"admin": str(admin)})
+            barrier.wait(timeout=10)
+            return connection.scalar(text("SELECT public.reserve_dashboard_reactivation(:user_id,:admin_id,:invitation_id,:email)"),
+                {"user_id": concurrent_member, "admin_id": admin, "invitation_id": invitation_id, "email": "c@example.test"})
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        concurrent_results = list(pool.map(reserve_concurrently, (
+            UUID("99999999-9999-4999-8999-999999999993"),
+            UUID("99999999-9999-4999-8999-999999999994"))))
+    assert sorted(concurrent_results) == [False, True]
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT count(*) FROM account_invitations WHERE target_user_id=:user_id AND accepted_user_id IS NULL AND revoked_at IS NULL AND expires_at>now()"), {"user_id": concurrent_member}) == 1
     # Public submission is mediated by one PostgreSQL function. Its quotas and
     # duplicate suppression are shared across application instances.
     with engine.begin() as connection:

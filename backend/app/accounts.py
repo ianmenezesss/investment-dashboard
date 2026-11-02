@@ -646,7 +646,12 @@ def revoke_member(user_id: UUID, principal: Principal = Depends(authenticate), d
     if user_id == admin_id or user_id in settings.invitation_admin_ids:
         raise HTTPException(403, "A conta administrativa está protegida contra revogação")
     _admin_context(db, admin_id)
-    member = db.scalar(select(AccountMember).where(AccountMember.user_id == user_id).with_for_update())
+    member_query = select(AccountMember).where(AccountMember.user_id == user_id)
+    if db.bind.dialect.name != "postgresql":
+        member_query = member_query.with_for_update()
+    # On PostgreSQL the SECURITY DEFINER function takes the row lock. A runtime
+    # SELECT FOR UPDATE itself requires UPDATE privilege on account_members.
+    member = db.scalar(member_query)
     if member is None:
         db.rollback()
         raise HTTPException(404, "Conta não encontrada")
@@ -683,7 +688,13 @@ async def reactivate_member(user_id: UUID, principal: Principal = Depends(authen
                    {"key": f"dashboard-invitations:{admin_id}"})
         db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
                    {"key": f"dashboard-reactivation:{user_id}"})
-    member = db.scalar(select(AccountMember).where(AccountMember.user_id == user_id).with_for_update())
+    # PostgreSQL locks and rechecks eligibility inside the restricted database
+    # function; runtime SELECT FOR UPDATE would require the intentionally absent
+    # UPDATE privilege on account_members.
+    member_query = select(AccountMember).where(AccountMember.user_id == user_id)
+    if db.bind.dialect.name != "postgresql":
+        member_query = member_query.with_for_update()
+    member = db.scalar(member_query)
     if member is None:
         db.rollback()
         raise HTTPException(404, "Conta não encontrada")
@@ -709,16 +720,25 @@ async def reactivate_member(user_id: UUID, principal: Principal = Depends(authen
     if existing:
         db.rollback()
         raise HTTPException(409, "Já existe uma reativação pendente para esta conta")
-    expired = db.scalars(select(AccountInvitation).where(AccountInvitation.email == auth_email,
-        AccountInvitation.accepted_user_id.is_(None), AccountInvitation.revoked_at.is_(None),
-        AccountInvitation.expires_at <= now)).all()
-    for prior in expired:
-        prior.revoked_at = now
     invitation = AccountInvitation(id=uuid4(), email=auth_email, invited_by=admin_id, created_at=now,
         expires_at=now + timedelta(days=7), access_duration_days=7, target_user_id=user_id)
-    db.add(invitation)
     try:
+        if db.bind.dialect.name == "postgresql":
+            reserved = db.scalar(text("SELECT public.reserve_dashboard_reactivation(:user_id,:admin_id,:invitation_id,:email)"),
+                {"user_id": user_id, "admin_id": admin_id, "invitation_id": invitation.id, "email": auth_email})
+            if not reserved:
+                db.rollback()
+                raise HTTPException(409, "A reativação não pôde ser reservada; atualize a situação da conta e tente novamente")
+        else:
+            expired = db.scalars(select(AccountInvitation).where(AccountInvitation.email == auth_email,
+                AccountInvitation.accepted_user_id.is_(None), AccountInvitation.revoked_at.is_(None),
+                AccountInvitation.expires_at <= now)).all()
+            for prior in expired:
+                prior.revoked_at = now
+            db.add(invitation)
         db.commit()
+    except HTTPException:
+        raise
     except Exception:
         db.rollback()
         raise HTTPException(409, "A reativação não pôde ser reservada") from None
