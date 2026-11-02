@@ -146,7 +146,7 @@ def test_admin_approval_creates_seven_day_invite_and_records_status(monkeypatch)
             status="pending", requested_at=now))
         db.commit()
     sent = []
-    async def send(email): sent.append(email)
+    async def send(email, invitation_id): sent.append((email, invitation_id))
     monkeypatch.setattr(accounts, "_send_supabase_invitation", send)
     with Session(engine) as db:
         assert run_immediate(accounts.approve_access_request(item_id, Principal(ADMIN), db)) == {"status": "approved"}
@@ -156,7 +156,7 @@ def test_admin_approval_creates_seven_day_invite_and_records_status(monkeypatch)
         assert item.status == "approved" and item.reviewed_by == ADMIN
         assert invite.access_duration_days == 7
         assert invite.expires_at - invite.created_at == timedelta(days=7)
-    assert sent == ["person@example.test"]
+    assert sent == [("person@example.test", invite.id)]
     engine.dispose()
 
 
@@ -167,7 +167,7 @@ def test_failed_supabase_invite_reverts_request_and_revokes_pending_invite(monke
     with Session(engine) as db:
         db.add(accounts.AccountAccessRequest(id=item_id, email="person@example.test", ip_hash="b" * 64,
             status="pending", requested_at=now)); db.commit()
-    async def fail(_email): raise RuntimeError("fictional delivery failure")
+    async def fail(_email, _invitation_id): raise RuntimeError("fictional delivery failure")
     monkeypatch.setattr(accounts, "_send_supabase_invitation", fail)
     with Session(engine) as db, pytest.raises(HTTPException) as error:
         run_immediate(accounts.approve_access_request(item_id, Principal(ADMIN), db))
@@ -211,7 +211,11 @@ def test_trial_starts_on_activation_and_expires_without_affecting_permanent_memb
         ])
         db.commit()
     with Session(engine) as db:
-        accounts.activate_account(Principal(USER, "trial@example.test"), db)
+        trial_invitation_id = db.scalar(select(accounts.AccountInvitation.id).where(accounts.AccountInvitation.email == "trial@example.test"))
+        trial_claim = accounts.claim_invitation(trial_invitation_id, Principal(USER, "trial@example.test"), db)
+        trial_access = accounts.activate_account(Principal(USER, "trial@example.test"), db,
+            accounts.AcceptInvitationInput(invitation_id=trial_invitation_id, claim_token=trial_claim["claim_token"]))
+        assert trial_access["status"] == "active" and trial_access["access_type"] == "trial"
         expiry = db.get(accounts.AccountMember, USER).access_expires_at
         expiry = expiry.replace(tzinfo=timezone.utc) if expiry and expiry.tzinfo is None else expiry
         assert expiry is not None and abs((expiry - datetime.now(timezone.utc) - timedelta(days=7)).total_seconds()) < 2
@@ -219,10 +223,13 @@ def test_trial_starts_on_activation_and_expires_without_affecting_permanent_memb
         member = db.get(accounts.AccountMember, USER)
         member.access_expires_at = datetime.now(timezone.utc) - timedelta(microseconds=1)
         db.commit()
-        assert accounts.activate_account(Principal(USER, "trial@example.test"), db) == {"status": "trial_expired"}
+        assert accounts.activate_account(Principal(USER, "trial@example.test"), db)["status"] == "expired"
     permanent_user = uuid4()
     with Session(engine) as db:
-        accounts.activate_account(Principal(permanent_user, "permanent@example.test"), db)
+        permanent_invitation_id = db.scalar(select(accounts.AccountInvitation.id).where(accounts.AccountInvitation.email == "permanent@example.test"))
+        permanent_claim = accounts.claim_invitation(permanent_invitation_id, Principal(permanent_user, "permanent@example.test"), db)
+        accounts.activate_account(Principal(permanent_user, "permanent@example.test"), db,
+            accounts.AcceptInvitationInput(invitation_id=permanent_invitation_id, claim_token=permanent_claim["claim_token"]))
         assert db.get(accounts.AccountMember, permanent_user).access_expires_at is None
     engine.dispose()
 

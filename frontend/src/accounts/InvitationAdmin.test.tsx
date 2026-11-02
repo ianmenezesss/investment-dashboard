@@ -28,6 +28,7 @@ test('admin envia, lista e revoga convites pelo backend autenticado', async () =
       return new Response('{"status":"revoked"}', { status: 200 })
     }
     if (input.endsWith('/access-requests')) return new Response(JSON.stringify([]), { status: 200 })
+    if (input.endsWith('/members')) return new Response(JSON.stringify([]), { status: 200 })
     return new Response(JSON.stringify(active), { status: 200 })
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -48,8 +49,30 @@ test('admin envia, lista e revoga convites pelo backend autenticado', async () =
   const revoke = [...host.querySelectorAll('button')].find(button => button.textContent === 'Revogar convite')!
   await act(async () => revoke.click())
   expect(calls.some(call => call.init?.method === 'DELETE' && call.url.endsWith('/invite-1'))).toBe(true)
-  expect(host.textContent).toContain('revogado')
+  expect(host.textContent?.toLowerCase()).toContain('revogado')
   expect(calls.every(call => (call.init?.headers as Record<string, string>)?.Authorization === `Bearer ${token}`)).toBe(true)
+})
+
+test('admin vê datas de ativação/expiração e reativa explicitamente apenas conta vencida', async () => {
+  const member = { user_id: 'user-expired', email: 'former@example.test', status: 'expired', access_type: 'trial', activated_at: '2026-10-20T12:00:00Z', trial_expires_at: '2026-10-27T12:00:00Z', can_reactivate: true }
+  const calls: { url: string; init?: RequestInit }[] = []
+  vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
+    calls.push({ url: input, init })
+    if (input.endsWith('/members')) return new Response(JSON.stringify([member]), { status: 200 })
+    if (input.endsWith('/access-requests')) return new Response('[]', { status: 200 })
+    if (init?.method === 'POST' && input.endsWith('/reactivate')) return new Response('{"status":"reactivation_email_sent"}', { status: 202 })
+    return new Response('[]', { status: 200 })
+  }))
+  host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
+  await act(async () => root.render(<InvitationAdmin token={token}/>))
+  await vi.waitFor(() => expect(host.textContent).toContain('former@example.test'))
+  expect(host.textContent).toContain('Expirada')
+  expect(host.textContent).toContain('Ativada em:')
+  expect(host.textContent).toContain('Expirou em:')
+  const button = [...host.querySelectorAll('button')].find(item => item.textContent === 'Conceder novo teste (7 dias)')!
+  await act(async () => button.click())
+  expect(calls.some(call => call.url.endsWith('/members/user-expired/reactivate') && call.init?.method === 'POST')).toBe(true)
+  expect(host.textContent).toContain('Contas e status de acesso')
 })
 
 test('admin revisa solicitação e aprovação usa o endpoint autenticado existente', async () => {

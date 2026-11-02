@@ -26,6 +26,10 @@ function Harness() {
   const auth = useAuth(true, clear)
   return <><span data-status>{auth.status}</span><span data-access-status>{auth.accessStatus}</span><span data-token>{auth.session?.access_token}</span>{auth.session ? <button onClick={() => void auth.logout()}>Sair</button> : <LoginPanel loading={auth.status === 'loading'} error={auth.error} onLogin={auth.login}/>}<button onClick={auth.expire}>Expirar</button></>
 }
+function InvitationHarness() {
+  const auth = useAuth(true, clear, true)
+  return <><span data-status>{auth.status}</span><span data-token>{auth.session?.access_token}</span></>
+}
 beforeEach(() => {
   vi.clearAllMocks()
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ status: 'active' }) })))
@@ -77,6 +81,17 @@ test('login por senha, envio do access token ao FastAPI e logout', async () => {
   expect(client.getQueryData(['summary', session.user.id])).toBeUndefined()
   expect(host.querySelector('form[aria-label="Login da carteira"]')).not.toBeNull()
   client.clear()
+})
+
+test('convite valida a identidade sem consumir autorização antes da troca de senha', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  const fetchMock = vi.fn()
+  vi.stubGlobal('fetch', fetchMock)
+  await act(async () => root.render(<InvitationHarness/>))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
+  expect(host.querySelector('[data-status]')?.textContent).toBe('authenticated')
+  expect(mock.auth.getUser).toHaveBeenCalledWith(session.access_token)
+  expect(fetchMock).not.toHaveBeenCalled()
 })
 
 test('preserva a sessão autenticada após o backend informar expiração para permitir gestão da conta', async () => {
@@ -256,7 +271,7 @@ test('menu mobile fecha com Escape e restaura foco ao acionador', async () => {
   vi.stubGlobal('fetch', vi.fn(async (input: string) => financialResponse(input)))
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
+  await vi.waitFor(() => expect(host.querySelector('[aria-label="Abrir menu de navegação"]')).not.toBeNull(), { timeout: 5000 })
   const trigger = host.querySelector('[aria-label="Abrir menu de navegação"]') as HTMLButtonElement
   expect(trigger.querySelector('svg.lucide-menu')).not.toBeNull()
   trigger.focus()
@@ -277,7 +292,7 @@ test('botão X fecha o drawer mobile e devolve o foco ao hambúrguer', async () 
   vi.stubGlobal('fetch', vi.fn(async (input: string) => financialResponse(input)))
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)) })
+  await vi.waitFor(() => expect(host.querySelector('[aria-label="Abrir menu de navegação"]')).not.toBeNull(), { timeout: 5000 })
   const trigger = host.querySelector('[aria-label="Abrir menu de navegação"]') as HTMLButtonElement
   trigger.focus()
   await act(async () => trigger.click())

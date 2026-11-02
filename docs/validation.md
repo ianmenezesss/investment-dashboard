@@ -1,12 +1,12 @@
 # Validação do Investment Dashboard
 
-## Candidata v3.0.0 — 01/11/2026 (local, não publicada)
+## Candidata v3.0.0 — 02/11/2026 (local, não publicada)
 
-- Backend: **451 aprovados, 1 ignorado**. A suíte completa usou as configurações forçadas pelo `conftest.py` (`DATABASE_URL=sqlite://`, `AUTH_MODE=local`, token fictício e `TEST_DATABASE_URL` vazio); dotenv e credenciais Groq foram isolados. Permanece um aviso de depreciação do adaptador Starlette `TestClient`/HTTPX.
-- PostgreSQL 17 descartável: **1 integração aprovada**; migrations 001–013, limites globais/por IP sob RLS incluindo duplicatas, convite temporário versus permanente, isolamento entre proprietários e backup/restauração autenticados `IDBKP013` passaram. O restore comparou contagens, dados sintéticos, head Alembic, RLS/FORCE RLS, policies, grants, owners e visibilidade.
-- Frontend: **240 testes aprovados em 35 arquivos**. Build TypeScript/Vite aprovado, **2.390 módulos** transformados.
-- A nova página de solicitação e o painel admin foram exercitados com mocks; a demonstração pública foi testada sem endpoint de solicitação, administração ou IA. A expiração, exclusão após vencimento e falha de envio foram testadas sem conta Supabase real. Não houve chamada à Groq, envio real de convite, leitura/escrita de carteira, migration/backup de produção, push ou deploy. A inspeção visual em produção com sessão Supabase legítima continua manual.
-- As quotas da solicitação foram testadas em PostgreSQL local, compartilhadas entre chamadas no mesmo banco. Nenhum SMTP/notificador administrativo foi configurado; os pedidos ficam visíveis no painel. A migration e o backup/restore foram executados apenas em containers descartáveis locais.
+- Backend: **456 aprovados, 1 ignorado**. A suíte completa usou as configurações forçadas pelo `conftest.py` (`DATABASE_URL=sqlite://`, `AUTH_MODE=local`, token fictício e `TEST_DATABASE_URL` vazio); dotenv e credenciais Groq foram isolados. Permanece um aviso de depreciação do adaptador Starlette `TestClient`/HTTPX.
+- PostgreSQL 17 descartável: migrations 001–014, claim/aceitação/revogação, reativação de membership e prazo de 168 horas passaram. O ciclo sintético de backup cifrado/restauração também passou em servidor separado; head 014, contagens, RLS/FORCE RLS, policies, grants e isolamento foram comparados.
+- Frontend: **245 testes aprovados em 36 arquivos**. Build TypeScript/Vite aprovado, **2.392 módulos** transformados.
+- O fluxo de senha e convite existente foi testado com mocks; não houve chamada ao Supabase, envio real de e-mail, Groq, leitura/escrita de carteira, migration/backup de produção, push ou deploy. A inspeção visual autenticada com sessão legítima continua manual.
+- Os containers PostgreSQL e a rede temporária foram encerrados pelo runner; o arquivo de backup sintético e a pasta temporária foram removidos. O usuário não alterou nenhuma conta real.
 
 ## Release v2.0.0 — registro da validação local antes da publicação
 

@@ -6,7 +6,8 @@
 - [x] RLS/FORCE RLS e testes negativos de isolamento entre proprietários.
 - [x] Exclusão própria autenticada e retomável, com executor restrito para os ledgers append-only.
 - [x] Loader CLI da fixture `v2-demo-scenario.json`, admin-only, transacional e limitado a carteira vazia.
-- [x] Testes backend/frontend, build, `git diff --check`, migrations 001–013 e integração PostgreSQL descartável com backup/restore.
+- [x] Testes backend/frontend, build, `git diff --check`, migrations 001–014 e integração PostgreSQL descartável com backup/restore.
+- [x] Aceitação de convite validada no backend contra UUID do convite, identidade/e-mail Auth confirmado e claim temporário de uso único; reativação administrativa direcionada inicia o novo prazo somente após aceitação.
 - [x] Fluxo de solicitação pública, painel admin, falha de envio, limite compartilhado e expiração de teste validados com fixtures/mocks e PostgreSQL descartável.
 - [x] Nenhuma chamada a serviço real, escrita em conta real, push, release ou deploy nesta validação.
 
@@ -16,7 +17,7 @@
 - [ ] Confirmar que a role usada pela migration pode criar a role restrita e alterar o owner das funções, sem conceder privilégios ao runtime.
 - [ ] Confirmar variáveis existentes do Render: `AUTH_MODE=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `MIGRATION_DATABASE_URL`, `INVITATION_ADMIN_IDS`, `APP_PUBLIC_URL` e CORS privado.
 - [ ] Manter cadastro público Supabase desabilitado; validar convite, confirmação de e-mail, redirect e política de senha.
-- [ ] Aplicar em sequência apenas as migrations que faltarem até `013`; verificar RLS/FORCE RLS, role `investment_deletion_executor`, grants e owners das funções antes do deploy.
+- [ ] Aplicar em sequência apenas as migrations que faltarem até `014`; verificar RLS/FORCE RLS, role `investment_deletion_executor`, grants e owners das funções antes do deploy.
 - [ ] Publicar backend e frontends privado/público; verificar health, login por convite, isolamento, demonstração pública e ausência de funcionalidades privadas no build público.
 - [ ] Testar a interface privada com conta de teste autorizada e sem enviar dados financeiros reais à Íris.
 
@@ -27,6 +28,8 @@
 - Limites aplicados por contadores RLS no PostgreSQL compartilhado: até 3 tentativas por IP e 100 no total em janelas de 24 horas iniciadas pela primeira tentativa. Duplicatas e tentativas bloqueadas também consomem cota, sem persistir os e-mails recusados. A chave HMAC deriva de segredo já existente apenas no backend.
 - Administradores consultam todos os pedidos em **Minha conta → Administração de convites → Solicitações de acesso**. Não há integração de notificação por e-mail ao administrador configurada; o painel funciona sem ela. O convite ao solicitante usa o envio do Supabase Auth já existente e está sujeito às cotas e ao SMTP do projeto.
 - Aprovação cria um convite Supabase; sete dias de acesso começam quando o usuário aceita o convite e o backend ativa a membership. A validade do link é controlada separadamente pelo Supabase Auth. Membros sem data de expiração continuam permanentes.
+- A página de aceitação não ativa automaticamente uma sessão antiga: exige o UUID atual do convite, identidade e e-mail confirmado no Supabase, claim backend temporário e aceitação atômica. Para uma identidade Auth confirmada já existente, o envio usa o fluxo recovery do Supabase, preservando o mesmo UUID de convite; a senha só é alterada após a elegibilidade e a reserva do claim. Reativar membership revogada/expirada exige ação administrativa explícita e não altera o período até a aceitação.
+- `014_bound_invitation_reactivation.py` adiciona colunas de auditoria/claim, uma policy de leitura administrativa da membership e a função de aceitação revisada. O backup versionado correspondente é `backend/scripts/backup_supabase_014.py`; não aplicar migrations em produção sem backup e procedimento operacional aprovados.
 - O vencimento bloqueia rotas privadas do backend e redireciona a interface para Minha conta; os dados não são apagados e a exclusão própria segue disponível. Não teste em conta real antes de aprovar a migration e os deploys.
 
 ## Popular uma conta de teste

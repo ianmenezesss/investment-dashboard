@@ -5,12 +5,13 @@ import { apiBase } from '../runtime'
 
 type Status = 'loading' | 'anonymous' | 'authenticated'
 type AccessStatus = 'active' | 'trial_expired'
-export function useAuth(enabled: boolean, clearPrivate: () => void) {
+export function useAuth(enabled: boolean, clearPrivate: () => void, skipActivation = false) {
   const [session, setSession] = useState<Session | null>(null)
   const [status, setStatus] = useState<Status>('loading')
   const [error, setError] = useState('')
   const [accessStatus, setAccessStatus] = useState<AccessStatus>('active')
   const [trialExpiresAt, setTrialExpiresAt] = useState<number | null>(null)
+  const [accessActivatedAt, setAccessActivatedAt] = useState<string | null>(null)
   const generation = useRef(0)
   const client = useRef<SupabaseClient | null>(null)
   const clear = useRef(clearPrivate)
@@ -20,7 +21,7 @@ export function useAuth(enabled: boolean, clearPrivate: () => void) {
 
   const accept = useCallback((next: Session | null) => {
     // SIGNED_IN also reconfirms a session on tab focus; it is not an account switch.
-    if (activeSession.current?.user.id !== next?.user.id) { clear.current(); setAccessStatus('active'); setTrialExpiresAt(null) }
+    if (activeSession.current?.user.id !== next?.user.id) { clear.current(); setAccessStatus('active'); setTrialExpiresAt(null); setAccessActivatedAt(null) }
     activeSession.current = next
     setSession(next); setStatus(next ? 'authenticated' : 'anonymous')
   }, [])
@@ -62,12 +63,16 @@ export function useAuth(enabled: boolean, clearPrivate: () => void) {
         const verified = await sdk.auth.getUser(next.access_token)
         if (!alive || revision !== generation.current || blocked.current) return
         if (verified.error || verified.data.user?.id !== next.user.id || (next.expires_at ?? 0) * 1000 <= Date.now()) throw new Error('expired')
+        if (skipActivation) {
+          accept(next); setAccessStatus('active'); setTrialExpiresAt(null); setError('')
+          return
+        }
         const activation = await fetch(`${apiBase()}/api/account/activate`, { method: 'POST', headers: { Authorization: `Bearer ${next.access_token}` } })
         if (!activation.ok) throw new Error('account_not_invited')
-        const activationState = await activation.json() as { status?: string; trial_expires_at?: string }
-        accept(next); setAccessStatus(activationState.status === 'trial_expired' ? 'trial_expired' : 'active')
+        const activationState = await activation.json() as { status?: string; trial_expires_at?: string; activated_at?: string }
+        accept(next); setAccessStatus(activationState.status === 'trial_expired' || activationState.status === 'expired' ? 'trial_expired' : 'active')
         const expiration = activationState.trial_expires_at ? Date.parse(activationState.trial_expires_at) : NaN
-        setTrialExpiresAt(Number.isFinite(expiration) ? expiration : null); setError('')
+        setTrialExpiresAt(Number.isFinite(expiration) ? expiration : null); setAccessActivatedAt(activationState.activated_at ?? null); setError('')
       } catch {
         if (alive && revision === generation.current && !blocked.current) expire()
       }
@@ -104,7 +109,7 @@ export function useAuth(enabled: boolean, clearPrivate: () => void) {
       }
     })()
     return () => { alive = false; generation.current++; pending.forEach(timer => window.clearTimeout(timer)); subscription.unsubscribe() }
-  }, [enabled, expire, accept])
+  }, [enabled, expire, accept, skipActivation])
 
   useEffect(() => {
     if (!session?.expires_at) return
@@ -169,5 +174,5 @@ export function useAuth(enabled: boolean, clearPrivate: () => void) {
     }
   }
 
-  return { session, status, error, login, reauthenticate, logout, expire, accessStatus, trialExpiresAt, markTrialExpired }
+  return { session, status, error, login, reauthenticate, logout, expire, accessStatus, trialExpiresAt, accessActivatedAt, markTrialExpired }
 }

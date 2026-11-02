@@ -1,6 +1,9 @@
 """Opt-in: exige banco PostgreSQL dedicado, vazio e descartável."""
 import os
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
@@ -10,7 +13,7 @@ from alembic.config import Config
 from app.database import get_db, settings
 from app.main import app
 from app.auth import Principal, authenticate
-from uuid import UUID
+from uuid import UUID, uuid4
 from decimal import Decimal
 from datetime import date
 
@@ -49,9 +52,19 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
     with engine.connect() as connection:
         original = {table: list(connection.execute(text(f'SELECT * FROM {table} ORDER BY id'))) for table in
           ('fixed_income_investments','fixed_income_lots','fixed_income_movements')}
+    command.upgrade(Config("alembic.ini"), "013")
+    admin = UUID("11111111-1111-4111-8111-111111111111")
+    member_b = UUID("22222222-2222-4222-8222-222222222222")
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO account_members(user_id,email,status) VALUES (:a,'a@example.test','active'),(:b,'b@example.test','active')"), {"a": admin, "b": member_b})
+    with engine.connect() as connection:
+        legacy_members = dict(connection.execute(text("SELECT user_id,created_at FROM account_members")).all())
     command.upgrade(Config("alembic.ini"), "head")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "013"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "014"
+        for user_id, created_at in legacy_members.items():
+            assert connection.scalar(text("SELECT activated_at IS NULL AND created_at=:created_at FROM account_members WHERE user_id=:user_id"),
+                                     {"user_id": user_id, "created_at": created_at}) is True
         access_request_table = connection.scalar(text("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.account_access_requests'::regclass"))
         assert access_request_table is True
         assert connection.scalar(text("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.account_access_request_limits'::regclass")) is True
@@ -84,25 +97,26 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
         connection.execute(text("REVOKE CREATE, USAGE ON SCHEMA public FROM investment_migration_probe"))
         connection.execute(text("DROP ROLE investment_owner_probe, investment_migration_probe"))
     with engine.begin() as connection:
-        connection.execute(text("INSERT INTO account_members(user_id,email,status) VALUES (:a,'a@example.test','active'),(:b,'b@example.test','active')"), {"a": UUID("11111111-1111-4111-8111-111111111111"), "b": UUID("22222222-2222-4222-8222-222222222222")})
         connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at) VALUES (:id,'invite@example.test',:admin,now(),now()+interval '7 days')"), {"id": UUID("33333333-3333-4333-8333-333333333333"), "admin": UUID("11111111-1111-4111-8111-111111111111")})
     # The privileged acceptance function must bind both identity and email to the
     # trusted request context; a revoked member may return only via a new invite.
     invitee = UUID("44444444-4444-4444-8444-444444444444")
-    admin = UUID("11111111-1111-4111-8111-111111111111")
     with engine.begin() as connection:
         connection.execute(text("SET LOCAL ROLE investment_runtime"))
         connection.execute(text("SELECT set_config('app.admin_id',:admin,true)"), {"admin": str(admin)})
-        connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at) VALUES (:id,'invitee@example.test',:admin,now(),now()+interval '7 days')"), {"id": UUID("55555555-5555-4555-8555-555555555555"), "admin": admin})
+        connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at,claim_user_id,claim_token_hash,claim_expires_at) VALUES (:id,'invitee@example.test',:admin,now(),now()+interval '7 days',:user_id,:hash,now()+interval '10 minutes')"), {"id": UUID("55555555-5555-4555-8555-555555555555"), "admin": admin, "user_id": invitee, "hash": "a"*64})
         connection.execute(text("SELECT set_config('app.user_id',:other,true),set_config('app.user_email','invitee@example.test',true)"), {"other": str(UUID("22222222-2222-4222-8222-222222222222"))})
+        connection.execute(text("SELECT set_config('app.invitation_id',:id,true),set_config('app.claim_user_id',:user_id,true),set_config('app.claim_token_hash',:hash,true)"), {"id": str(UUID("55555555-5555-4555-8555-555555555555")), "user_id": str(invitee), "hash": "a"*64})
         assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is False
         connection.execute(text("SELECT set_config('app.user_id',:user_id,true),set_config('app.user_email','different@example.test',true)"), {"user_id": str(invitee)})
         assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is False
         connection.execute(text("SELECT set_config('app.user_email','invitee@example.test',true)"))
         assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is True
+        assert connection.scalar(text("SELECT activated_at IS NOT NULL FROM account_members WHERE user_id=:user_id"), {"user_id": invitee}) is True
         assert connection.scalar(text("SELECT access_expires_at IS NULL FROM account_members WHERE user_id=:user_id"), {"user_id": invitee}) is True
         assert connection.scalar(text("SELECT public.revoke_dashboard_account(:user_id,:admin_id)"), {"user_id": invitee, "admin_id": admin}) is True
-        connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at,access_duration_days) VALUES (:id,'invitee@example.test',:admin,now(),now()+interval '7 days',7)"), {"id": UUID("66666666-6666-4666-8666-666666666666"), "admin": admin})
+        connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at,access_duration_days,target_user_id,claim_user_id,claim_token_hash,claim_expires_at) VALUES (:id,'invitee@example.test',:admin,now(),now()+interval '7 days',7,:user_id,:user_id,:hash,now()+interval '10 minutes')"), {"id": UUID("66666666-6666-4666-8666-666666666666"), "admin": admin, "user_id": invitee, "hash": "b"*64})
+        connection.execute(text("SELECT set_config('app.invitation_id',:id,true),set_config('app.claim_token_hash',:hash,true)"), {"id": str(UUID("66666666-6666-4666-8666-666666666666")), "hash": "b"*64})
         assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is True
         assert connection.scalar(text("SELECT status FROM account_members WHERE user_id=:user_id"), {"user_id": invitee}) == "active"
         assert connection.scalar(text("SELECT access_expires_at BETWEEN now()+interval '6 days 23 hours' AND now()+interval '7 days 1 second' FROM account_members WHERE user_id=:user_id"), {"user_id": invitee}) is True
@@ -166,6 +180,35 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
                 connection.execute(text("GRANT SELECT ON portfolio_valuation_observations TO investment_test_runtime"))
                 connection.execute(text("ALTER ROLE investment_runtime PASSWORD 'fictional-test-only-password'"))
                 connection.execute(text("GRANT SELECT ON operations TO investment_runtime"))
+
+            # Two independent runtime connections race to claim one invitation.
+            # The database advisory/row lock must allow exactly one reservation.
+            from app import accounts
+            claim_id = uuid4()
+            claim_user = UUID("99999999-9999-4999-8999-999999999999")
+            claim_admin = UUID("11111111-1111-4111-8111-111111111111")
+            with engine.begin() as connection:
+                connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at) VALUES (:id,'race@example.test',:admin,now(),now()+interval '1 hour')"),
+                                   {"id": claim_id, "admin": claim_admin})
+            claim_engine = create_engine(engine.url.set(username="investment_runtime", password="fictional-test-only-password"))
+            barrier = Barrier(2)
+            def claim_once():
+                with Session(claim_engine) as session:
+                    barrier.wait(timeout=5)
+                    return accounts.claim_invitation(claim_id, Principal(claim_user, "race@example.test"), session)
+            successes = 0
+            conflicts = 0
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futures = [pool.submit(claim_once) for _ in range(2)]
+                for future in futures:
+                    try:
+                        assert len(future.result(timeout=10)["claim_token"]) >= 40
+                        successes += 1
+                    except HTTPException as exc:
+                        assert exc.status_code == 409
+                        conflicts += 1
+            claim_engine.dispose()
+            assert (successes, conflicts) == (1, 1)
 
             def restricted_db():
                 with Session(engine) as session:

@@ -22,8 +22,8 @@ def snapshot(url: str) -> dict:
     try:
         with engine.connect() as connection:
             result = {"head": connection.scalar(text("SELECT version_num FROM alembic_version"))}
-            if result["head"] != "013":
-                raise AssertionError("Banco restaurado não está no Alembic head 013")
+            if result["head"] != "014":
+                raise AssertionError("Banco restaurado não está no Alembic head 014")
             result["counts"] = {
                 table: connection.scalar(text(f'SELECT count(*) FROM public."{table}"'))
                 for table in TABLES
@@ -194,8 +194,14 @@ def snapshot(url: str) -> dict:
                 wealth_visible = connection.scalar(text("SELECT count(*) FROM public.portfolio_valuation_observations"))
                 wealth_foreign = connection.scalar(text("SELECT count(*) FROM public.portfolio_valuation_observations WHERE owner_id <> CAST(:owner AS uuid)"), {"owner": owner})
                 member_visible = connection.scalar(text("SELECT count(*) FROM public.account_members"))
-                if member_visible != 1:
-                    raise AssertionError("Isolamento RLS de membership falhou no restore")
+                own_member_visible = connection.scalar(text("SELECT count(*) FROM public.account_members WHERE user_id=CAST(:owner AS uuid)"), {"owner": owner})
+                foreign_member_visible = connection.scalar(text("SELECT count(*) FROM public.account_members WHERE user_id<>CAST(:owner AS uuid)"), {"owner": owner})
+                # Migration 014 permits an allowlisted admin transaction to read
+                # all membership rows; regular members still see only themselves.
+                expected_member_total = result["counts"]["account_members"] if owner == OWNERS[0] else 1
+                expected_foreign_members = expected_member_total - 1
+                if own_member_visible != 1 or foreign_member_visible != expected_foreign_members or member_visible != expected_member_total:
+                    raise AssertionError(f"Isolamento RLS de membership falhou no restore (admin={owner == OWNERS[0]}, own={own_member_visible}, foreign={foreign_member_visible}, total={member_visible})")
                 invite_visible = connection.scalar(text("SELECT count(*) FROM public.account_invitations"))
                 if (owner == OWNERS[0] and invite_visible < 1) or (owner != OWNERS[0] and invite_visible != 0):
                     raise AssertionError("Isolamento RLS de convites administrativos falhou no restore")
