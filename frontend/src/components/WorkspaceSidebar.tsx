@@ -47,8 +47,10 @@ export function WorkspaceSidebar({ demo, routeTo, collapsed = false, onToggleCol
       })}
     </nav>
     <div className="sidebar-bottom"><ShieldCheck size={22} aria-hidden="true"/><p>Seu futuro começa aqui.<small>Uma decisão de cada vez.</small></p></div>
-    <div className="profile" aria-label={`Perfil: ${displayName}; ${demo ? 'Carteira demonstrativa' : 'Acesso privado'}`}>
-      <div className="avatar" aria-hidden="true">{avatarInitial}</div><div className="profile-copy" title={displayName}>{displayName}<small>{demo ? 'Carteira demonstrativa' : 'Acesso privado'}</small></div><span className="status-dot" aria-hidden="true"/>
-    </div>
+    {demo ? <div className="profile" aria-label={`Perfil: ${displayName}; Carteira demonstrativa`}>
+      <div className="avatar" aria-hidden="true">{avatarInitial}</div><div className="profile-copy" title={displayName}>{displayName}<small>Carteira demonstrativa</small></div><span className="status-dot" aria-hidden="true"/>
+    </div> : <NavLink className={({ isActive }) => `profile${isActive ? ' active' : ''}`} to="/conta" onClick={onNavigate} aria-label={`Minha conta de ${displayName}`} title="Minha conta">
+      <div className="avatar" aria-hidden="true">{avatarInitial}</div><div className="profile-copy" title={displayName}>{displayName}<small>Acesso privado · Minha conta</small></div><span className="status-dot" aria-hidden="true"/>
+    </NavLink>}
   </aside>
 }

@@ -94,6 +94,22 @@ test('carteira carregada pela fixture mostra aviso explícito de dados fictício
   client.clear()
 })
 
+test('perfil da barra lateral abre Minha conta e a exclusão não aparece em Ações', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => financialResponse(input)))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/acoes']}><App/></MemoryRouter></QueryClientProvider>))
+  await vi.waitFor(() => expect(host.querySelector('.profile[href="/conta"]')).not.toBeNull())
+  expect(host.textContent).not.toContain('Zona de perigo')
+  const profile = host.querySelector('.profile[href="/conta"]')!
+  await act(async () => profile.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })))
+  await vi.waitFor(() => expect(host.querySelector('h1')?.textContent).toBe('Minha conta'))
+  expect(host.textContent).toContain('investor@example.test')
+  expect(host.textContent).toContain('Zona de perigo')
+  expect(host.textContent).toContain('Excluir minha conta')
+  client.clear()
+})
+
 test.each(['/acoes', '/historico', '/cdbs', '/metas', '/simulador'])('rota privada %s não renderiza carteira nem faz rede sem login', async route => {
   const fetchMock = vi.fn()
   vi.stubGlobal('fetch', fetchMock)
