@@ -1,11 +1,13 @@
 """Opt-in: exige banco PostgreSQL dedicado, vazio e descartável."""
 import os
+from pydantic import SecretStr
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from alembic import command
@@ -57,25 +59,79 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
     member_b = UUID("22222222-2222-4222-8222-222222222222")
     with engine.begin() as connection:
         connection.execute(text("INSERT INTO account_members(user_id,email,status) VALUES (:a,'a@example.test','active'),(:b,'b@example.test','active'),('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','c@example.test','revoked')"), {"a": admin, "b": member_b})
+    command.upgrade(Config("alembic.ini"), "015")
     with engine.connect() as connection:
         legacy_members = dict(connection.execute(text("SELECT user_id,created_at FROM account_members")).all())
-    command.upgrade(Config("alembic.ini"), "head")
+
+    # Apply 016 as a non-superuser migration login. The role owns the existing
+    # revocation function and membership tables, can SET ROLE to the executor,
+    # and can grant CREATE on public with grant option. The executor itself
+    # starts without CREATE, which reproduces the Supabase ownership failure.
+    migration_role = f"investment_migration_probe_{uuid4().hex[:10]}"
+    migration_password = uuid4().hex + uuid4().hex
+    migration_identifier = engine.dialect.identifier_preparer.quote(migration_role)
+    with engine.begin() as connection:
+        migration_role_table_owners = {
+            table: connection.scalar(text("SELECT pg_get_userbyid(relowner) FROM pg_class WHERE oid=CAST(:table AS regclass)"), {"table": f"public.{table}"})
+            for table in ("account_members", "account_invitations", "alembic_version")
+        }
+        original_revoke_owner = connection.scalar(text("SELECT pg_get_userbyid(proowner) FROM pg_proc WHERE oid='public.revoke_dashboard_account(uuid,uuid)'::regprocedure"))
+        connection.execute(text(f"CREATE ROLE {migration_identifier} LOGIN CREATEROLE NOINHERIT NOSUPERUSER NOCREATEDB NOBYPASSRLS PASSWORD '{migration_password}'"))
+        connection.execute(text(f"GRANT USAGE, CREATE ON SCHEMA public TO {migration_identifier} WITH GRANT OPTION"))
+        connection.execute(text(f"GRANT investment_deletion_executor TO {migration_identifier} WITH ADMIN TRUE, INHERIT FALSE, SET FALSE"))
+        for table in ("account_members", "account_invitations", "alembic_version"):
+            connection.execute(text(f"ALTER TABLE public.{table} OWNER TO {migration_identifier}"))
+        connection.execute(text(f"ALTER FUNCTION public.revoke_dashboard_account(uuid,uuid) OWNER TO {migration_identifier}"))
+
+    original_migration_url = settings.migration_database_url
+    migration_url = make_url(os.environ["TEST_DATABASE_URL"]).set(
+        username=migration_role, password=migration_password).render_as_string(hide_password=False)
+    probe_engine = create_engine(migration_url, hide_parameters=True)
+    with probe_engine.connect() as connection:
+        assert connection.execute(text("SELECT current_user, rolsuper FROM pg_roles WHERE rolname=current_user")).one() == (migration_role, False)
+        assert connection.scalar(text("SELECT has_schema_privilege('investment_deletion_executor','public','CREATE')")) is False
+        assert connection.scalar(text("SELECT pg_has_role(current_user,'investment_deletion_executor','SET')")) is False
+    probe_engine.dispose()
+    try:
+        settings.migration_database_url = SecretStr(migration_url)
+        command.upgrade(Config("alembic.ini"), "head")
+    finally:
+        settings.migration_database_url = original_migration_url
+        with engine.begin() as connection:
+            for table, owner in migration_role_table_owners.items():
+                owner_identifier = engine.dialect.identifier_preparer.quote(owner)
+                connection.execute(text(f"ALTER TABLE public.{table} OWNER TO {owner_identifier}"))
+            current_revoke_owner = connection.scalar(text("SELECT pg_get_userbyid(proowner) FROM pg_proc WHERE oid='public.revoke_dashboard_account(uuid,uuid)'::regprocedure"))
+            if current_revoke_owner == migration_role:
+                owner_identifier = engine.dialect.identifier_preparer.quote(original_revoke_owner)
+                connection.execute(text(f"ALTER FUNCTION public.revoke_dashboard_account(uuid,uuid) OWNER TO {owner_identifier}"))
+            connection.execute(text(f"REVOKE USAGE, CREATE ON SCHEMA public FROM {migration_identifier}"))
+            connection.execute(text(f"REVOKE investment_deletion_executor FROM {migration_identifier}"))
+            connection.execute(text(f"DROP ROLE {migration_identifier}"))
+
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "016"
         revoke_acl = connection.execute(text("""SELECT p.prosecdef,
+          pg_get_userbyid(p.proowner), p.proconfig,
           has_function_privilege('investment_runtime','public.revoke_dashboard_account(uuid,uuid)','EXECUTE'),
+          has_function_privilege('anon','public.revoke_dashboard_account(uuid,uuid)','EXECUTE'),
+          has_function_privilege('authenticated','public.revoke_dashboard_account(uuid,uuid)','EXECUTE'),
+          has_function_privilege('service_role','public.revoke_dashboard_account(uuid,uuid)','EXECUTE'),
           has_table_privilege('investment_runtime','public.account_members','UPDATE'),
           has_table_privilege('investment_runtime','public.account_members','DELETE')
           FROM pg_proc p WHERE p.oid='public.revoke_dashboard_account(uuid,uuid)'::regprocedure""")).one()
-        assert revoke_acl == (True, True, False, False)
+        assert revoke_acl == (True, "investment_deletion_executor", ["search_path=pg_catalog, public"],
+                              True, False, False, False, False, False)
         reactivation_acl = connection.execute(text("""SELECT p.prosecdef,
           has_function_privilege('investment_runtime','public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)','EXECUTE'),
           has_function_privilege('anon','public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)','EXECUTE'),
           pg_get_userbyid(p.proowner),
+          p.proconfig,
           has_table_privilege('investment_runtime','public.account_members','UPDATE'),
           has_table_privilege('investment_runtime','public.account_members','DELETE')
           FROM pg_proc p WHERE p.oid='public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)'::regprocedure""")).one()
-        assert reactivation_acl == (True, True, False, "investment_deletion_executor", False, False)
+        assert reactivation_acl == (True, True, False, "investment_deletion_executor", ["search_path=pg_catalog, public"], False, False)
+        assert connection.scalar(text("SELECT has_schema_privilege('investment_deletion_executor','public','CREATE')")) is False
         assert connection.scalar(text("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.account_members'::regclass")) is True
         for user_id, created_at in legacy_members.items():
             assert connection.scalar(text("SELECT activated_at IS NULL AND created_at=:created_at FROM account_members WHERE user_id=:user_id"),

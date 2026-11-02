@@ -79,8 +79,19 @@ def upgrade():
         RETURN true;
       END $$""")
 
-    # The migration runner temporarily obtains SET permission, following the
-    # established executor ownership protocol from migration 012.
+    # Set the ACL while the migration role still owns both functions. After
+    # ALTER OWNER, this role no longer has authority to REVOKE/GRANT EXECUTE.
+    for signature in (
+        "revoke_dashboard_account(uuid,uuid)",
+        "reserve_dashboard_reactivation(uuid,uuid,uuid,text)",
+    ):
+        op.execute(f"REVOKE ALL ON FUNCTION public.{signature} FROM PUBLIC, anon, authenticated, service_role")
+        op.execute(f"GRANT EXECUTE ON FUNCTION public.{signature} TO investment_runtime")
+
+    # ALTER FUNCTION ... OWNER TO requires the new owner to have CREATE on the
+    # containing schema, in addition to the migration role being able to SET
+    # ROLE to that owner. Grant CREATE only for this transaction, as migration
+    # 012 does, and remove it immediately after both ownership changes.
     op.execute("""DO $$ BEGIN
       IF current_setting('server_version_num')::integer >= 160000 THEN
         GRANT investment_deletion_executor TO CURRENT_USER WITH SET TRUE, INHERIT FALSE;
@@ -88,25 +99,62 @@ def upgrade():
         GRANT investment_deletion_executor TO CURRENT_USER;
       END IF;
     END $$""")
+    op.execute("GRANT CREATE ON SCHEMA public TO investment_deletion_executor")
     for signature in (
         "revoke_dashboard_account(uuid,uuid)",
         "reserve_dashboard_reactivation(uuid,uuid,uuid,text)",
     ):
         op.execute(f"ALTER FUNCTION public.{signature} OWNER TO investment_deletion_executor")
-        op.execute(f"REVOKE ALL ON FUNCTION public.{signature} FROM PUBLIC, anon, authenticated, service_role")
-        op.execute(f"GRANT EXECUTE ON FUNCTION public.{signature} TO investment_runtime")
-    op.execute("REVOKE investment_deletion_executor FROM CURRENT_USER")
     op.execute("REVOKE CREATE ON SCHEMA public FROM investment_deletion_executor")
+    # On PostgreSQL 16+, revoking the temporary membership can leave the
+    # bootstrap ADMIN-only membership for the CREATEROLE role that created the
+    # executor. Permit only that non-inheriting, non-SET administrative edge;
+    # no runtime role may belong to the executor.
+    op.execute("REVOKE investment_deletion_executor FROM CURRENT_USER")
 
     op.execute("""DO $$ BEGIN
       IF (SELECT prosecdef FROM pg_proc WHERE oid='public.revoke_dashboard_account(uuid,uuid)'::regprocedure) IS NOT TRUE
         OR (SELECT prosecdef FROM pg_proc WHERE oid='public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)'::regprocedure) IS NOT TRUE
+        OR (SELECT proconfig FROM pg_proc WHERE oid='public.revoke_dashboard_account(uuid,uuid)'::regprocedure)
+             IS DISTINCT FROM ARRAY['search_path=pg_catalog, public']::text[]
+        OR (SELECT proconfig FROM pg_proc WHERE oid='public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)'::regprocedure)
+             IS DISTINCT FROM ARRAY['search_path=pg_catalog, public']::text[]
+        OR (SELECT proowner FROM pg_proc WHERE oid='public.revoke_dashboard_account(uuid,uuid)'::regprocedure)
+             IS DISTINCT FROM 'investment_deletion_executor'::regrole
+        OR (SELECT proowner FROM pg_proc WHERE oid='public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)'::regprocedure)
+             IS DISTINCT FROM 'investment_deletion_executor'::regrole
+        OR NOT has_function_privilege('investment_runtime','public.revoke_dashboard_account(uuid,uuid)','EXECUTE')
+        OR NOT has_function_privilege('investment_runtime','public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)','EXECUTE')
+        OR has_function_privilege('anon','public.revoke_dashboard_account(uuid,uuid)','EXECUTE')
+        OR has_function_privilege('authenticated','public.revoke_dashboard_account(uuid,uuid)','EXECUTE')
+        OR has_function_privilege('service_role','public.revoke_dashboard_account(uuid,uuid)','EXECUTE')
+        OR has_function_privilege('anon','public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)','EXECUTE')
+        OR has_function_privilege('authenticated','public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)','EXECUTE')
+        OR has_function_privilege('service_role','public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)','EXECUTE')
         OR has_table_privilege('investment_runtime','public.account_members','UPDATE')
         OR has_table_privilege('investment_runtime','public.account_members','DELETE')
+        OR has_schema_privilege('investment_deletion_executor','public','CREATE')
         OR (SELECT NOT relrowsecurity OR NOT relforcerowsecurity FROM pg_class WHERE oid='public.account_members'::regclass)
         OR (SELECT rolsuper OR rolcanlogin OR rolbypassrls OR rolcreaterole OR rolcreatedb
             FROM pg_roles WHERE rolname='investment_deletion_executor') THEN
         RAISE EXCEPTION 'Administrative membership executor configuration is unsafe';
+      END IF;
+      IF current_setting('server_version_num')::integer >= 160000 AND EXISTS (
+        SELECT 1 FROM pg_auth_members m
+        WHERE m.roleid='investment_deletion_executor'::regrole
+          AND NOT (m.member=(SELECT oid FROM pg_roles WHERE rolname=current_user)
+            AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option)
+      ) THEN
+        RAISE EXCEPTION 'Administrative executor retained an unintended role membership';
+      END IF;
+      IF (current_setting('server_version_num')::integer < 160000 AND EXISTS (
+          SELECT 1 FROM pg_auth_members m
+          WHERE m.roleid='investment_deletion_executor'::regrole
+            AND m.member<>(SELECT oid FROM pg_roles WHERE rolname=current_user)
+        )) OR EXISTS (
+          SELECT 1 FROM pg_auth_members WHERE member='investment_deletion_executor'::regrole
+        ) THEN
+        RAISE EXCEPTION 'Administrative executor retained an unintended role membership';
       END IF;
     END $$""")
 
