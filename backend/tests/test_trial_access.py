@@ -74,6 +74,28 @@ def test_public_request_rejects_malformed_email(monkeypatch):
     engine.dispose()
 
 
+def test_production_ip_uses_render_edge_client_header_and_ignores_spoofable_x_forwarded_for(monkeypatch):
+    access_settings(monkeypatch, environment="production")
+    from starlette.requests import Request
+    request_with_headers = Request({"type": "http", "method": "POST", "path": "/api/access-requests",
+        "headers": [(b"cf-connecting-ip", b"198.51.100.42"),
+                    (b"x-forwarded-for", b"203.0.113.99, 198.51.100.42")],
+        "client": ("10.0.0.8", 1234), "server": ("testserver", 80), "scheme": "https"})
+    assert accounts._request_ip(request_with_headers) == "198.51.100.42"
+
+
+def test_production_ip_fails_closed_when_render_client_header_is_missing_or_invalid(monkeypatch):
+    access_settings(monkeypatch, environment="production")
+    from starlette.requests import Request
+    for headers in ([(b"x-forwarded-for", b"198.51.100.42")],
+                    [(b"cf-connecting-ip", b"198.51.100.42, 203.0.113.9")]):
+        req = Request({"type": "http", "method": "POST", "path": "/api/access-requests",
+            "headers": headers, "client": ("10.0.0.8", 1234), "server": ("testserver", 80), "scheme": "https"})
+        with pytest.raises(HTTPException) as error:
+            accounts._request_ip(req)
+        assert error.value.status_code == 503
+
+
 def test_public_request_global_daily_limit_is_enforced(monkeypatch):
     access_settings(monkeypatch)
     engine = database()
