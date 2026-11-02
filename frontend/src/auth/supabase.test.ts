@@ -4,11 +4,11 @@ vi.mock('@supabase/supabase-js', () => ({ createClient: create }))
 vi.mock('../runtime', () => ({ PUBLIC_DEMO: false, SUPABASE_AUTH: true }))
 beforeEach(() => { vi.resetModules(); create.mockClear(); vi.stubEnv('VITE_SUPABASE_URL', 'https://project.example'); vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', 'sb_publishable_testOnly') })
 
-test('cliente usa armazenamento por aba e recuperação por URL fica desativada', async () => {
+test('cliente usa armazenamento por aba e processa retorno do convite por URL', async () => {
   const { getSupabase } = await import('./supabase')
   expect(getSupabase()).toBe(getSupabase())
   expect(create).toHaveBeenCalledTimes(1)
-  expect(create.mock.calls[0][2].auth).toMatchObject({ storage: sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false })
+  expect(create.mock.calls[0][2].auth).toMatchObject({ storage: sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: true })
 })
 
 test.each(['sb_secret_testOnly', 'legacy-token-not-accepted', ''])('configuração inadequada da chave é recusada sem criar cliente', async key => {

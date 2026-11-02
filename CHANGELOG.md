@@ -1,6 +1,17 @@
 # Changelog
 
-## v2.0.0 — análise patrimonial com cobertura explícita (implementada localmente; não publicada)
+## v3.0.0 — candidata local (não publicada)
+
+- Acesso Supabase por convite, sem cadastro público, membership ativo e confirmação server-side do e-mail antes de ativar novas contas.
+- Convites administrativos limitados, expirados e revogáveis; contas isoladas por proprietário com RLS/FORCE RLS e quotas persistentes da Íris (5/minuto e 50/dia).
+- Exportação privada schema 3 inclui registros owner-scoped e metadados básicos de conta; metas locais são anexadas pelo navegador.
+- Comparador de CDI/Ibovespa/IPCA removido da UI/API; a série CDI/Selic necessária à renda fixa permanece.
+- Exclusão própria com confirmação textual e autenticação recente; as fases financeiras, identidade Supabase e finalização são retomáveis. Ledgers continuam append-only para runtime; o executor SQL é NOLOGIN, sem BYPASSRLS e sem membership em outras roles.
+- Loader CLI sem rota HTTP: UUIDs explícitos, admin allowlist, projeto Supabase/DB coincidente, membership ativo, carteira vazia, validação do cenário, observações por data e transação atômica. Registros e fontes ficam identificados como fictícios; alvos não vazios ou já usados são recusados.
+- Validação local da candidata final: resultados registrados em [validation.md](docs/validation.md); a integração PostgreSQL usa exclusivamente containers descartáveis.
+- Não houve exclusão de conta real, execução da fixture em conta real, migration de produção, push ou deploy.
+
+## v2.0.0 — análise patrimonial com cobertura explícita (publicada segundo relato do proprietário)
 
 - Substituída a antiga seção de evolução histórica desativada por observações patrimoniais datadas, fonte informada, cobertura de CDB e total apenas quando as classes cobertas permitem.
 - Adicionada migration append-only 010 com RLS/FORCE RLS, endpoint privado de leitura/gravação idempotente e verificação de permissões no PostgreSQL descartável.

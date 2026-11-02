@@ -1,6 +1,6 @@
 # Investment Dashboard — plano mestre e histórico
 
-**Documento de continuidade e histórico.** Atualizado em 01/11/2026. A v1.2.0 — Íris foi publicada segundo relato do proprietário; a candidata v2.0.0 está em validação local e não foi publicada. O roadmap atual das versões públicas é [INVESTMENT_DASHBOARD_V2_ROADMAP.md](INVESTMENT_DASHBOARD_V2_ROADMAP.md); este documento preserva decisões e fases técnicas anteriores. Nenhum banco de produção foi acessado ou migrado.
+**Documento de continuidade e histórico.** Atualizado em 01/11/2026. Segundo o proprietário, a v2.0.0 está publicada; a candidata local atual é v3.0.0. Use [INVESTMENT_DASHBOARD_V2_ROADMAP.md](INVESTMENT_DASHBOARD_V2_ROADMAP.md) e [v3-launch-checklist.md](v3-launch-checklist.md) para o estado atual; as fases abaixo preservam contexto histórico e não são backlog aprovado. O trabalho desta candidata não acessou nem migrou banco de produção.
 
 ## Como interpretar este documento
 
@@ -13,7 +13,7 @@
 
 ### Estado atual do candidato (2026-11-01)
 
-O último release publicado continua sendo v1.2.0. A candidata local v2.0.0 incorpora a estabilização v1.2.1, históricos v1.3 e análise patrimonial observada. A migration 010, endpoints, benchmarks, relatórios e backup/restore sintético passaram em PostgreSQL 17 descartável; a suíte local registrou 419 testes backend aprovados/1 ignorado, 230 frontend aprovados, build aprovado e integração PostgreSQL 001–010 aprovada. Não houve consulta externa nem acesso a carteira ou banco de produção. A Brapi Free permanece opt-in e limita histórico a até três meses. O valor patrimonial por ação é inserido pelo usuário a partir de fonte identificada; `adjustedClose` não é usado para reconstruir patrimônio. Quedas ajustadas são exibidas como recebidas, sem suavização; sem `rawClose` e eventos não se confirma automaticamente a causa. TWR/XIRR permanecem indisponíveis sem valuations e fluxos suficientemente completos. A Íris recebe somente um rótulo de tela permitido além da pergunta e do conhecimento estático. A v3.0 por convite ainda não foi implementada. Veja estado e critérios no [roadmap de versões](INVESTMENT_DASHBOARD_V2_ROADMAP.md).
+A candidata local v3.0.0 finaliza convites Supabase, membership, isolamento financeiro, quotas da Íris, exportação ampliada, exclusão própria retomável e loader administrativo da fixture fictícia. Backend, frontend, build e integração/backup-restauração PostgreSQL 001–012 passaram localmente. Nenhum banco de produção, painel externo ou conta real foi acessado. A demonstração pública mantém dados fictícios offline. O código ainda não foi publicado; use a [checklist v3.0](v3-launch-checklist.md) para as verificações operacionais de produção.
 
 ## A. Visão geral do projeto
 
@@ -21,7 +21,7 @@ O último release publicado continua sendo v1.2.0. A candidata local v2.0.0 inco
 
 O Investment Dashboard é um dashboard pessoal de investimentos brasileiros e um projeto de portfólio técnico. Ele organiza operações manuais de ações e renda fixa, fluxo de caixa/proventos registrados, composição com bases explicitadas, relatórios, cenários de simulação e metas. Seu valor demonstrável está em regras financeiras auditáveis, separação entre demonstração e carteira privada, autenticação/isolamento e tratamento explícito de cobertura incompleta.
 
-O usuário principal é o proprietário da carteira. Recrutadores podem explorar a demonstração pública de dados fictícios. A futura expansão para um grupo pequeno por convite fica proposta para v3.0; não há intenção aprovada de transformar a aplicação em cadastro público irrestrito, produto comercial ou serviço com despesas obrigatórias.
+O usuário principal é o proprietário da carteira. Recrutadores podem explorar a demonstração pública de dados fictícios. A v3.0 implementa o acesso a um grupo pequeno por convite; cadastro público irrestrito, produto comercial e serviços pagos não fazem parte do escopo aprovado.
 
 ### Arquitetura atual
 
@@ -39,8 +39,8 @@ Navegador React/Vite
 |---|---|
 | Frontend | React 19, TypeScript, Vite, React Router, TanStack Query, Recharts, Tailwind, componentes Radix/shadcn e Decimal.js para apresentação/cálculos locais apropriados. |
 | API | Python 3.12+, FastAPI, Pydantic, SQLAlchemy 2, PyJWT/JWKS e psycopg. Rotas privadas validam token e consultam o banco sob contexto transacional de identidade. |
-| Banco | PostgreSQL; migrations Alembic em `backend/migrations/versions`; valores contábeis em `NUMERIC`. Head do checkout local candidato: `010_portfolio_valuation_observations`; estado de produção não consultado. |
-| Identidade | Supabase Auth no modo privado; JWT assimétrico ES256/RS256, issuer/audience/expiração, allowlist de UUIDs e autorização por proprietário. O cliente não recebe chave de serviço do Supabase. |
+| Banco | PostgreSQL; migrations Alembic em `backend/migrations/versions`; valores contábeis em `NUMERIC`. Migration 012 adiciona membership/convites, controles de exclusão e proveniência do loader; estado de produção não consultado. |
+| Identidade | Supabase Auth no modo privado; JWT assimétrico ES256/RS256, issuer/audience/expiração, membership ativo em rotas privadas, convites sem cadastro público e autorização por proprietário. O cliente não recebe chave de serviço do Supabase. |
 | Hospedagem reportada | Frontend Vercel, API Render e banco/Auth Supabase. Esta documentação não lê secrets nem confirma variáveis, SHAs implantados, plano contratado ou configurações atuais dos painéis. |
 | Desenvolvimento | Frontend local por Vite; API local FastAPI; PostgreSQL local via Compose ou PostgreSQL descartável em containers para integração. |
 
@@ -58,8 +58,8 @@ Navegador React/Vite
 | `backend/app/finance.py`, `valuation.py`, `performance.py`, `portfolio.py` | Custo médio, valuation atual, agregados de performance atual e composição/fluxos registrados. |
 | `backend/app/fixed_income/`, `financial_events.py` | Ledger CDB, projeção/revisões/observações e eventos de caixa/proventos. |
 | `backend/app/market_data/`, `bcb_rates/` | Cotações pontuais e integração de taxas BCB/SGS; serviços históricos permanecem separados e condicionais. |
-| `backend/app/wealth_observations.py`, `benchmarks.py` | Snapshots patrimoniais manuais owner-scoped e índices de referência mensais; não declaram retorno da carteira. |
-| `backend/migrations/versions/` | Cadeia de migrations 001–010 no checkout local; 010 ainda não aplicada em produção. |
+| `backend/app/wealth_observations.py`, `accounts.py` | Observações patrimoniais owner-scoped e lifecycle de convites/membership/quota; comparador de índices removido na candidata v3.0. |
+| `backend/migrations/versions/` | Cadeia de migrations 001–012 validada em PostgreSQL descartável; estado de produção não consultado. |
 | `backend/tests/`, `frontend/src/**/*.test.*` | Testes unitários, de API, auth, componentes e cálculo; integração PostgreSQL opt-in/runner descartável. |
 | `scripts/`, `backend/scripts/` | Auditoria de publicação e utilitários de backup/restore; arquivos de backup devem permanecer fora do Git. |
 | `docs/` | Decisões, registros de fases, segurança, deploy, backups, release e planejamento. Este arquivo centraliza estado e próximos passos. |
@@ -113,35 +113,35 @@ As fases 2.0.x de renda fixa são nomenclatura técnica anterior às versões p�
 
 Detalhes e logs históricos estão em [validação](validation.md), [segurança](security-audit.md), [documentação v5](phase-5-master-plan.md), [handoff v5](v5-development-handoff.md) e documentos individuais listados em cada linha. Esses artefatos podem ter cabeçalhos de status antigos; este resumo não os reescreve como evidência atual.
 
-## C. Estado funcional atual da v1
+## C. Estado funcional atual do checkout v3.0
 
 | Área | Estado | Evidência e limite que deve aparecer ao usuário |
 |---|---|---|
 | Demonstração | **Implementado no código; validação operacional parcial** | Seed fictício, persistência demo local e repository sem API privada. CSP/Network efetivos do domínio público devem ser rechecados se for necessário atestado atual. |
-| Login/logout privado | **Implementado; produção parcialmente validada pelo proprietário** | Supabase Auth, JWT/JWKS, allowlist, sessão por aba, estados de erro; não há signup público. Testes confirmam regras locais, mas não provam config atual do painel. |
+| Login/logout privado | **Membership por convite no candidato local** | Supabase Auth, JWT/JWKS, ativação por membership, e-mail verificado server-side e sem signup público. Não prova configuração atual do painel. |
 | Ações, compras e vendas | **Implementado** | Ledger por custo médio cronológico, taxas, validação de venda e resultado realizado. Não inclui por si só saldo em caixa ou retorno total. |
 | Cotações/valuation atual | **Parcial / dependente de configuração e fonte** | Serviço pontual valida preço/moeda/timestamp/stale/cobertura; total agregado fica nulo se falta componente. Fonte e termos devem ser revalidados antes de ativar. |
 | Renda fixa/CDB | **Implementado para ledger/estimativas contratadas, com limites** | Produtos, lotes, aplicação/resgate, saldo/principal, observações, revisões, taxas BCB/SGS e estimativas por contrato. Estimativa não é saldo de resgate garantido ou rendimento efetivamente recebido. |
-| Fluxos/eventos | **Implementado** | Eventos manuais privados de caixa, dividendos/JCP e revisão append-only; migration 009 criou as tabelas de eventos. A migration 010 acrescenta observações patrimoniais; o estado atual do Supabase não foi consultado nesta tarefa. |
+| Fluxos/eventos | **Implementado** | Eventos manuais privados de caixa, dividendos/JCP e revisão append-only; migrations 009–010 preservam os registros e a observação patrimonial. Membership/convites e controles de exclusão chegam ao head 012; nenhum banco remoto foi consultado. |
 | Histórico | **Implementado para movimentos registrados** | Timeline unificada com filtros e estados; não é avaliação patrimonial histórica. Históricos de preço podem ficar indisponíveis. |
 | Dashboard, composição, gráficos | **Implementado com cobertura/bases definidas** | Capital investido/custo/principal e valuation atual não se confundem; fluxos não são retorno. |
 | Relatórios/PDF | **Implementado** | Relatórios privados reaproveitam endpoints; PDF via impressão nativa. Não há arquivo/relatório server-side persistido. |
 | Simulador | **Implementado** | Cálculo local com cenários editáveis, inflação opcional e premissas; não consulta saldo da carteira. |
 | Metas | **Implementado com persistência local** | Progresso manual ou custo/principal investido; metas não sincronizam e não aparecem na demo; uma limpeza do armazenamento do navegador pode removê-las. |
-| Evolução patrimonial prospectiva | **Implementada no candidato local v2.0.0** | Observações append-only por data/fonte, actions informadas pelo usuário e CDBs observados na mesma data; total indisponível se cobertura incompleta. Migration 010 exige ensaio PostgreSQL descartável antes de qualquer migration de produção. |
+| Evolução patrimonial prospectiva | **Implementada na v2.0.0 publicada** | Observações append-only por data/fonte, ações informadas pelo usuário e CDBs observados na mesma data; total indisponível se cobertura incompleta. |
 | Rentabilidade total/TWR/XIRR | **Indisponível por falta de série completa e limites de fluxo** | O resultado de ações realizado e o não realizado coberto ficam em seus próprios campos; valorização não é retorno total. |
-| Benchmarks CDI, Ibovespa e IPCA | **Comparação implementada no candidato local com cobertura condicionada** | CDI (12), IPCA (433) e `^BVSP`; somente meses comuns completos, índices base 100 e estado parcial quando falta mês. Não é retorno da carteira. |
-| Backup | **Processo manual versionado para schema 010; restore real pendente** | `docs/manual-backup.md` e `backend/scripts/backup_supabase_010.py`. O formato 010 inclui a tabela nova; restore de arquivo real não foi executado. Não contém Auth, Storage ou configuração externa. |
+| Comparador CDI, Ibovespa e IPCA | **Removido na candidata v3.0** | Não existe mais UI nem endpoint de comparação. As séries CDI/Selic exigidas por renda fixa permanecem. |
+| Backup | **Runner sintético de schema 012 aprovado; sem teste do backup de produção** | Runner local criou dump fictício, verificou `IDBKP012`, restaurou em PostgreSQL descartável e comparou dados/RLS/grants/owners. Não acessou backup ou serviço real; backups não contêm Auth, Storage ou configuração externa. |
 
 ### Segurança e operações
 
-Confirmado no código: CORS por origem exata, erros SQL genéricos sem parâmetros no log, headers `no-store`, validação JWT e allowlist, consultas por proprietário, RLS contextual, papel runtime verificado em produção para não ser superuser/BYPASSRLS/owner de `operations`, TLS PostgreSQL `verify-full` requerido quando `ENVIRONMENT=production`, frontend demo/privado separado. O checker de role da aplicação examina uma tabela crítica, mas não substitui a revisão completa de role/grants no banco ativo.
+Confirmado no código e em PostgreSQL descartável: CORS por origem exata, erros SQL genéricos sem parâmetros no log, headers `no-store`, validação JWT e membership, consultas por proprietário, RLS/FORCE RLS, runtime sem DELETE de ledgers append-only e executor NOLOGIN sem BYPASSRLS, além da separação demo/privado. Isso não confirma as roles, variáveis ou configuração dos serviços publicados.
 
 Não está comprovado neste documento: teste de duas contas reais publicadas, leitura do schema/`alembic_version` no Supabase, network/CSP atual da demo, rota/commit ativo do Render, configuração de Auth e variáveis dos painéis, restore do backup real, pentest, MFA, limite de requisição distribuído, alerta/incident response e recuperação de Supabase Auth/Storage. Para detalhes e classificação da aceitação da v1.0, ver `docs/v1.0-release-readiness.md` e `docs/security-audit.md`.
 
 ### Testes e versões
 
-Registros existentes mostram a v1.0 com frontend 217 testes em 28 arquivos, build Vite/TypeScript aprovado, npm audit sem vulnerabilidade conhecida na árvore consultada e backend 382 aprovados/1 ignorado em Python 3.12 descartável; PostgreSQL 17 descartável percorreu 001–009 e testou backup/restore sintético, RLS/grants e dois proprietários. Após o hotfix do runner `329ba67`, o registro da correção indica suite backend 383 aprovados/1 ignorado; a integração CI tinha sido a falha que motivou o hotfix. Estes são resultados de execuções registradas, não reexecutados nesta documentação. O Actions atual deve ser consultado no GitHub antes de uma futura alteração.
+Nesta validação da candidata local v3.0: backend **439 aprovados, 1 ignorado**; frontend **232 aprovados em 33 arquivos**, build TypeScript/Vite aprovado com 2.387 módulos, e PostgreSQL 17 descartável percorreu 001–012 com backup/restore sintético, isolamento, exclusão retomável e loader da fixture fictícia. Nenhum serviço Supabase real, dado privado, backup real, migration de produção, push ou deploy foi usado.
 
 ## D. Pendências e itens deixados pelo caminho
 
@@ -272,20 +272,20 @@ Complexidade é relativa (S pequena, M média, L grande) e não equivale a calen
 | v1.1.x | Sincronizar metas e acabamento de relatórios | Proposto, opcional | P2 | Caso de uso, persistência/privacidade | M | Funciona sob owner/RLS e não mistura demo nem identidade | Nova sugestão; confirmar escopo |
 | v1.2.0 | Chat privado Íris, conhecimento estático, limites e segurança | Publicada segundo o proprietário | Entregue | Groq Free opcional; auth Supabase; demo isolada | M | Validação anterior à release: 393 testes backend (1 skip), 221 frontend, build e chamadas reais completas; a revisão documental não acessou painéis | Seção F/CHANGELOG |
 | Fora do escopo aprovado | Ferramentas, memória persistente ou contexto automático da carteira na Íris | Não incluído em v1.2.1/v1.3/v2.0/v3.0 | — | Nenhuma dependência ativa | — | Nenhuma tarefa pendente; só reabrir por nova decisão explícita | Roadmap atual |
-| v2.0 | Snapshots patrimoniais, fluxos, rentabilidade e benchmarks sob cobertura explícita | Implementada na candidata local; não publicada | Validação local aprovada; publicação ainda não solicitada | Snapshot append-only, classificação de fluxos, migration/RLS/restore descartável | A | Métricas reproduzíveis, lacunas explícitas, cálculo recusado se incompleto | `INVESTMENT_DASHBOARD_V2_ROADMAP.md` |
-| v3.0.1–.6 | A proposta antiga de onboarding restrito por convite | Reclassificada; não implementada | Após v2.0/estabilidade | Threat model, auth/admin, RLS, restore, suporte e limites | A | Acesso cruzado negado, restore e saída segura testados | `multiuser-expansion-plan.md` e novo roadmap |
+| v2.0 | Snapshots patrimoniais, fluxos, rentabilidade e benchmarks sob cobertura explícita | Publicada segundo o proprietário; comparador retirado na candidata v3 | Estabilidade | Snapshot append-only, classificação de fluxos e RLS | — | Métricas reproduzíveis e lacunas explícitas | `INVESTMENT_DASHBOARD_V2_ROADMAP.md` |
+| v3.0.0 | Acesso restrito por convite | Código implementado e validado localmente; não publicado | Aplicar migrations ausentes e conferir serviços em etapa operacional | Migration 012, membership, convite, RLS, quotas, exclusão retomável, loader e export prontos no checkout | Fechamento funcional concluído | PostgreSQL 001–012, isolamento, falha parcial, loader e restore `IDBKP012` aprovados em dados sintéticos | `INVESTMENT_DASHBOARD_V2_ROADMAP.md` |
 | Fora do escopo aprovado | Open Finance, scraping, APIs pagas/CSV/adaptadores, monetização/cadastro público | Explicitamente excluído das versões planejadas | Não agendado | Nova decisão de produto seria necessária para reabrir qualquer item | — | Sem requisito ou backlog dessas ideias | Roadmap atual |
 
 ## H. Guia para futuras sessões
 
 ### Estado para retomar
 
-- Checkout atual: `main` em `558e878` antes das alterações não commitadas da candidata v2.0. A referência `origin/main` não foi atualizada pela rede; não houve commit ou push. A árvore contém mudanças de v1.2.1/v1.3/v2.0 e seus testes/documentação. A cadeia local de migrations chega a `010_portfolio_valuation_observations`; o banco de produção não foi consultado.
+- Checkout atual e estado Git devem ser conferidos com `git status`/`git rev-parse`; as alterações não commitadas desta tarefa correspondem à candidata local v3.0.0. Não houve commit ou push. A cadeia local de migrations chega a `011_invited_accounts`; o banco de produção não foi consultado.
 - Release v1.0.0 foi publicada segundo o proprietário; tag local existente aponta para `1d54a36`. Tag remota v1.0.1 no commit `329ba67` foi observada em consulta anterior; a reconsulta falhou por DNS. Não criar/mover tags ou release sem pedido.
 - A implementação v2.0 inclui correção para serializar observações patrimoniais antes do commit sob RLS, contexto de tela não sensível na Íris, rótulos diários legíveis para histórico e ambiente de teste sem chaves Groq herdadas.
-- Migration 010 é head no código e foi ensaiada em PostgreSQL 17 descartável. O estado corrente do banco de produção não foi consultado; não rodar migration ou query de produção sem autorização específica.
-- Backup único cifrado fora do repo; documento não inclui frase/hash/DSN. Restore real ainda não foi ensaiado; somente dados fictícios e banco descartável foram usados nos testes sintéticos registrados.
-- v1.2.0 — Íris foi publicada segundo relato do proprietário. A candidata v2.0.0 local reúne v1.2.1, v1.3 e v2.0 e passou nas suítes e no ensaio PostgreSQL descritos em `docs/validation.md`; ainda não foi publicada. Não houve inspeção visual autenticada nem consulta a Render/Vercel/Supabase. A v3.0 por convite não foi implementada. O escopo excluído está consolidado no roadmap atual.
+- Migration 012 é head no código e o runner PostgreSQL descartável 001–012, incluindo `IDBKP012` e restore sintético, passou nesta tarefa. Nenhuma migration ou consulta de produção foi feita.
+- Nenhum backup real foi criado, lido ou restaurado nesta tarefa. Restore sintético usa exclusivamente fixtures e containers locais descartáveis.
+- v2.0.0 foi publicada segundo o proprietário. A candidata local v3.0.0 passou nas suítes descritas em `docs/validation.md`; exclusão e loader estão implementados e testados apenas com dados sintéticos. A publicação aguarda validação operacional dos serviços e migration. Nenhum painel externo foi acessado; inspeção visual autenticada com sessão Supabase legítima permanece manual.
 
 ### Comandos locais
 

@@ -28,6 +28,7 @@ function Harness() {
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ status: 'active' }) })))
   mock.callback = null
   mock.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
   mock.auth.getUser.mockResolvedValue({ data: { user: session.user }, error: null })
@@ -77,6 +78,22 @@ test('login por senha, envio do access token ao FastAPI e logout', async () => {
   client.clear()
 })
 
+test('carteira carregada pela fixture mostra aviso explícito de dados fictícios', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
+    const path = new URL(input, 'https://test.invalid').pathname
+    if (path.endsWith('/api/account/fixture-status')) return new Response('{"fictional_fixture_loaded":true}', { status: 200 })
+    return financialResponse(input)
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
+  await vi.waitFor(() => expect(host.textContent).toContain('não representam investimentos reais'))
+  const call = fetchMock.mock.calls.find(([input]) => String(input).includes('/api/account/fixture-status'))
+  expect(call?.[1]?.headers).toEqual(expect.objectContaining({ Authorization: 'Bearer test-access-a' }))
+  client.clear()
+})
+
 test.each(['/acoes', '/historico', '/cdbs', '/metas', '/simulador'])('rota privada %s não renderiza carteira nem faz rede sem login', async route => {
   const fetchMock = vi.fn()
   vi.stubGlobal('fetch', fetchMock)
@@ -91,7 +108,8 @@ test.each(['/acoes', '/historico', '/cdbs', '/metas', '/simulador'])('rota priva
 
 test('403 da API mantém somente login e feedback de falta de autorização', async () => {
   mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 403 })))
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => input.includes('/api/account/activate')
+    ? new Response('{"status":"active"}', { status: 200 }) : new Response('{}', { status: 403 })))
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)) })
@@ -150,6 +168,8 @@ function RouteProbe() { return <output data-route>{useLocation().pathname}</outp
 
 function financialResponse(input: string) {
   const path = new URL(input, 'https://test.invalid').pathname
+  if (path.endsWith('/api/account/activate')) return new Response('{"status":"active"}', { status: 200 })
+  if (path.endsWith('/api/account/fixture-status')) return new Response('{"fictional_fixture_loaded":false}', { status: 200 })
   const payload = path.endsWith('/dashboard/valuation')
     ? { holdings: [], acquisition_cost: '0', total_purchases: '0', realized_profit: '0', market_value: null }
     : path.endsWith('/dashboard/performance')
@@ -498,7 +518,8 @@ test('dashboard privado usa valuation uma vez, sem endpoint contábil separado o
 
 test('erro inicial do endpoint valuation é visível e oferece nova tentativa sem simular logout', async () => {
   mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
-  vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })))
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => input.includes('/api/account/activate')
+    ? new Response('{"status":"active"}', { status: 200 }) : new Response('{}', { status: 500 })))
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><App/></MemoryRouter></QueryClientProvider>))
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
@@ -514,6 +535,7 @@ test.each(['create', 'delete'])('operação privada %s invalida valuation mesmo 
   let mutated = false
   const operation = { id: 1, ticker: 'ITUB4', kind: 'BUY', date: '2026-01-01', quantity: '10', price: '20', fees: '0' }
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    if (input.includes('/api/account/activate')) return new Response('{"status":"active"}', { status: 200 })
     if (init?.method === 'POST' || init?.method === 'DELETE') {
       mutated = true
       return init.method === 'DELETE' ? new Response(null, { status: 204 }) : new Response(JSON.stringify(operation), { status: 201 })

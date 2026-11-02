@@ -29,6 +29,10 @@ const MAX_TARGET = new Decimal('1000000000000')
 
 export function goalsStorageKey(identity: string) { return `${KEY_PREFIX}${encodeURIComponent(identity)}` }
 
+export function clearGoals(identity: string, storage: Pick<Storage, 'removeItem'> = window.localStorage): boolean {
+  try { storage.removeItem(goalsStorageKey(identity)); return true } catch { return false }
+}
+
 export const DEFAULT_GOAL_PLANNING: GoalPlanningSettings = {
   monthlyContribution: '500.00', horizonMonths: '120', useManualHorizon: false,
   annualRates: { conservative: '6', moderate: '10', optimistic: '14' },

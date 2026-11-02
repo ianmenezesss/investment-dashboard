@@ -50,12 +50,6 @@ export type WealthObservation = {
   consolidated_coverage: 'complete' | 'partial'; created_at: string
 }
 export type WealthObservationInput = { as_of: string; equities_market_value: string; equities_source: string }
-export type BenchmarkComparison = {
-  period: '1M' | '3M'; coverage_start: string | null; coverage_end: string | null
-  availability: 'available' | 'partial' | 'disabled' | 'unavailable' | 'empty'
-  reason: 'feature_disabled' | 'provider_not_configured' | 'provider_unavailable' | 'source_coverage' | 'incompatible_data' | 'insufficient_common_period' | null
-  source: string; bases: Record<string, string>; points: { month: string; values: Record<string, string> }[]
-}
 export type Summary = { acquisition_cost: string; total_purchases: string; sale_proceeds: string; realized_profit: string; market_value: null; holdings: { ticker: string; quantity: string; cost: string; average_price: string }[] }
 export type MarketQuote = {
   ticker: string; price: string | null; currency: string; provider: string

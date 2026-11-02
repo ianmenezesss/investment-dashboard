@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     auth_mode: Literal["local", "supabase"] = "local"
     supabase_url: str = ""
     allowed_user_ids: list[UUID] = Field(default_factory=list)
+    invitation_admin_ids: list[UUID] = Field(default_factory=list)
+    supabase_service_role_key: SecretStr = SecretStr("")
+    app_public_url: str = ""
     migration_database_url: SecretStr = SecretStr("")
     market_data_enabled: bool = False
     equity_history_enabled: bool = False
@@ -42,8 +45,14 @@ class Settings(BaseSettings):
                 raise ValueError("Produção exige conexão TLS com verificação do certificado PostgreSQL")
         if self.auth_mode == "supabase":
             url = urlsplit(self.supabase_url)
-            if url.scheme != "https" or not url.hostname or url.path or url.query or url.fragment or url.username or not self.allowed_user_ids:
-                raise ValueError("Supabase exige URL HTTPS sem caminho e ALLOWED_USER_IDS explícito")
+            if url.scheme != "https" or not url.hostname or url.path or url.query or url.fragment or url.username:
+                raise ValueError("Supabase exige URL HTTPS sem caminho")
+        if self.environment == "production" and self.auth_mode == "supabase":
+            app_url = urlsplit(self.app_public_url)
+            if not self.invitation_admin_ids or not self.supabase_service_role_key.get_secret_value().strip():
+                raise ValueError("Produção com convites exige admins e chave administrativa Supabase no backend")
+            if app_url.scheme != "https" or not app_url.netloc or app_url.path or app_url.query or app_url.fragment or app_url.username:
+                raise ValueError("APP_PUBLIC_URL deve ser uma origem HTTPS exata")
         return self
 
 

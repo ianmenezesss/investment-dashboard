@@ -41,7 +41,7 @@ from .equity_comparison import router as equity_comparison_router
 from .financial_events import router as financial_events_router
 from .assistant import router as assistant_router
 from .wealth_observations import router as wealth_observations_router
-from .benchmarks import router as benchmarks_router
+from .accounts import router as accounts_router, admin_router as account_admin_router
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 from uuid import uuid4
@@ -75,7 +75,7 @@ async def lifespan(app):
             app.state.bcb_rates_service = None
 
 
-app = FastAPI(title="Investment Dashboard", version="2.0.0", lifespan=lifespan, docs_url=None if settings.environment == "production" else "/docs", redoc_url=None, openapi_url=None if settings.environment == "production" else "/openapi.json")
+app = FastAPI(title="Investment Dashboard", version="3.0.0", lifespan=lifespan, docs_url=None if settings.environment == "production" else "/docs", redoc_url=None, openapi_url=None if settings.environment == "production" else "/openapi.json")
 app.include_router(fixed_income_router)
 app.include_router(revision_router)
 app.include_router(bcb_rates_router)
@@ -89,7 +89,8 @@ app.include_router(equity_comparison_router)
 app.include_router(financial_events_router)
 app.include_router(assistant_router)
 app.include_router(wealth_observations_router)
-app.include_router(benchmarks_router)
+app.include_router(accounts_router)
+app.include_router(account_admin_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -311,4 +312,34 @@ def delete(operation_id: int, db: Session = Depends(private_db)):
 
 @app.get("/api/export", dependencies=[Depends(authenticate)])
 def export(db: Session = Depends(private_db)):
-    return {"schema_version": 1, "operations": [serialize(op) for op in records(db)]}
+    from .fixed_income.models import Investment, Lot, Movement, InvestmentArchive, ApplicationRevision
+    from .fixed_income.observations import PositionObservation
+    from .financial_events import FinancialEvent, FinancialEventRevision
+    from .wealth_observations import PortfolioValuationObservation
+    from .accounts import AccountMember
+
+    owner = db.info.get("owner_id")
+    member = db.get(AccountMember, owner) if owner is not None else None
+    account = None if member is None else {
+        "user_id": str(member.user_id), "email": member.email, "status": member.status,
+        "created_at": member.created_at.isoformat(),
+    }
+    def encode(model):
+        result = []
+        for row in db.scalars(select(model).where(model.owner_id == owner).order_by(model.id)):
+            item = {}
+            for column in model.__table__.columns:
+                value = getattr(row, column.name)
+                if isinstance(value, Decimal): value = str(value)
+                elif hasattr(value, "isoformat"): value = value.isoformat()
+                elif value is not None and value.__class__.__name__ == "UUID": value = str(value)
+                item[column.name] = value
+            result.append(item)
+        return result
+    return {"schema_version": 3, "account": account,
+        "operations": [serialize(op) for op in records(db)],
+        "fixed_income_investments": encode(Investment), "fixed_income_lots": encode(Lot),
+        "fixed_income_movements": encode(Movement), "fixed_income_observations": encode(PositionObservation),
+        "fixed_income_archives": encode(InvestmentArchive), "fixed_income_revisions": encode(ApplicationRevision),
+        "financial_events": encode(FinancialEvent), "financial_event_revisions": encode(FinancialEventRevision),
+        "wealth_observations": encode(PortfolioValuationObservation)}

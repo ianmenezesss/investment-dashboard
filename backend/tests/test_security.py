@@ -48,7 +48,8 @@ def test_production_accepts_verified_tls_configuration_without_connecting(query)
         _env_file=None, environment="production", auth_mode="supabase",
         database_url="postgresql+psycopg://runtime:example@pooler.example:5432/postgres" + query,
         cors_origin="https://portfolio.example", supabase_url="https://auth.example",
-        allowed_user_ids=[A],
+        allowed_user_ids=[A], invitation_admin_ids=[A], supabase_service_role_key="test-only-admin-secret",
+        app_public_url="https://portfolio.example",
     )
     assert config.environment == "production"
 
@@ -76,7 +77,7 @@ def test_every_financial_endpoint_requires_authentication(method, path):
         app.dependency_overrides.clear()
 
 
-def test_jwt_signature_issuer_audience_expiry_and_allowlist(monkeypatch):
+def test_jwt_signature_issuer_audience_expiry_and_invited_member_authorization(monkeypatch):
     from app import auth
     private = ec.generate_private_key(ec.SECP256R1())
     other = ec.generate_private_key(ec.SECP256R1())
@@ -93,8 +94,11 @@ def test_jwt_signature_issuer_audience_expiry_and_allowlist(monkeypatch):
     with pytest.raises(HTTPException) as error:
         verify_jwt(token(claims, other), private.public_key())
     assert error.value.status_code == 401
+    assert verify_jwt(token(dict(claims, sub=str(B))), private.public_key()).user_id == B
+    monkeypatch.setattr(auth, "account_is_active", lambda user_id: user_id == A)
+    assert auth.require_active_account(Principal(A)).user_id == A
     with pytest.raises(HTTPException) as error:
-        verify_jwt(token(dict(claims, sub=str(B))), private.public_key())
+        auth.require_active_account(Principal(B))
     assert error.value.status_code == 403
     with pytest.raises(HTTPException):
         verify_jwt(token(dict(claims, role="service_role")), private.public_key())
@@ -108,6 +112,12 @@ def test_users_only_read_their_own_portfolio_and_export():
     with Session(engine) as db:
         for i, owner in enumerate([None, A, B]):
             db.add(Operation(owner_id=owner, ticker=f"TEST{i}", kind="BUY", date=date(2026, 1, 1), quantity=Decimal(1), price=Decimal(10), fees=Decimal(0)))
+        from app.accounts import AccountMember
+        from datetime import datetime, timezone
+        db.add_all([
+            AccountMember(user_id=A, email="a@example.test", status="active", created_at=datetime.now(timezone.utc)),
+            AccountMember(user_id=B, email="b@example.test", status="active", created_at=datetime.now(timezone.utc)),
+        ])
         db.commit()
 
     def db_session():
@@ -120,8 +130,93 @@ def test_users_only_read_their_own_portfolio_and_export():
         for owner, ticker in [(None, "TEST0"), (A, "TEST1"), (B, "TEST2")]:
             app.dependency_overrides[authenticate] = lambda owner=owner: Principal(owner)
             assert [op["ticker"] for op in client.get("/api/operations").json()] == [ticker]
-            assert [op["ticker"] for op in client.get("/api/export").json()["operations"]] == [ticker]
+            exported = client.get("/api/export").json()
+            assert [op["ticker"] for op in exported["operations"]] == [ticker]
+            if owner is not None:
+                assert exported["account"]["user_id"] == str(owner)
+                assert exported["account"]["email"] == ("a@example.test" if owner == A else "b@example.test")
+            else:
+                assert exported["account"] is None
             assert [op["ticker"] for op in client.get("/api/dashboard").json()["holdings"]] == [ticker]
+    finally:
+        app.dependency_overrides.clear()
+        engine.dispose()
+
+
+def test_private_export_covers_financial_tables_with_owner_scope():
+    from datetime import date
+    from decimal import Decimal
+    from uuid import uuid4
+    from app.accounts import AccountMember
+    from app.fixed_income.models import ApplicationRevision, Investment, InvestmentArchive, Lot, Movement
+    from app.fixed_income.observations import PositionObservation
+    from app.financial_events import FinancialEvent, FinancialEventRevision
+    from app.wealth_observations import PortfolioValuationObservation
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    now = datetime.now(timezone.utc)
+    with Session(engine) as db:
+        db.add_all([
+            AccountMember(user_id=A, email="a@example.test", status="active", created_at=now),
+            AccountMember(user_id=B, email="b@example.test", status="active", created_at=now),
+        ])
+        investment_a = Investment(owner_id=A, issuer="Banco fixture A", product_name="CDB fixture A",
+            product_type="CDB", remuneration="FIXED", indexer="NONE", contracted_rate=Decimal("12"),
+            application_date=date(2025, 1, 1), maturity_date=date(2027, 1, 1))
+        investment_b = Investment(owner_id=B, issuer="Banco fixture B", product_name="CDB fixture B",
+            product_type="CDB", remuneration="FIXED", indexer="NONE", contracted_rate=Decimal("12"),
+            application_date=date(2025, 1, 1), maturity_date=date(2027, 1, 1))
+        db.add_all([investment_a, investment_b])
+        db.flush()
+        lot = Lot(investment_id=investment_a.id, owner_id=A, application_date=date(2025, 1, 1))
+        db.add(lot); db.flush()
+        movement = Movement(investment_id=investment_a.id, lot_id=lot.id, owner_id=A, kind="APPLICATION",
+            date=date(2025, 1, 1), principal_amount=Decimal("100"))
+        db.add(movement); db.flush()
+        db.add_all([
+            PositionObservation(investment_id=investment_a.id, owner_id=A, kind="OPENING", reason="POSITION",
+                as_of=date(2025, 1, 1), gross_value=Decimal("100"), net_value=Decimal("100"), source="Fixture"),
+            InvestmentArchive(investment_id=investment_a.id, owner_id=A),
+            ApplicationRevision(application_id=movement.id, owner_id=A, revision=1, kind="VOID",
+                reason="Fixture revision", request_id=uuid4()),
+        ])
+        event_a = FinancialEvent(owner_id=A, request_id=uuid4(), kind="CONTRIBUTION", event_date=date(2025, 1, 2),
+            cash_amount=Decimal("50"), source="Fixture")
+        event_b = FinancialEvent(owner_id=B, request_id=uuid4(), kind="CONTRIBUTION", event_date=date(2025, 1, 2),
+            cash_amount=Decimal("99"), source="Other fixture")
+        db.add_all([event_a, event_b]); db.flush()
+        db.add_all([
+            FinancialEventRevision(event_id=event_a.id, owner_id=A, revision=1, kind="VOID",
+                reason="Fixture correction", request_id=uuid4()),
+            PortfolioValuationObservation(owner_id=A, request_id=uuid4(), as_of=date(2025, 1, 3),
+                equities_market_value=Decimal("150"), equities_source="Fixture statement",
+                fixed_income_coverage="empty", fixed_income_sources=[], missing_fixed_income=[]),
+            Operation(owner_id=A, ticker="TEST4", kind="BUY", date=date(2025, 1, 1), quantity=Decimal(1), price=Decimal(10), fees=Decimal(0)),
+            Operation(owner_id=B, ticker="OTHR4", kind="BUY", date=date(2025, 1, 1), quantity=Decimal(1), price=Decimal(20), fees=Decimal(0)),
+        ])
+        db.commit()
+
+    def db_session():
+        with Session(engine) as db:
+            yield db
+
+    app.dependency_overrides[get_db] = db_session
+    app.dependency_overrides[authenticate] = lambda: Principal(A)
+    try:
+        exported = TestClient(app).get("/api/export").json()
+        assert exported["schema_version"] == 3
+        assert exported["account"]["user_id"] == str(A)
+        assert [row["ticker"] for row in exported["operations"]] == ["TEST4"]
+        expected = {
+            "fixed_income_investments", "fixed_income_lots", "fixed_income_movements",
+            "fixed_income_observations", "fixed_income_archives", "fixed_income_revisions",
+            "financial_events", "financial_event_revisions", "wealth_observations",
+        }
+        assert expected.issubset(exported)
+        assert all(len(exported[key]) == 1 for key in expected)
+        assert exported["fixed_income_investments"][0]["owner_id"] == str(A)
+        assert exported["financial_events"][0]["cash_amount"] == "50.00000000"
     finally:
         app.dependency_overrides.clear()
         engine.dispose()

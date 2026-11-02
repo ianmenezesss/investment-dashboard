@@ -1,6 +1,14 @@
 # Validação do Investment Dashboard
 
-## Candidata v2.0.0 — 01/11/2026 (local, não publicada)
+## Candidata v3.0.0 — 01/11/2026 (local, não publicada)
+
+- Backend: **439 aprovados, 1 ignorado**. A suíte completa usou configurações de teste forçadas (`DATABASE_URL=sqlite://`, `AUTH_MODE=local`, token fictício e `TEST_DATABASE_URL` vazio); dotenv foi isolado pelo `conftest.py`. O aviso deprecado é o adaptador Starlette `TestClient`/HTTPX.
+- PostgreSQL 17 descartável: **1 teste de integração aprovado**; migrations 001–012, isolamento entre proprietários, grants do executor/runtime, exclusão própria retomável, rejeição de identidade cruzada, rollback de falha parcial, loader em conta vazia/não vazia e backup/restauração autenticados `IDBKP012` passaram. O restore comparou contagens, hashes, Alembic head, RLS/FORCE RLS, policies, grants, owners de funções e visibilidade entre contas.
+- Frontend: **232 testes aprovados em 33 arquivos**. Build TypeScript/Vite: aprovado, **2.387 módulos** transformados. JSDOM mantém avisos não bloqueantes de dimensões zero do Recharts e `act(...)`.
+- O teste visual do aviso da fixture usa mock de sessão/API; o teste da demonstração confirma que não consulta endpoint privado. Não houve login no Supabase real, chamada à Groq, execução do loader em conta real, exclusão real, leitura/escrita de dados, migration/backup de produção, push ou deploy. A interface autenticada não foi inspecionada em navegador com sessão Supabase real.
+- A migration e o backup/restore foram exercitados somente em containers PostgreSQL locais descartáveis. O candidato inclui controles de exclusão e fixture, mas a configuração, permissão DDL e publicação de produção ainda precisam ser verificadas no procedimento operacional.
+
+## Release v2.0.0 — registro da validação local antes da publicação
 
 - Backend completo: **419 aprovados, 1 ignorado** em Python 3.12. O teste ignorado é o opt-in PostgreSQL na execução geral; a integração abaixo foi executada separadamente. Permaneceu um aviso de depreciação do `TestClient`/HTTPX.
 - PostgreSQL 17 descartável: **1 aprovado**; migrations 001–010, endpoints sob role runtime restrita, isolamento de dois proprietários e backup/restauração sintéticos `IDBKP010` passaram. Contagens, hashes dos dados, RLS/FORCE RLS, policies, triggers e grants conferidos.

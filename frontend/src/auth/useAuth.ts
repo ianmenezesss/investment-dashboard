@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session, SupabaseClient } from '@supabase/supabase-js'
 import { getSupabase } from './supabase'
+import { apiBase } from '../runtime'
 
 type Status = 'loading' | 'anonymous' | 'authenticated'
 export function useAuth(enabled: boolean, clearPrivate: () => void) {
@@ -53,6 +54,8 @@ export function useAuth(enabled: boolean, clearPrivate: () => void) {
         const verified = await sdk.auth.getUser(next.access_token)
         if (!alive || revision !== generation.current || blocked.current) return
         if (verified.error || verified.data.user?.id !== next.user.id || (next.expires_at ?? 0) * 1000 <= Date.now()) throw new Error('expired')
+        const activation = await fetch(`${apiBase()}/api/account/activate`, { method: 'POST', headers: { Authorization: `Bearer ${next.access_token}` } })
+        if (!activation.ok) throw new Error('account_not_invited')
         accept(next); setError('')
       } catch {
         if (alive && revision === generation.current && !blocked.current) expire()
@@ -117,6 +120,22 @@ export function useAuth(enabled: boolean, clearPrivate: () => void) {
     }
   }
 
+  async function reauthenticate(password: string) {
+    const email = session?.user.email
+    if (!enabled || !client.current || !email) throw new Error('Não foi possível confirmar esta sessão.')
+    try {
+      const { data, error: authError } = await client.current.auth.signInWithPassword({ email, password })
+      if (authError || !data.session || data.session.user.id !== session?.user.id) {
+        throw new Error('Senha incorreta ou confirmação adicional necessária.')
+      }
+      accept(data.session)
+      return data.session
+    } catch (cause) {
+      if (cause instanceof Error && cause.message.includes('confirmação adicional')) throw cause
+      throw new Error('Não foi possível confirmar a senha. Confira e tente novamente.')
+    }
+  }
+
   async function logout() {
     const current = ++generation.current
     blocked.current = true
@@ -131,5 +150,5 @@ export function useAuth(enabled: boolean, clearPrivate: () => void) {
     }
   }
 
-  return { session, status, error, login, logout, expire }
+  return { session, status, error, login, reauthenticate, logout, expire }
 }

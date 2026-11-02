@@ -4,8 +4,8 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SERIES = {11: "SELIC", 12: "CDI", 433: "IPCA"}
-SERIES_UNITS = {11: "% ao dia", 12: "% ao dia", 433: "% ao mês"}
+SERIES = {11: "SELIC", 12: "CDI"}
+SERIES_UNITS = {11: "% ao dia", 12: "% ao dia"}
 
 
 def today():
@@ -30,7 +30,7 @@ class Observation(BaseModel):
     model_config = ConfigDict(frozen=True)
     date: date
     value: Decimal = Field(max_digits=20, decimal_places=12, allow_inf_nan=False)
-    series_code: Literal[11, 12, 433]
+    series_code: Literal[11, 12]
     unit: Literal["% ao dia", "% ao mês"] = "% ao dia"
 
     @model_validator(mode="after")
@@ -42,8 +42,8 @@ class Observation(BaseModel):
 
 class RateHistory(BaseModel):
     model_config = ConfigDict(frozen=True)
-    series_code: Literal[11, 12, 433]
-    name: Literal["CDI", "SELIC", "IPCA"]
+    series_code: Literal[11, 12]
+    name: Literal["CDI", "SELIC"]
     unit: Literal["% ao dia", "% ao mês"]
     source: Literal["BCB/SGS"] = "BCB/SGS"
     start_date: date

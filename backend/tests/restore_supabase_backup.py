@@ -12,7 +12,7 @@ from uuid import uuid4
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from backup_archive import MAGIC, MAGIC_010, SUPPORTED_MAGICS, decrypt_stream, sha256_file
+from backup_archive import MAGIC, MAGIC_010, MAGIC_011, MAGIC_012, SUPPORTED_MAGICS, decrypt_stream, sha256_file
 
 
 REQUIRED_TABLES_009 = {
@@ -21,7 +21,10 @@ REQUIRED_TABLES_009 = {
     "fixed_income_application_revisions", "financial_events", "financial_event_revisions",
 }
 REQUIRED_TABLES_010 = REQUIRED_TABLES_009 | {"portfolio_valuation_observations"}
-VERSIONS = {MAGIC: ("009", REQUIRED_TABLES_009), MAGIC_010: ("010", REQUIRED_TABLES_010)}
+REQUIRED_TABLES_011 = REQUIRED_TABLES_010 | {"account_members", "account_invitations"}
+REQUIRED_TABLES_012 = REQUIRED_TABLES_011 | {"account_deletion_jobs", "account_deletion_audit", "account_fixture_loads"}
+VERSIONS = {MAGIC: ("009", REQUIRED_TABLES_009), MAGIC_010: ("010", REQUIRED_TABLES_010),
+            MAGIC_011: ("011", REQUIRED_TABLES_011), MAGIC_012: ("012", REQUIRED_TABLES_012)}
 EVENTS = {"financial_events", "financial_event_revisions"}
 
 
@@ -64,7 +67,7 @@ def validate_backup(path, expected_hash=None):
             raise RuntimeError("SHA-256 do arquivo criptografado não confere")
     with backup.open("rb") as source:
         if source.read(len(MAGIC)) not in VERSIONS:
-            raise RuntimeError("Cabeçalho do backup não corresponde a IDBKP009 ou IDBKP010")
+            raise RuntimeError("Cabeçalho do backup não corresponde a IDBKP009, IDBKP010, IDBKP011 ou IDBKP012")
     return backup
 
 
@@ -89,7 +92,9 @@ def main(argv=None):
     args = parse_args(argv)
     backup = validate_backup(args.backup, args.sha256)
     version = archive_version(backup)
-    required_tables = REQUIRED_TABLES_009 if version == "009" else REQUIRED_TABLES_010
+    with backup.open("rb") as source:
+        magic = source.read(len(MAGIC))
+    required_tables = VERSIONS[magic][1]
     rls_tables = required_tables - {"alembic_version"}
     passphrase = getpass.getpass("Frase de proteção do backup: ")
     if input("Este processo cria e remove somente um container PostgreSQL descartável. Digite DESCARTAVEL: ").strip() != "DESCARTAVEL":
@@ -174,6 +179,7 @@ CREATE ROLE service_role NOLOGIN;
 CREATE ROLE authenticator NOLOGIN NOINHERIT;
 CREATE ROLE investment_runtime LOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
 CREATE ROLE investment_test_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS;
+CREATE ROLE investment_deletion_executor NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
 CREATE SCHEMA auth;
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT NULLIF(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
 CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT COALESCE(NULLIF(current_setting('request.jwt.claims',true),'')::jsonb,'{}'::jsonb) $$;
@@ -185,9 +191,16 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
                    input_data=roles_sql, env=env)
         # Keep GRANT/REVOKE entries from the archive; ownership is recreated by the disposable superuser.
         docker("exec", name, "pg_restore", "--exit-on-error", "--schema=public", "--no-owner", "-d", database, "/restore/input.dump")
+        if version == "012":
+            for signature in (
+                "dashboard_account_deletion_state(uuid)", "begin_dashboard_account_deletion(uuid,text)",
+                "purge_dashboard_account_data(uuid)", "mark_dashboard_auth_identity_deleted(uuid)",
+                "finish_dashboard_account_deletion(uuid)",
+            ):
+                psql(f"ALTER FUNCTION public.{signature} OWNER TO investment_deletion_executor")
         psql("GRANT SELECT ON public.financial_events, public.financial_event_revisions "
              "TO investment_test_runtime")
-        if version == "010":
+        if version in ("010", "011", "012"):
             psql("GRANT SELECT ON public.portfolio_valuation_observations TO investment_test_runtime")
 
         restored_version = psql("SELECT version_num FROM public.alembic_version")
@@ -210,7 +223,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
             ("public.financial_event_revisions", "public.financial_event_revisions_id_seq"),
             ("public.fixed_income_application_revisions", "public.fixed_income_application_revisions_id_seq"),
         ]
-        if version == "010":
+        if version in ("010", "011", "012"):
             grant_targets.append(("public.portfolio_valuation_observations", "public.portfolio_valuation_observations_id_seq"))
         for table, sequence in grant_targets:
             grants = psql("SELECT has_table_privilege('investment_runtime', '" + table + "', 'SELECT') || '|' || "
@@ -229,7 +242,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
                              "SELECT count(*) FROM public.financial_events WHERE owner_id <> current_setting('app.user_id')::uuid; ROLLBACK;")
             if not isolation.splitlines()[-2].endswith("0"):
                 raise RuntimeError("Falha no teste RLS sintético por proprietário")
-            if version == "010":
+            if version in ("010", "011", "012"):
                 wealth = psql("BEGIN; SET LOCAL ROLE investment_test_runtime; "
                     "SELECT set_config('app.auth_mode','supabase',true); "
                     f"SELECT set_config('app.user_id','{owner}',true); "

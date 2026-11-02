@@ -43,6 +43,10 @@ test('chat do assistente não aparece na demonstração e nenhuma chamada ao end
     expect(host.querySelector('[aria-label="Abrir conversa com Íris"]')).toBeNull()
     expect(host.querySelector('#iris-chat-panel')).toBeNull()
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/assistant/chat'))).toBe(false)
+    expect(host.textContent).not.toContain('Administração de convites')
+    expect(host.textContent).not.toContain('Excluir minha conta')
+    expect(host.querySelector('.account-deletion')).toBeNull()
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/api/admin/invitations'))).toBe(false)
   } finally { await act(async () => root.unmount()); client.clear(); host.remove() }
 })
 

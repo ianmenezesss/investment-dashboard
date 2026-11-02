@@ -17,7 +17,7 @@ export function getSupabase(): SupabaseClient | null {
     storageKey: 'investment-auth-session',
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,
   } })
   return instance
 }

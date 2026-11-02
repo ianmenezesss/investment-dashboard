@@ -5,8 +5,10 @@ from typing import Literal
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from .auth import Principal, authenticate
-from .database import settings
+from .database import get_db, settings
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 _requests: dict[str, deque[float]] = defaultdict(deque)
@@ -35,21 +37,28 @@ class ChatInput(BaseModel):
     context: Literal["overview", "equities", "fixed_income", "history", "reports", "simulator", "goals"] = "overview"
 
 @router.post("/chat")
-async def chat(body: ChatInput, request: Request, principal: Principal = Depends(authenticate)):
+async def chat(body: ChatInput, request: Request, principal: Principal = Depends(authenticate), db: Session = Depends(get_db)):
     key = settings.groq_api_key.get_secret_value().strip()
     if not key:
         raise HTTPException(503, "Assistente temporariamente indisponível.")
     message = body.message.strip()
     if not message:
         raise HTTPException(422, "Digite uma pergunta.")
-    identity = str(principal.user_id or "local")
-    now = monotonic()
-    queue = _requests[identity]
-    while queue and now - queue[0] > 60:
-        queue.popleft()
-    if len(queue) >= 5:
-        raise HTTPException(429, "Você atingiu o limite temporário. Tente novamente em um minuto.")
-    queue.append(now)
+    if principal.user_id is not None and db.bind.dialect.name == "postgresql":
+        db.execute(text("SELECT set_config('app.user_id', :user_id, true)"), {"user_id": str(principal.user_id)})
+        allowed = db.scalar(text("SELECT public.consume_dashboard_assistant_quota(:user_id)"), {"user_id": principal.user_id})
+        db.commit()
+        if not allowed:
+            raise HTTPException(429, "Limite da Íris atingido: até 5 mensagens por minuto e 50 por dia.")
+    else:
+        identity = str(principal.user_id or "local")
+        now = monotonic()
+        queue = _requests[identity]
+        while queue and now - queue[0] > 60:
+            queue.popleft()
+        if len(queue) >= 5:
+            raise HTTPException(429, "Você atingiu o limite temporário. Tente novamente em um minuto.")
+        queue.append(now)
     payload = {"model": settings.groq_model, "messages": [
         {"role": "system", "content": SYSTEM + "\n\nConhecimento do dashboard:\n" + KNOWLEDGE
             + "\n\nContexto não sensível da tela atual: " + SCREEN_CONTEXTS[body.context]

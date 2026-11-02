@@ -16,7 +16,7 @@ def rates_service(request: Request):
 
 
 @router.get("/{series_code}", response_model=RateHistory)
-async def historical_rates(start_date: date, end_date: date, series_code: int = Path(ge=11, le=433),
+async def historical_rates(start_date: date, end_date: date, series_code: int = Path(ge=11, le=12),
                            service: RateService = Depends(rates_service)):
     try:
         period = Period(start_date=start_date, end_date=end_date)

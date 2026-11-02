@@ -20,10 +20,13 @@ import { ConfirmDialog } from './components/ui/ConfirmDialog'
 import { MarketDashboard } from './components/MarketDashboard'
 import { FinancialHint } from './components/FinancialHint'
 import { WorkspaceSidebar, workspaceNavItems } from './components/WorkspaceSidebar'
+import { InvitationAdmin } from './accounts/InvitationAdmin'
+import { AccountDeletionPanel } from './accounts/AccountDeletionPanel'
+import { loadGoals } from './goals/goalStorage'
+import { InvitePasswordPage } from './auth/InvitePasswordPage'
 const FixedIncomePage = lazy(() => import('./fixed-income/FixedIncomePage').then(module => ({ default: module.FixedIncomePage })))
 const PortfolioInsights = lazy(() => import('./portfolio/PortfolioInsights').then(module => ({ default: module.PortfolioInsights })))
 const WealthEvolution = lazy(() => import('./portfolio/WealthEvolution').then(module => ({ default: module.WealthEvolution })))
-const BenchmarkComparison = lazy(() => import('./portfolio/BenchmarkComparison').then(module => ({ default: module.BenchmarkComparison })))
 const IndividualEquityHistory = lazy(() => import('./portfolio/IndividualEquityHistory').then(module => ({ default: module.IndividualEquityHistory })))
 const AssetComparison = lazy(() => import('./portfolio/AssetComparison').then(module => ({ default: module.AssetComparison })))
 const MovementHistory = lazy(() => import('./portfolio/MovementHistory').then(module => ({ default: module.MovementHistory })))
@@ -38,6 +41,7 @@ const number = (v: string | number) => Number(v).toLocaleString('pt-BR', { maxim
 const palette = ['#68e5b4', '#8298f8', '#e8c77c', '#d494dc', '#7bc7e6', '#edac86']
 const noSubscription = () => () => {}
 const emptySnapshot = () => null
+const invitationAdmins = (import.meta.env.VITE_INVITATION_ADMIN_IDS ?? '').split(',').map((id: string) => id.trim()).filter(Boolean)
 
 export default function App() {
   const location = useLocation()
@@ -84,6 +88,7 @@ export default function App() {
   const routeTo = (path: string) => demo && !PUBLIC_DEMO ? '/demo' + (path === '/' ? '' : path) : path
   const summary = useQuery({ queryKey: ['summary', identity], queryFn: ({ signal }) => privateRepository.summary(signal), enabled: connected && !demo, retry: false, staleTime: 30 * 60 * 1000, refetchInterval: false })
   const operations = useQuery({ queryKey: ['operations', identity], queryFn: ({ signal }) => privateRepository.list(signal), enabled: connected && !demo, retry: false })
+  const fixtureStatus = useQuery({ queryKey: ['fixture-status', identity], queryFn: ({ signal }) => privateRepository.fixtureStatus(signal), enabled: connected && !demo && SUPABASE_AUTH, retry: false, staleTime: 30 * 60 * 1000 })
   const data = demo ? demoState?.summary : connected ? summary.data : undefined
   const ops = demo ? demoState?.operations ?? [] : connected ? operations.data ?? [] : []
   const busy = summary.isFetching || operations.isFetching
@@ -120,7 +125,7 @@ export default function App() {
   }
   async function exportData() {
     try {
-      const payload = demo ? { demonstration: true, operations: demoState?.operations ?? [] } : await privateRepository.export()
+      const payload = demo ? { demonstration: true, operations: demoState?.operations ?? [] } : { ...await privateRepository.export(), local_goals: loadGoals(identity) }
       const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
       const a = document.createElement('a'); a.href = url; a.download = demo ? 'investment-demo.json' : 'investment-registros.json'; a.click(); URL.revokeObjectURL(url)
     } catch (e) { reportError(e) }
@@ -142,6 +147,11 @@ export default function App() {
     } finally { setConfirmBusy(false) }
   }
   if (PUBLIC_DEMO && location.pathname === '/login') return <DemoAccessPage/>
+  if (!demo && location.pathname === '/invite/accept') {
+    if (auth.status === 'loading') return <main className="session-gate" role="status">Validando convite…</main>
+    if (!auth.session) return <main className="session-gate"><p role="alert">O convite expirou ou não pôde ser validado. Solicite um novo ao administrador.</p><Button onClick={() => navigate('/login')}>Ir para o login</Button></main>
+    return <InvitePasswordPage onComplete={() => navigate('/', { replace: true })}/>
+  }
   const accessDenied = apiError instanceof ApiError && (apiError.status === 401 || apiError.status === 403)
   const authorized = connected && summary.data !== undefined && operations.data !== undefined && !accessDenied
   const logout = () => { clearPrivate(); setConnected(false); setToken(''); if (SUPABASE_AUTH) void auth.logout(); navigate('/login', { replace: true }) }
@@ -162,18 +172,21 @@ export default function App() {
     <WorkspaceSidebar demo={demo} routeTo={routeTo} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed(value => !value)} displayName={displayName} avatarInitial={avatarInitial}/>
     <main><header><div className="mobile-header-brand"><span className="brand-icon"><ChartNoAxesCombined size={20}/></span>investment<span className="brand-dot">.</span></div><Dialog.Root open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}><Dialog.Trigger asChild><button type="button" className="mobile-menu-trigger" aria-label="Abrir menu de navegação" aria-controls="mobile-navigation-panel"><Menu size={20}/></button></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="mobile-nav-overlay" onClick={() => setMobileNavigationOpen(false)}/><Dialog.Content id="mobile-navigation-panel" className="mobile-nav-content"><Dialog.Title className="sr-only">Menu de navegação</Dialog.Title><button type="button" className="mobile-nav-close" aria-label="Fechar menu de navegação" onPointerDown={() => setMobileNavigationOpen(false)} onClick={() => setMobileNavigationOpen(false)}><X size={19}/></button><WorkspaceSidebar demo={demo} routeTo={routeTo} mobile onNavigate={() => setMobileNavigationOpen(false)} displayName={displayName} avatarInitial={avatarInitial}/></Dialog.Content></Dialog.Portal></Dialog.Root><div className="breadcrumb">Workspace <ChevronRight size={13}/> <span>{workspaceNavItems.find(n => n.to === page)?.label}</span></div><span className="local-badge"><span className="status-dot"/> {demo ? 'Modo Demonstração' : 'Ambiente pessoal'}</span></header>
 
-    <section className="page-title"><div><p className="eyebrow">CLAREZA PARA O SEU PRÓXIMO PASSO</p><h1>{workspaceNavItems.find(n => n.to === page)?.label ?? 'Página não encontrada'}</h1><p>Acompanhe suas escolhas. Construa seu amanhã.</p></div><div className="actions">{page !== '/cdbs' && <Button variant="outline" onClick={exportData} disabled={!demo && !connected} title={demo ? 'JSON com operações fictícias da demonstração.' : 'JSON com operações de ações. Não inclui CDBs, observações, eventos financeiros, metas nem configurações.'} aria-label={demo ? 'Exportar operações fictícias da demonstração em JSON' : 'Exportar operações de ações em JSON; não inclui renda fixa, eventos financeiros ou metas'}><Download size={16}/> Exportar operações</Button>}{page !== '/metas' && <Button onClick={() => page === '/cdbs' ? setFixedNewRequest(value => value + 1) : setModal(true)} disabled={!demo && !connected || demo && page === '/cdbs'}><Plus size={17}/> Nova operação</Button>}</div></section>
+    <section className="page-title"><div><p className="eyebrow">CLAREZA PARA O SEU PRÓXIMO PASSO</p><h1>{workspaceNavItems.find(n => n.to === page)?.label ?? 'Página não encontrada'}</h1><p>Acompanhe suas escolhas. Construa seu amanhã.</p></div><div className="actions">{page !== '/cdbs' && <Button variant="outline" onClick={exportData} disabled={!demo && !connected} title={demo ? 'JSON com operações fictícias da demonstração.' : 'JSON com registros financeiros deste usuário; metas locais também são incluídas. Não é uma cópia de configuração do Supabase.'} aria-label={demo ? 'Exportar operações fictícias da demonstração em JSON' : 'Exportar registros financeiros da minha conta em JSON'}><Download size={16}/> {demo ? 'Exportar operações' : 'Exportar meus dados'}</Button>}{page !== '/metas' && <Button onClick={() => page === '/cdbs' ? setFixedNewRequest(value => value + 1) : setModal(true)} disabled={!demo && !connected || demo && page === '/cdbs'}><Plus size={17}/> Nova operação</Button>}</div></section>
       <section className={demo ? 'mode-banner demo-banner' : 'mode-banner private-banner'} aria-label={demo ? 'Modo demonstração' : 'Conta conectada'}>
         <div className="mode-summary"><span className="mode-icon">{demo ? <DemoIcon size={20}/> : <ShieldCheck size={20}/>}</span><div><strong>{demo ? 'Modo demonstração' : 'Carteira conectada'}</strong><p>{demo ? 'Dados fictícios armazenados neste navegador' : auth.session?.user.email ?? 'Desenvolvimento local'}</p></div></div>
         <div className="mode-actions">{demo ? <><Button variant="outline" onClick={resetDemo}><RotateCcw size={16}/> Restaurar</Button><Button variant="outline" onClick={() => { void toggleDemo() }}><LogIn size={16}/> Entrar</Button></> : <><Button variant="outline" onClick={() => { void toggleDemo() }}><DemoIcon size={16}/> Explorar demonstração</Button><Button variant="outline" onClick={logout}><LogOut size={16}/> Sair</Button></>}</div>
       </section>
+      {!demo && SUPABASE_AUTH && fixtureStatus.data?.fictional_fixture_loaded && <div className="fixture-warning" role="status">Esta carteira contém registros fictícios de demonstração. Eles não representam investimentos reais.</div>}
+      {!demo && SUPABASE_AUTH && connected && fixtureStatus.isError && <div className="fixture-warning" role="status">Não foi possível confirmar se esta carteira contém registros fictícios.</div>}
+      {!demo && SUPABASE_AUTH && auth.session && <AccountDeletionPanel identity={identity} reauthenticate={auth.reauthenticate} onDeleted={async () => { clearPrivate(); await auth.logout(); navigate('/login', { replace: true }) }}/>}
       {demoState?.notice && demo && <div className="connection" role="status">{demoState.notice}</div>}
       {(error || apiError) && <div className="error" role="alert">{error || (apiError as Error).message}<button onClick={() => {setError(''); void refresh()}}>Tentar novamente</button></div>}
       {busy && <p role="status">Carregando carteira…</p>}
       {(page === '/' || page === '/acoes') && <>
         <div className={demo ? 'metrics' : 'metrics private-cost-metrics'}><article className="metric featured"><div><span>Capital em ações · custo</span><Wallet size={19}/></div><h2>{data ? money(data.acquisition_cost) : 'R$ —'}</h2><small><span className="status-dot"/> Custo de aquisição da posição aberta</small><div className="metric-decoration"/></article><article className="metric"><div><span>Compras acumuladas</span><ArrowDownLeft size={19}/></div><h2>{data ? money(data.total_purchases) : 'R$ —'}</h2><small>Inclui taxas de aquisição</small></article><article className="metric"><div><span>Resultado realizado {!demo && <FinancialHint label="resultado realizado">Resultado das vendas após custo de aquisição e taxas registradas de compra e venda. Tributos não são calculados; separado das posições abertas.</FinancialHint>}</span><ChartNoAxesCombined size={19}/></div><h2 className={Number(data?.realized_profit) < 0 ? 'negative' : 'positive'}>{data ? money(data.realized_profit) : 'R$ —'}</h2><small>{demo ? 'Resultado líquido das vendas' : 'Vendas após taxas registradas; antes de tributos'}</small></article>{demo && <article className="metric"><div><span>Patrimônio a mercado</span><Eye size={19}/></div><h2 className="muted">Indisponível</h2><small>Sem cotações de mercado</small></article>}</div>
         {!demo && summary.data && <MarketDashboard snapshot={summary.data} updating={summary.isFetching} failed={summary.isError} onRefresh={() => { void refresh() }}/>}
-        {!demo ? <Suspense fallback={<p role="status" className="panel">Carregando gráficos financeiros…</p>}><><PortfolioInsights repository={privateRepository} identity={identity}/><WealthEvolution repository={privateRepository} identity={identity}/><BenchmarkComparison repository={privateRepository} identity={identity}/></></Suspense> : <div className="chart-grid"><Suspense fallback={<p role="status" className="panel">Carregando gráfico…</p>}><DemoFlowChart period={period} onPeriodChange={setPeriod} series={series}/></Suspense>
+        {!demo ? <Suspense fallback={<p role="status" className="panel">Carregando gráficos financeiros…</p>}><><PortfolioInsights repository={privateRepository} identity={identity}/><WealthEvolution repository={privateRepository} identity={identity}/></></Suspense> : <div className="chart-grid"><Suspense fallback={<p role="status" className="panel">Carregando gráfico…</p>}><DemoFlowChart period={period} onPeriodChange={setPeriod} series={series}/></Suspense>
         <article className="panel allocation"><div className="panel-heading"><div><h3>Composição em ações</h3><p>Distribuição pelo custo de aquisição</p></div><span className="tag">B3</span></div><div className="donut" style={{ background: data?.holdings.length ? `conic-gradient(${data.holdings.map((h, i) => { const start = data.holdings.slice(0, i).reduce((sum, item) => sum + Number(item.cost), 0) / Number(data.acquisition_cost) * 100; const end = start + Number(h.cost) / Number(data.acquisition_cost) * 100; return `${palette[i % palette.length]} ${start}% ${end}%` }).join(', ')})` : '#253039' }}><div><span>Ativos em carteira</span><strong>{data?.holdings.length ?? 0}</strong></div></div><div className="allocation-list">{data?.holdings.map((h, i) => <div key={h.ticker}><span><i style={{ background: palette[i % palette.length] }}/>{h.ticker}</span><strong>{(Number(h.cost) / Number(data.acquisition_cost) * 100).toFixed(1)}%</strong></div>)}{!data?.holdings.length && <p>Nenhuma posição cadastrada.</p>}</div></article></div>}
         {demo && page === '/acoes' && <article className="panel"><div className="panel-heading"><h3>Posições por custo médio</h3></div><div className="table-scroll"><table><thead><tr><th>Ativo</th><th>Quantidade</th><th>Preço médio</th><th>Custo da posição</th></tr></thead><tbody>{data?.holdings.map(h => <tr key={h.ticker}><td>{h.ticker}</td><td>{number(h.quantity)}</td><td>{money(h.average_price)}</td><td>{money(h.cost)}</td></tr>)}</tbody></table></div></article>}
       </>}
@@ -192,6 +205,7 @@ export default function App() {
       {page === '/simulador' && <Suspense fallback={<p role="status" className="panel">Carregando simulador…</p>}><SimulatorPage/></Suspense>}
       {!demo && page === '/cdbs' && <Suspense fallback={<p role="status" className="panel">Carregando renda fixa…</p>}><FixedIncomePage key={identity} repository={privateRepository} identity={identity} newOperationRequest={fixedNewRequest} onAuthError={onFixedAuthError}/></Suspense>}
       {demo && page === '/cdbs' && <article className="panel planned"><h2>Renda fixa na carteira privada</h2><p>A demonstração permanece offline e não simula persistência de CDBs ou consultas de rendimento.</p><Button onClick={() => navigate(routeTo('/'))}>Voltar à demonstração</Button></article>}
+      {!demo && auth.session?.access_token && invitationAdmins.includes(auth.session.user.id) && <InvitationAdmin token={auth.session.access_token}/>}
       <footer><span><ShieldCheck size={13}/> Seus registros. Suas decisões.</span><span>Investment Dashboard · {demo ? 'Demonstração' : 'Carteira privada'}</span></footer>
     </main>
     <ConfirmDialog open={confirmation !== null} onClose={() => setConfirmation(null)} onConfirm={confirmAction} title={confirmation?.kind === 'delete' ? 'Excluir operação?' : 'Restaurar carteira demonstrativa?'} description={confirmation?.kind === 'delete' ? 'Esta operação será removida e os saldos serão recalculados. A exclusão será bloqueada se invalidar vendas posteriores.' : 'Suas operações fictícias serão substituídas pela nova carteira demonstrativa. Nenhum registro privado será alterado.'} confirmLabel={confirmation?.kind === 'delete' ? 'Excluir operação' : 'Restaurar carteira'} kind={confirmation?.kind ?? 'reset'} busy={confirmBusy} error={confirmError} returnFocus={returnFocus.current}/>

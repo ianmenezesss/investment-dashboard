@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from scripts.backup_archive import MAGIC, MAGIC_010, decrypt_stream, encrypt_stream
+from scripts.backup_archive import MAGIC, MAGIC_010, MAGIC_011, decrypt_stream, encrypt_stream
 from scripts.backup_supabase_009 import parse_database_url, preflight_failures
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from restore_supabase_backup import validate_backup
@@ -32,6 +32,16 @@ def test_v2_archive_marker_round_trip_keeps_legacy_format_supported():
     restored = io.BytesIO()
     decrypt_stream(io.BytesIO(encrypted.getvalue()), restored, "Synthetic-only-passphrase-2026")
     assert restored.getvalue() == b"synthetic v2 archive"
+
+
+def test_v3_archive_marker_round_trip_keeps_prior_formats_supported():
+    encrypted = io.BytesIO()
+    encrypt_stream(io.BytesIO(b"synthetic v3 archive"), encrypted,
+                   "Synthetic-only-passphrase-2026", magic=MAGIC_011)
+    assert encrypted.getvalue().startswith(MAGIC_011)
+    restored = io.BytesIO()
+    decrypt_stream(io.BytesIO(encrypted.getvalue()), restored, "Synthetic-only-passphrase-2026")
+    assert restored.getvalue() == b"synthetic v3 archive"
 
 
 @pytest.mark.parametrize("password", ["wrong-synthetic-passphrase", "Short"])

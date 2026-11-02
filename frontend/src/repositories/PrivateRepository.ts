@@ -13,6 +13,7 @@ export type UnifiedMovement = { id: string; date: string; investment_class: 'AÇ
 // Nunca recebe Storage ou dados da demonstração.
 export class PrivateRepository {
   constructor(private token: string) {}
+  fixtureStatus(signal?: AbortSignal) { return request<{ fictional_fixture_loaded: boolean }>('account/fixture-status', this.token, { signal }) }
   list(signal?: AbortSignal) { return request<Operation[]>('operations', this.token, { signal }) }
   summary(signal?: AbortSignal) { return request<PortfolioValuation>('dashboard/valuation', this.token, { signal }) }
   performance(signal?: AbortSignal) { return request<FinancialPerformance>('dashboard/performance', this.token, { signal }) }
@@ -32,7 +33,6 @@ export class PrivateRepository {
   createWealthObservation(input: import('../api').WealthObservationInput, key: string, signal?: AbortSignal) {
     return request<import('../api').WealthObservation>('dashboard/wealth-observations', this.token, { method: 'POST', body: JSON.stringify(input), signal, headers: { 'Idempotency-Key': key } })
   }
-  benchmarks(period: '1M' | '3M', signal?: AbortSignal) { return request<import('../api').BenchmarkComparison>(`dashboard/benchmarks?period=${period}`, this.token, { signal }) }
   equityHistory(period: string, signal?: AbortSignal) { return request<import('../api').EquityHistory>(`dashboard/equity-history?period=${period}`, this.token, { signal }) }
   equityPriceHistory(ticker: string, period: import('../api').IndividualEquityPriceHistory['period'], signal?: AbortSignal) {
     return request<import('../api').IndividualEquityPriceHistory>(`dashboard/equities/${encodeURIComponent(ticker)}/price-history?period=${period}`, this.token, { signal })
@@ -45,7 +45,7 @@ export class PrivateRepository {
   }
   create(input: OperationInput) { return request<Operation>('operations', this.token, { method: 'POST', body: JSON.stringify(input) }) }
   delete(id: number) { return request<void>(`operations/${id}`, this.token, { method: 'DELETE' }) }
-  export() { return request('export', this.token) }
+  export() { return request<Record<string, unknown>>('export', this.token) }
   observedHistory(id: number, start: string, end: string, signal: AbortSignal) { return request<import("../fixed-income/ObservedHistory").ObservedSeries>(`fixed-income/investments/${id}/observed-history?start=${start}&end=${end}`, this.token, { signal }) }
   cdbs(offset = 0, signal?: AbortSignal) { return request<Cdb[]>(`fixed-income/investments?offset=${offset}&limit=20`, this.token, { signal }) }
   cdb(id: number, signal?: AbortSignal) { return request<CdbDetail>(`fixed-income/investments/${id}`, this.token, { signal }) }

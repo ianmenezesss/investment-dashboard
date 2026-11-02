@@ -51,7 +51,32 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
           ('fixed_income_investments','fixed_income_lots','fixed_income_movements')}
     command.upgrade(Config("alembic.ini"), "head")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "010"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "012"
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO account_members(user_id,email,status) VALUES (:a,'a@example.test','active'),(:b,'b@example.test','active')"), {"a": UUID("11111111-1111-4111-8111-111111111111"), "b": UUID("22222222-2222-4222-8222-222222222222")})
+        connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at) VALUES (:id,'invite@example.test',:admin,now(),now()+interval '7 days')"), {"id": UUID("33333333-3333-4333-8333-333333333333"), "admin": UUID("11111111-1111-4111-8111-111111111111")})
+    # The privileged acceptance function must bind both identity and email to the
+    # trusted request context; a revoked member may return only via a new invite.
+    invitee = UUID("44444444-4444-4444-8444-444444444444")
+    admin = UUID("11111111-1111-4111-8111-111111111111")
+    with engine.begin() as connection:
+        connection.execute(text("SET LOCAL ROLE investment_runtime"))
+        connection.execute(text("SELECT set_config('app.admin_id',:admin,true)"), {"admin": str(admin)})
+        connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at) VALUES (:id,'invitee@example.test',:admin,now(),now()+interval '7 days')"), {"id": UUID("55555555-5555-4555-8555-555555555555"), "admin": admin})
+        connection.execute(text("SELECT set_config('app.user_id',:other,true),set_config('app.user_email','invitee@example.test',true)"), {"other": str(UUID("22222222-2222-4222-8222-222222222222"))})
+        assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is False
+        connection.execute(text("SELECT set_config('app.user_id',:user_id,true),set_config('app.user_email','different@example.test',true)"), {"user_id": str(invitee)})
+        assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is False
+        connection.execute(text("SELECT set_config('app.user_email','invitee@example.test',true)"))
+        assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is True
+        assert connection.scalar(text("SELECT public.revoke_dashboard_account(:user_id,:admin_id)"), {"user_id": invitee, "admin_id": admin}) is True
+        connection.execute(text("INSERT INTO account_invitations(id,email,invited_by,created_at,expires_at) VALUES (:id,'invitee@example.test',:admin,now(),now()+interval '7 days')"), {"id": UUID("66666666-6666-4666-8666-666666666666"), "admin": admin})
+        assert connection.scalar(text("SELECT public.accept_dashboard_invitation(:user_id,'invitee@example.test')"), {"user_id": invitee}) is True
+        assert connection.scalar(text("SELECT status FROM account_members WHERE user_id=:user_id"), {"user_id": invitee}) == "active"
+        connection.execute(text("SELECT set_config('app.user_id',:user_id,true)"), {"user_id": str(admin)})
+        assert all(connection.scalar(text("SELECT public.consume_dashboard_assistant_quota(:user_id)"), {"user_id": admin}) is True for _ in range(5))
+        assert connection.scalar(text("SELECT public.consume_dashboard_assistant_quota(:user_id)"), {"user_id": admin}) is False
+        assert connection.scalar(text("SELECT public.consume_dashboard_assistant_quota(:user_id)"), {"user_id": UUID("22222222-2222-4222-8222-222222222222")}) is False
     with engine.connect() as connection:
         for table, rows in original.items():
             assert list(connection.execute(text(f'SELECT * FROM {table} ORDER BY id'))) == rows
@@ -225,6 +250,26 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
                 assert connection.scalar(text("SELECT count(*) FROM public.portfolio_valuation_observations")) == 1
             with engine.begin() as connection:
                 connection.execute(text("GRANT SELECT ON public.financial_events, public.financial_event_revisions TO investment_test_runtime"))
+            from account_deletion_postgres import verify_account_deletion_postgres
+            verify_account_deletion_postgres(engine, runtime_engine)
+            # Reproduce the existing runtime privileges required by the private API:
+            # single-operation deletion remains owner-scoped; ledgers stay append-only.
+            with engine.begin() as connection:
+                for table in ("operations", "fixed_income_investments", "fixed_income_lots",
+                              "fixed_income_movements", "fixed_income_observations",
+                              "fixed_income_investment_archives", "fixed_income_application_revisions",
+                              "financial_events", "financial_event_revisions",
+                              "portfolio_valuation_observations"):
+                    connection.execute(text(f"GRANT SELECT, INSERT ON public.{table} TO investment_runtime"))
+                connection.execute(text("GRANT DELETE ON public.operations TO investment_runtime"))
+                for sequence in ("operations_id_seq", "fixed_income_investments_id_seq", "fixed_income_lots_id_seq",
+                                 "fixed_income_movements_id_seq", "fixed_income_observations_id_seq",
+                                 "fixed_income_investment_archives_id_seq", "fixed_income_application_revisions_id_seq",
+                                 "financial_events_id_seq", "financial_event_revisions_id_seq",
+                                 "portfolio_valuation_observations_id_seq"):
+                    connection.execute(text(f"GRANT USAGE, SELECT ON SEQUENCE public.{sequence} TO investment_runtime"))
+            from demo_fixture_postgres import verify_demo_fixture_postgres
+            verify_demo_fixture_postgres(engine, runtime_engine)
             runtime_engine.dispose()
     finally:
         app.dependency_overrides.clear()

@@ -15,12 +15,18 @@
     "contracted_rate": "10",
     "application_date": "2026-06-01",
     "maturity_date": "2027-06-01",
-    "application": { "date": "2026-06-01", "principal_amount": "1000.00" },
+    "opening_observation": {
+      "as_of": "2026-06-01",
+      "gross_value": "900.00",
+      "net_value": "900.00",
+      "source": "FICTÍCIO — posição inicial da demonstração"
+    },
+    "application": { "date": "2026-07-01", "principal_amount": "100.00" },
     "position_observation": {
       "as_of": "2026-10-31",
       "gross_value": "1050.00",
       "net_value": "1040.00",
-      "source": "Informe fictício de demonstração"
+      "source": "FICTÍCIO — informe de posição da demonstração"
     }
   },
   "financial_events": [
@@ -29,11 +35,13 @@
     { "kind": "DIVIDEND", "event_date": "2026-09-15", "ticker": "BBAS3", "cash_amount": "15.00", "source": "Comprovante fictício de provento" },
     { "kind": "JCP", "event_date": "2026-10-15", "ticker": "ITUB4", "cash_amount": "5.00", "gross_amount": "6.25", "tax_withheld": "1.25", "source": "Comprovante fictício de JCP" }
   ],
-  "wealth_observation": {
-    "as_of": "2026-10-31",
-    "equities_market_value": "455.00",
-    "equities_source": "Extrato fictício da corretora de demonstração"
-  },
+  "wealth_observations": [
+    { "as_of": "2026-05-01", "equities_market_value": "0.00", "equities_source": "FICTÍCIO — início do cenário", "fixed_income_coverage": "empty", "fixed_income_gross_value": null, "fixed_income_net_value": null },
+    { "as_of": "2026-06-30", "equities_market_value": "395.00", "equities_source": "FICTÍCIO — posição da demonstração", "fixed_income_coverage": "complete", "fixed_income_gross_value": "900.00", "fixed_income_net_value": "900.00" },
+    { "as_of": "2026-08-31", "equities_market_value": "420.00", "equities_source": "FICTÍCIO — posição da demonstração", "fixed_income_coverage": "complete", "fixed_income_gross_value": "1010.00", "fixed_income_net_value": "1005.00" },
+    { "as_of": "2026-09-30", "equities_market_value": "440.00", "equities_source": "FICTÍCIO — posição da demonstração", "fixed_income_coverage": "complete", "fixed_income_gross_value": "1025.00", "fixed_income_net_value": "1017.50" },
+    { "as_of": "2026-10-31", "equities_market_value": "455.00", "equities_source": "FICTÍCIO — posição da demonstração", "fixed_income_coverage": "complete", "fixed_income_gross_value": "1050.00", "fixed_income_net_value": "1040.00" }
+  ],
   "goal_input": {
     "name": "Reserva fictícia de longo prazo",
     "targetAmount": "5000.00",
@@ -50,6 +58,8 @@
     "external_contributions": "1500.00",
     "external_withdrawals": "100.00",
     "dividends_received": "15.00",
-    "jcp_received_net": "5.00"
+    "jcp_received_net": "5.00",
+    "cdb_application_principal": "100.00",
+    "wealth_observation_count": 5
   }
 }

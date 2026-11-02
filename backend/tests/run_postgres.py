@@ -1,4 +1,4 @@
-"""Executa integração 001–010 e ensaio pg_dump/restore em containers efêmeros."""
+"""Executa integração 001–012 e ensaio pg_dump/restore em containers efêmeros."""
 import os
 import io
 from pathlib import Path
@@ -173,9 +173,10 @@ def main():
         # Explicit local test settings override any .env and prevent accidental external DB/Auth use.
         env = {k: v for k, v in os.environ.items() if k not in {
             "DATABASE_URL", "MIGRATION_DATABASE_URL", "TEST_DATABASE_URL", "SUPABASE_URL",
-            "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY", "API_TOKEN", "BRAPI_TOKEN",
+            "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "APP_PUBLIC_URL",
+            "API_TOKEN", "BRAPI_TOKEN",
             "GROQ_API_KEY", "GROQ_MODEL",
-            "AUTH_MODE", "ENVIRONMENT", "ALLOWED_USER_IDS", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_BIN",
+            "AUTH_MODE", "ENVIRONMENT", "ALLOWED_USER_IDS", "INVITATION_ADMIN_IDS", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_BIN",
             "PGHOST", "PGPORT", "PGUSER", "PGDATABASE", "PGPASSWORD", "PGSERVICE", "PGSERVICEFILE",
             "PGSSLMODE", "PGSSLROOTCERT", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
             "http_proxy", "https_proxy", "all_proxy",
@@ -184,27 +185,28 @@ def main():
                     "MIGRATION_DATABASE_URL": source_url, "ENVIRONMENT": "test",
                     "AUTH_MODE": "local", "API_TOKEN": "fictional-disposable-test-token",
                     "SUPABASE_URL": "", "CORS_ORIGIN": "http://localhost:5173",
-                    "ALLOWED_USER_IDS": "[]", "MARKET_DATA_ENABLED": "false", "BRAPI_TOKEN": "",
+                    "ALLOWED_USER_IDS": "[]", "INVITATION_ADMIN_IDS": "[]", "SUPABASE_SERVICE_ROLE_KEY": "",
+                    "APP_PUBLIC_URL": "", "MARKET_DATA_ENABLED": "false", "BRAPI_TOKEN": "",
                     "TEMP": str(temp_root), "TMP": str(temp_root), "TMPDIR": str(temp_root),
                     "INVESTMENT_TEMP_DIR": str(temp_root), "PYTHONDONTWRITEBYTECODE": "1",
                     "NO_PROXY": "*"})
         backend = Path(__file__).resolve().parents[1]
-        result = subprocess.run([sys.executable, "-m", "pytest", "-vv", "--tb=long", "--show-capture=all", "-p", "no:cacheprovider", "tests/test_postgres.py"], env=env, cwd=backend)
+        result = subprocess.run([sys.executable, "-m", "pytest", "-q", "--tb=short", "-p", "no:cacheprovider", "tests/test_postgres.py"], env=env, cwd=backend)
         if result.returncode:
             return result.returncode
 
-        print("INTEGRACAO_POSTGRESQL_001_010=PASSOU")
+        print("INTEGRACAO_POSTGRESQL_001_012=PASSOU")
         print("Criando backup lógico fictício e iniciando servidor de restore independente...")
         dump = subprocess.run([docker, "exec", "-e", f"PGPASSWORD={password}", name, "pg_dump", "-h", "127.0.0.1", "-p", "5432",
                                "-U", "postgres", "-Fc", source_db], capture_output=True)
         if dump.returncode:
             detail = (dump.stderr or b"Falha sem diagnostico").decode(errors="replace").replace(password, "[redacted]")[:2000]
             raise RuntimeError(f"pg_dump falhou: {detail}")
-        from scripts.backup_archive import MAGIC_010, decrypt_stream, encrypt_stream
+        from scripts.backup_archive import MAGIC_012, decrypt_stream, encrypt_stream
         synthetic_passphrase = "Synthetic-only-passphrase-2026"
         fd, backup_path = tempfile.mkstemp(prefix=f"investment-dashboard-{run_id}-", suffix=".idbackup", dir=temp_root)
         with os.fdopen(fd, "wb") as backup_file:
-            encrypted_size, encrypted_hash = encrypt_stream(io.BytesIO(dump.stdout), backup_file, synthetic_passphrase, magic=MAGIC_010)
+            encrypted_size, encrypted_hash = encrypt_stream(io.BytesIO(dump.stdout), backup_file, synthetic_passphrase, magic=MAGIC_012)
         decrypted = io.BytesIO()
         with open(backup_path, "rb") as encrypted_file:
             decrypted_size, decrypted_hash = decrypt_stream(encrypted_file, decrypted, synthetic_passphrase)
@@ -215,6 +217,7 @@ def main():
         wait_for_postgres(docker, restore_name, restore_db, password)
         roles_sql = """CREATE ROLE investment_runtime LOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
 CREATE ROLE investment_test_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS;
+CREATE ROLE investment_deletion_executor NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
 CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN;
 """
         # Roles are cluster-global; create them in the guaranteed postgres maintenance DB.
@@ -225,6 +228,13 @@ CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service
         if restored.returncode:
             detail = (restored.stderr or b"Falha sem diagnostico").decode(errors="replace").replace(password, "[redacted]")[:2000]
             raise RuntimeError(f"pg_restore falhou: {detail}")
+        executor_function_owners = """ALTER FUNCTION public.dashboard_account_deletion_state(uuid) OWNER TO investment_deletion_executor;
+ALTER FUNCTION public.begin_dashboard_account_deletion(uuid,text) OWNER TO investment_deletion_executor;
+ALTER FUNCTION public.purge_dashboard_account_data(uuid) OWNER TO investment_deletion_executor;
+ALTER FUNCTION public.mark_dashboard_auth_identity_deleted(uuid) OWNER TO investment_deletion_executor;
+ALTER FUNCTION public.finish_dashboard_account_deletion(uuid) OWNER TO investment_deletion_executor;
+"""
+        run_restore_role_setup(docker, restore_name, restore_db, executor_function_owners, password)
         restore_port = published_loopback_port(restore_name)
         restore_url = f"postgresql+psycopg://postgres:{password}@127.0.0.1:{restore_port}/{restore_db}"
         # Compare row counts, Alembic, catalog security flags and two-owner visibility.
@@ -235,8 +245,8 @@ CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service
         if source_snapshot != restored_snapshot:
             raise RuntimeError("Snapshot de contagens, RLS/grants ou isolamento divergiu após restore")
         print(f"BACKUP_RESTORE=PASSOU; encrypted_bytes={encrypted_size}; encrypted_sha256={encrypted_hash}; plaintext_sha256={decrypted_hash}")
-        print("BACKUP_ENCRYPTION=AES-256-GCM; AUTHENTICATED_DECRYPTION=PASS; format=IDBKP010")
-        print("RESTORE_HEAD=010; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
+        print("BACKUP_ENCRYPTION=AES-256-GCM; AUTHENTICATED_DECRYPTION=PASS; format=IDBKP012")
+        print("RESTORE_HEAD=012; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
         return 0
     finally:
         # Only containers created by this invocation are stopped; no volumes are mounted or removed.

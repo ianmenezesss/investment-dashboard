@@ -1,8 +1,8 @@
 # Arquitetura e plano
 
-> Este documento mantém as decisões fundacionais e a arquitetura original. Para o estado local v2.0.0 e o escopo v3.0, consulte o [roadmap de versões públicas](INVESTMENT_DASHBOARD_V2_ROADMAP.md); o [plano mestre](INVESTMENT_DASHBOARD_MASTER_PLAN.md) preserva a história técnica.
+> Este documento mantém as decisões fundacionais e a arquitetura original. Para o estado local v3.0.0, use o [registro atual de versões](INVESTMENT_DASHBOARD_V2_ROADMAP.md) e a [checklist de validação](v3-launch-checklist.md); as fases antigas abaixo são histórico, não backlog aprovado.
 
-Atualização do candidato local v2.0.0 (01/11/2026; não publicado): preserva a integração histórica Brapi Free da v1.3 e adiciona `portfolio_valuation_observations` em migration 010. `GET/POST /api/dashboard/wealth-observations` usa autenticação privada, owner/RLS e escrita append-only idempotente. CDI/IPCA/Ibovespa são comparados somente em meses completos comuns; cobertura curta é marcada como parcial. O relatório de proventos usa eventos efetivos já cadastrados. `adjustedClose` não reconstrói patrimônio e quedas abruptas não são suavizadas. TWR/XIRR continuam indisponíveis. A Íris combina conhecimento estático com um rótulo de tela restrito a uma lista fechada; não recebe valores, filtros, operações ou carteira. A migration não foi executada em produção.
+Atualização da candidata local v3.0.0 (01/11/2026; não publicada): migrations 011–012 adicionam membership/convites, exclusão própria retomável e proveniência do loader fictício. O JWT Supabase é verificado, cada rota privada exige membership ativo e registros financeiros mantêm RLS/FORCE RLS por UUID proprietário. A role dedicada de exclusão é NOLOGIN e sem BYPASSRLS; o runtime mantém os ledgers append-only. A fixture só é carregada pela CLI administrativa, em carteira vazia e numa única transação. A demonstração pública permanece sem API privada e sem Íris.
 
 O histórico individual Brapi usa `adjustedClose`, uma chamada por ticker, cache de 30 minutos e limitador de 12.000 chamadas/uma chamada simultânea **por processo**. O limitador não representa a cota da conta e não coordena outros workers, reinicializações ou aplicações; flags continuam opt-in. Intervalos acima de três meses são parciais. Nenhuma chamada externa foi feita nesta implementação local.
 
@@ -40,19 +40,20 @@ backend/
   app/database.py configuração, engine e sessão SQLAlchemy
   app/models.py   modelo persistente
   app/wealth_observations.py snapshots patrimoniais observados, owner-scoped
-  app/benchmarks.py comparação mensal BCB/Brapi com cobertura comum
+  app/accounts.py lifecycle de convites, membership e exclusão Supabase
+  scripts/        loader fictício e backup/restore versionados
   app/finance.py  cálculo por custo médio sem dependência HTTP
   app/main.py     validação, autenticação e endpoints
-  app/auth.py     token local ou JWT Supabase com allowlist
+  app/auth.py     token local ou JWT Supabase com membership ativo
   app/access.py   identidade no contexto transacional de RLS
   migrations/    migrações Alembic versionadas
   tests/         testes das regras financeiras
 compose.yaml     PostgreSQL local
 ```
 
-O head local da cadeia é a migration `010_portfolio_valuation_observations.py`. Ela cria uma tabela financeira append-only com RLS/FORCE RLS e grants mínimos. A publicação exige migration autorizada separada; o código local não consulta o estado do schema remoto.
+O head local da cadeia é a migration `012_account_deletion_and_fixtures.py`, após `011_invited_accounts.py`. Ela mantém RLS/FORCE RLS e grants mínimos; a migration e a integração são validadas em PostgreSQL descartável. Nenhum estado de schema remoto é consultado por essa validação local.
 
-## Fases e critérios
+## Fases e critérios do plano inicial (histórico)
 
 1. **Fundação:** dashboard responsivo, demonstração explícita, API protegida por token, compras e vendas de ações, histórico com busca e ordenação, exclusão confirmada, custo médio, exportação JSON e migração PostgreSQL. Verificar build, testes e inicialização. O gráfico representa fluxo de compras menos vendas, não evolução de mercado.
 2. **Ações completas:** contas/corretoras, edição transacional com recálculo cronológico, dividendos/JCP, cotações manuais com fonte e timestamp e interfaces para provedores. Testar reinvestimentos sem dupla contagem. Separar usuário, ativo, conta, provento e cotação em tabelas próprias.
@@ -68,8 +69,8 @@ Cada fase deve ser validada antes de expandir o escopo. A navegação da demo oc
 - Backend Python 3.12+, FastAPI, SQLAlchemy 2, Alembic, Pydantic Settings, psycopg e Pytest.
 - Frontend React, React Router, TanStack Query, Recharts, Lucide, Tailwind 4 e componentes locais no padrão shadcn/Radix.
 - Valores entram como strings decimais, persistem em NUMERIC(20,8) e são calculados com Decimal. A API devolve valores monetários como strings. O frontend converte apenas para exibição e gráficos aproximados.
-- O token é digitado e mantido apenas em memória no navegador. Não incluir segredos em VITE_* nem no repositório. Esta autenticação é provisória para uso local por uma pessoa e é rejeitada em produção. O backend preparado para Supabase valida identidade e filtra proprietário, mas ainda depende da configuração externa e de uma interface de login privada.
-- As mutações bloqueiam a tabela de operações no PostgreSQL e validam a carteira cronológica inteira antes do commit. É uma decisão simples para um único usuário; evoluir para locks por carteira antes de multiusuário.
+- O modo local conserva token apenas em memória; o modo privado usa Supabase Auth, membership ativo e filtro por proprietário. Segredos administrativos Supabase permanecem no backend e nunca em `VITE_*`.
+- As mutações preservam validação cronológica, isolamento owner-scoped e RLS. A candidata v3 exige integração PostgreSQL descartável 001–012 antes de qualquer alegação de prontidão multiusuário.
 - Data e ID definem a ordem de operações do mesmo dia. Uma compra inserida depois de uma venda no mesmo dia não passa retroativamente à frente dela.
 - Não há caixa contábil nesta fase. Compras não equivalem a aportes externos; receita de vendas não equivale a resgate. Por isso não são mostrados patrimônio consolidado, capital líquido aportado nem retorno percentual.
 - Dividendos, CDBs, CDI, IPCA, Ibovespa e cotações não são inferidos ou inventados. Nenhuma credencial externa é necessária para a Fase 1.
