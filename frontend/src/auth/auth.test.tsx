@@ -94,6 +94,21 @@ test('convite valida a identidade sem consumir autorização antes da troca de s
   expect(fetchMock).not.toHaveBeenCalled()
 })
 
+test('rota de convite usa somente elegibilidade e não consulta nem ativa a carteira antecipadamente', async () => {
+  mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
+  const fetchMock = vi.fn(async () => new Response('{"eligible":true}'))
+  vi.stubGlobal('fetch', fetchMock)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const path = '/invite/accept?invitation_id=55555555-5555-4555-8555-555555555555'
+  try {
+    await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><App/></MemoryRouter></QueryClientProvider>))
+    await vi.waitFor(() => expect(host.querySelector('#invite-password')).not.toBeNull())
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(mock.auth.onAuthStateChange).not.toHaveBeenCalled()
+    expect(host.querySelector('.sidebar')).toBeNull()
+  } finally { client.clear(); window.history.replaceState({}, '', '/') }
+})
+
 test('preserva a sessão autenticada após o backend informar expiração para permitir gestão da conta', async () => {
   mock.auth.getSession.mockResolvedValue({ data: { session }, error: null })
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ status: 'trial_expired' }) })))
@@ -517,6 +532,38 @@ test('recuperação da sessão exige getUser e restaura o access token', async (
   expect(mock.auth.getUser).toHaveBeenCalledWith('test-access-a')
   expect(host.querySelector('[data-status]')!.textContent).toBe('authenticated')
   expect(host.querySelector('[data-token]')!.textContent).toBe('test-access-a')
+})
+
+test('login sem callback SIGNED_IN aguarda autorização do backend antes de publicar a sessão', async () => {
+  let finishActivation!: (value: Response) => void
+  const fetchMock = vi.fn(() => new Promise<Response>(resolve => { finishActivation = resolve }))
+  vi.stubGlobal('fetch', fetchMock)
+  await act(async () => root.render(<Harness/>))
+  await submit()
+  expect(mock.auth.getUser).toHaveBeenCalledWith(session.access_token)
+  expect(host.querySelector('[data-status]')!.textContent).toBe('loading')
+  expect(host.querySelector('[data-token]')!.textContent).toBe('')
+  await act(async () => finishActivation(new Response('{"status":"active"}')))
+  expect(host.querySelector('[data-status]')!.textContent).toBe('authenticated')
+})
+
+test('identidade válida sem convite mostra acesso negado e não expiração de sessão', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 403 })))
+  await act(async () => root.render(<Harness/>))
+  await submit()
+  expect(host.querySelector('[data-status]')!.textContent).toBe('anonymous')
+  expect(host.querySelector('[data-token]')!.textContent).toBe('')
+  expect(host.textContent).toContain('Sua conta não está autorizada')
+  expect(host.textContent).not.toContain('Sua sessão expirou')
+})
+
+test('indisponibilidade de autorização não confunde falha de serviço com credenciais inválidas', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 503 })))
+  await act(async () => root.render(<Harness/>))
+  await submit()
+  expect(host.querySelector('[data-status]')!.textContent).toBe('anonymous')
+  expect(host.textContent).toContain('Não foi possível confirmar a autorização')
+  expect(mock.auth.signOut).not.toHaveBeenCalled()
 })
 
 test.each(['expirada', 'inválida'])('sessão recuperada %s é descartada', async kind => {

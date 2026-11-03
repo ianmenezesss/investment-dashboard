@@ -65,6 +65,22 @@ test('rota de solicitação é indisponível na demonstração pública', async 
   } finally { await act(async () => root.unmount()); client.clear(); host.remove() }
 })
 
+test('convite aberto no domínio da demo informa endereço incorreto e elimina credenciais sem rede', async () => {
+  const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock)
+  const host = document.createElement('div'); document.body.append(host)
+  const root = createRoot(host), client = new QueryClient()
+  const path = '/invite/accept?invitation_id=55555555-5555-4555-8555-555555555555#access_token=mail-access&refresh_token=mail-refresh&type=invite'
+  window.history.replaceState({}, '', path)
+  try {
+    await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><App/></MemoryRouter></QueryClientProvider>))
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('endereço privado')
+    expect(host.querySelector('form')).toBeNull()
+    expect(window.location.search).toBe('')
+    expect(window.location.hash).toBe('')
+    expect(fetchMock).not.toHaveBeenCalled()
+  } finally { await act(async () => root.unmount()); client.clear(); host.remove(); window.history.replaceState({}, '', '/') }
+})
+
 test('visitante navega entre dashboard e histórico sem autenticação ou rede', async () => {
   const fetchMock = vi.fn().mockRejectedValue(new Error('API indisponível'))
   vi.stubGlobal('fetch', fetchMock)

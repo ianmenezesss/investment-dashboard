@@ -99,14 +99,16 @@ def account_is_active(user_id: UUID) -> bool:
 
 
 def account_access_state(user_id: UUID) -> str | None:
-    from sqlalchemy import text
+    from sqlalchemy import case, func, select, text
+    from .accounts import AccountMember
     from .database import SessionLocal
     with SessionLocal() as db:
         if db.bind.dialect.name == "postgresql":
             db.execute(text("SELECT set_config('app.user_id', :user_id, true)"), {"user_id": str(user_id)})
-        lookup_id = user_id if db.bind.dialect.name == "postgresql" else str(user_id)
-        return db.scalar(text("""SELECT CASE
-            WHEN status <> 'active' THEN 'inactive'
-            WHEN access_expires_at IS NOT NULL AND access_expires_at <= CURRENT_TIMESTAMP THEN 'trial_expired'
-            ELSE 'active' END
-            FROM account_members WHERE user_id = :user_id"""), {"user_id": lookup_id})
+        # Bind through the UUID column type: SQLite stores hex UUIDs whereas
+        # PostgreSQL uses native UUID values. Raw string parameters disagreed.
+        return db.scalar(select(case(
+            (AccountMember.status != "active", "inactive"),
+            (AccountMember.access_expires_at.is_not(None) &
+             (AccountMember.access_expires_at <= func.current_timestamp()), "trial_expired"),
+            else_="active")).where(AccountMember.user_id == user_id))

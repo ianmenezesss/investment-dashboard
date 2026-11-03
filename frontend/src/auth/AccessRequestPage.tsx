@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, ChartNoAxesCombined, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/button'
@@ -12,10 +12,12 @@ export function AccessRequestPage() {
   const [busy, setBusy] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+  const submissionInFlight = useRef(false)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy || submitted) return
+    if (submissionInFlight.current || submitted) return
+    submissionInFlight.current = true
     setBusy(true); setError('')
     try {
       const response = await fetch(`${apiBase()}/api/access-requests`, {
@@ -25,6 +27,7 @@ export function AccessRequestPage() {
       if (!response.ok) throw new Error('request_failed')
       setSubmitted(true)
     } catch {
+      submissionInFlight.current = false
       setError('Não foi possível enviar agora. Tente novamente mais tarde.')
     } finally { setBusy(false) }
   }

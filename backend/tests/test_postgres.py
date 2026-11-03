@@ -94,7 +94,7 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
     probe_engine.dispose()
     try:
         settings.migration_database_url = SecretStr(migration_url)
-        command.upgrade(Config("alembic.ini"), "head")
+        command.upgrade(Config("alembic.ini"), "016")
     finally:
         settings.migration_database_url = original_migration_url
         with engine.begin() as connection:
@@ -505,6 +505,8 @@ def test_migrations_persistence_and_chronological_validation(monkeypatch):
                     connection.execute(text(f"GRANT USAGE, SELECT ON SEQUENCE public.{sequence} TO investment_runtime"))
             from demo_fixture_postgres import verify_demo_fixture_postgres
             verify_demo_fixture_postgres(engine, runtime_engine)
+            from rebuilt_access_postgres import verify_rebuilt_access_postgres
+            verify_rebuilt_access_postgres(engine, runtime_engine, monkeypatch)
             runtime_engine.dispose()
     finally:
         app.dependency_overrides.clear()

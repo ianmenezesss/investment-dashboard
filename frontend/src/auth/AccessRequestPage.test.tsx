@@ -25,3 +25,38 @@ test('envia somente o e-mail e mostra a resposta neutra após o envio', async ()
   expect(host.textContent).toContain('Se sua solicitação puder ser processada')
   expect(host.querySelector('.access-request-back')?.textContent).toContain('Voltar ao login')
 })
+
+test('submissões simultâneas não duplicam a solicitação pública', async () => {
+  let finish!: (value: Response) => void
+  const fetchMock = vi.fn(() => new Promise<Response>(resolve => { finish = resolve }))
+  vi.stubGlobal('fetch', fetchMock)
+  host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
+  await act(async () => root.render(<MemoryRouter><AccessRequestPage/></MemoryRouter>))
+  const email = host.querySelector('input[type="email"]') as HTMLInputElement
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(email, 'visitor@example.test')
+  await act(async () => email.dispatchEvent(new Event('input', { bubbles: true })))
+  await act(async () => {
+    host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+  })
+  expect(fetchMock).toHaveBeenCalledOnce()
+  await act(async () => finish(new Response('{"message":"accepted"}', { status: 202 })))
+  expect(host.textContent).toContain('Se sua solicitação puder ser processada')
+})
+
+test('falha de gravação não apresenta confirmação neutra e permite nova tentativa', async () => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 503 }))
+  vi.stubGlobal('fetch', fetchMock)
+  host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
+  await act(async () => root.render(<MemoryRouter><AccessRequestPage/></MemoryRouter>))
+  const email = host.querySelector('input[type="email"]') as HTMLInputElement
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(email, 'visitor@example.test')
+  await act(async () => email.dispatchEvent(new Event('input', { bubbles: true })))
+  await act(async () => host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })))
+  expect(host.textContent).toContain('Não foi possível enviar agora')
+  expect(host.querySelector('.access-request-success')).toBeNull()
+  fetchMock.mockResolvedValue(new Response('{"message":"accepted"}', { status: 202 }))
+  await act(async () => host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })))
+  expect(host.querySelector('.access-request-success')).not.toBeNull()
+  expect(fetchMock).toHaveBeenCalledTimes(2)
+})

@@ -1,4 +1,4 @@
-"""Executa integração 001–016 e ensaio pg_dump/restore em containers efêmeros."""
+"""Executa integração 001–018 e ensaio pg_dump/restore em containers efêmeros."""
 import os
 import io
 from pathlib import Path
@@ -195,18 +195,18 @@ def main():
         if result.returncode:
             return result.returncode
 
-        print("INTEGRACAO_POSTGRESQL_001_016=PASSOU")
+        print("INTEGRACAO_POSTGRESQL_001_018=PASSOU")
         print("Criando backup lógico fictício e iniciando servidor de restore independente...")
         dump = subprocess.run([docker, "exec", "-e", f"PGPASSWORD={password}", name, "pg_dump", "-h", "127.0.0.1", "-p", "5432",
                                "-U", "postgres", "-Fc", source_db], capture_output=True)
         if dump.returncode:
             detail = (dump.stderr or b"Falha sem diagnostico").decode(errors="replace").replace(password, "[redacted]")[:2000]
             raise RuntimeError(f"pg_dump falhou: {detail}")
-        from scripts.backup_archive import MAGIC_015, decrypt_stream, encrypt_stream
+        from scripts.backup_archive import MAGIC_018, decrypt_stream, encrypt_stream
         synthetic_passphrase = "Synthetic-only-passphrase-2026"
         fd, backup_path = tempfile.mkstemp(prefix=f"investment-dashboard-{run_id}-", suffix=".idbackup", dir=temp_root)
         with os.fdopen(fd, "wb") as backup_file:
-            encrypted_size, encrypted_hash = encrypt_stream(io.BytesIO(dump.stdout), backup_file, synthetic_passphrase, magic=MAGIC_015)
+            encrypted_size, encrypted_hash = encrypt_stream(io.BytesIO(dump.stdout), backup_file, synthetic_passphrase, magic=MAGIC_018)
         decrypted = io.BytesIO()
         with open(backup_path, "rb") as encrypted_file:
             decrypted_size, decrypted_hash = decrypt_stream(encrypted_file, decrypted, synthetic_passphrase)
@@ -218,6 +218,9 @@ def main():
         roles_sql = """CREATE ROLE investment_runtime LOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
 CREATE ROLE investment_test_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS;
 CREATE ROLE investment_deletion_executor NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
+CREATE ROLE investment_access_admin NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
+CREATE ROLE investment_access_operator LOGIN INHERIT NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION;
+GRANT investment_access_admin TO investment_access_operator WITH INHERIT TRUE, SET TRUE;
 CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN;
 """
         # Roles are cluster-global; create them in the guaranteed postgres maintenance DB.
@@ -228,12 +231,10 @@ CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service
         if restored.returncode:
             detail = (restored.stderr or b"Falha sem diagnostico").decode(errors="replace").replace(password, "[redacted]")[:2000]
             raise RuntimeError(f"pg_restore falhou: {detail}")
-        executor_function_owners = """ALTER FUNCTION public.dashboard_account_deletion_state(uuid) OWNER TO investment_deletion_executor;
-ALTER FUNCTION public.begin_dashboard_account_deletion(uuid,text) OWNER TO investment_deletion_executor;
-ALTER FUNCTION public.purge_dashboard_account_data(uuid) OWNER TO investment_deletion_executor;
-ALTER FUNCTION public.mark_dashboard_auth_identity_deleted(uuid) OWNER TO investment_deletion_executor;
-ALTER FUNCTION public.finish_dashboard_account_deletion(uuid) OWNER TO investment_deletion_executor;
-"""
+        from scripts.backup_profiles import executor_function_signatures
+        executor_function_owners = "\n".join(
+            f"ALTER FUNCTION public.{signature} OWNER TO investment_deletion_executor;"
+            for signature in executor_function_signatures("018"))
         run_restore_role_setup(docker, restore_name, restore_db, executor_function_owners, password)
         restore_port = published_loopback_port(restore_name)
         restore_url = f"postgresql+psycopg://postgres:{password}@127.0.0.1:{restore_port}/{restore_db}"
@@ -245,8 +246,8 @@ ALTER FUNCTION public.finish_dashboard_account_deletion(uuid) OWNER TO investmen
         if source_snapshot != restored_snapshot:
             raise RuntimeError("Snapshot de contagens, RLS/grants ou isolamento divergiu após restore")
         print(f"BACKUP_RESTORE=PASSOU; encrypted_bytes={encrypted_size}; encrypted_sha256={encrypted_hash}; plaintext_sha256={decrypted_hash}")
-        print("BACKUP_ENCRYPTION=AES-256-GCM; AUTHENTICATED_DECRYPTION=PASS; format=IDBKP015")
-        print("RESTORE_HEAD=016; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
+        print("BACKUP_ENCRYPTION=AES-256-GCM; AUTHENTICATED_DECRYPTION=PASS; format=IDBKP018")
+        print("RESTORE_HEAD=018; CONTAGENS_RLS_GRANTS_ISOLAMENTO=IGUAIS")
         return 0
     finally:
         # Only containers created by this invocation are stopped; no volumes are mounted or removed.

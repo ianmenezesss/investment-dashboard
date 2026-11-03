@@ -248,7 +248,8 @@ def test_admin_invitation_is_sent_server_side_limited_and_revocable(monkeypatch)
     monkeypatch.setattr(accounts.httpx, "AsyncClient", Client)
     monkeypatch.setattr(accounts, "settings", SimpleNamespace(
         invitation_admin_ids=[ADMIN], supabase_service_role_key=SecretStr("fake-test-admin-key"),
-        supabase_url="https://project.example", app_public_url="https://private.example"))
+        supabase_url="https://project.example", app_public_url="https://private.example",
+        invitation_max_send_attempts=3))
     with Session(engine) as db:
         result = run_mocked(accounts.create_invitation(accounts.InvitationInput(email="Person@Example.com"), Principal(ADMIN), db))
         assert result["email"] == "person@example.com" and result["accepted"] is False
@@ -268,7 +269,8 @@ def test_admin_invitation_is_sent_server_side_limited_and_revocable(monkeypatch)
         assert result["delivery_confirmed"] is False
         with pytest.raises(HTTPException) as cooldown:
             run_mocked(accounts.resend_invitation(UUID(result["id"]), Principal(ADMIN), db))
-        assert cooldown.value.status_code == 429 and "60 segundos" in cooldown.value.detail
+        assert cooldown.value.status_code == 429 and cooldown.value.detail["provider_code"] == "cooldown"
+        assert 1 <= cooldown.value.detail["retry_after_seconds"] <= 60
         attempts = db.query(accounts.AccountInvitationSendAttempt).order_by(accounts.AccountInvitationSendAttempt.attempted_at).all()
         attempts[0].attempted_at = datetime.now(timezone.utc) - timedelta(hours=2)
         attempts[1].attempted_at = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -280,7 +282,8 @@ def test_admin_invitation_is_sent_server_side_limited_and_revocable(monkeypatch)
         db.commit()
         with pytest.raises(HTTPException) as cap:
             run_mocked(accounts.resend_invitation(UUID(result["id"]), Principal(ADMIN), db))
-        assert cap.value.status_code == 429 and "3 tentativas" in cap.value.detail
+        assert cap.value.status_code == 429 and cap.value.detail["provider_code"] == "attempt_limit"
+        assert cap.value.detail["retryable"] is False
         assert accounts.revoke_invitation(UUID(result["id"]), Principal(ADMIN), db) == {"status": "invitation_revoked"}
         assert db.query(accounts.AccountInvitation).one().revoked_at is not None
         assert db.query(accounts.AccountInvitationSendAttempt).count() == 3
@@ -324,7 +327,8 @@ def test_invitation_for_existing_confirmed_auth_identity_uses_recovery_for_same_
         db.commit()
         with pytest.raises(HTTPException) as error:
             run_mocked(accounts.resend_invitation(invite_id, Principal(ADMIN), db))
-        assert error.value.status_code == 502
+        assert error.value.status_code == 429
+        assert error.value.headers["Retry-After"] == "60"
         attempt = db.query(accounts.AccountInvitationSendAttempt).one()
         assert (attempt.outcome, attempt.method, attempt.http_status, attempt.provider_code) == (
             "failed", "recovery", 429, "over_email_send_rate_limit")

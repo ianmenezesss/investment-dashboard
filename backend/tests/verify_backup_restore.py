@@ -11,6 +11,7 @@ TABLES = (
     "account_members", "account_invitations", "account_deletion_jobs",
     "account_deletion_audit", "account_fixture_loads", "account_access_requests", "account_access_request_limits",
     "account_invitation_send_attempts",
+    "account_access_administrators", "account_access_audit",
 )
 OWNERS = (
     "11111111-1111-4111-8111-111111111111",
@@ -23,15 +24,15 @@ def snapshot(url: str) -> dict:
     try:
         with engine.connect() as connection:
             result = {"head": connection.scalar(text("SELECT version_num FROM alembic_version"))}
-            if result["head"] != "016":
-                raise AssertionError("Banco restaurado não está no Alembic head 016")
+            if result["head"] != "018":
+                raise AssertionError("Banco restaurado não está no Alembic head 018")
             result["counts"] = {
                 table: connection.scalar(text(f'SELECT count(*) FROM public."{table}"'))
                 for table in TABLES
             }
             result["data_sha256"] = {}
             for table in TABLES:
-                key = ("user_id" if table in ("account_members", "account_deletion_jobs", "account_fixture_loads")
+                key = ("user_id" if table in ("account_members", "account_deletion_jobs", "account_fixture_loads", "account_access_administrators")
                        else "scope_key" if table == "account_access_request_limits" else "id")
                 rows = connection.execute(text(f'SELECT row_to_json(t)::text FROM (SELECT * FROM public."{table}" ORDER BY {key}) AS t')).scalars()
                 digest = hashlib.sha256()
@@ -54,7 +55,7 @@ def snapshot(url: str) -> dict:
                 row[0]: (row[1], row[2]) for row in connection.execute(text("""
                 SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class
                 WHERE relnamespace='public'::regnamespace AND relkind IN ('r','p')
-                  AND (relname='operations' OR relname LIKE 'fixed_income_%' OR relname LIKE 'financial_event%' OR relname IN ('portfolio_valuation_observations','account_members','account_invitations','account_deletion_jobs','account_deletion_audit','account_fixture_loads','account_invitation_send_attempts'))
+                  AND (relname='operations' OR relname LIKE 'fixed_income_%' OR relname LIKE 'financial_event%' OR relname IN ('portfolio_valuation_observations','account_members','account_invitations','account_deletion_jobs','account_deletion_audit','account_fixture_loads','account_invitation_send_attempts','account_access_administrators','account_access_audit'))
                 ORDER BY relname
             """)).all()
             }
@@ -104,7 +105,7 @@ def snapshot(url: str) -> dict:
                        has_function_privilege('investment_runtime','public.revoke_dashboard_account(uuid,uuid)','EXECUTE'),
                        has_function_privilege('investment_runtime','public.consume_dashboard_assistant_quota(uuid)','EXECUTE')
             """)).one()
-            if result["account_grants"] != (True, False, False, True, True, True, False, True, True, True):
+            if result["account_grants"] != (True, False, False, True, False, False, False, True, False, True):
                 raise AssertionError("Grants do runtime de convites/membership estão excessivos ou incompletos")
             result["admin_function_security"] = connection.execute(text("""
                 SELECT r.prosecdef, pg_get_userbyid(r.proowner), r.proconfig,
@@ -121,8 +122,8 @@ def snapshot(url: str) -> dict:
                   AND a.oid='public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)'::regprocedure
             """)).one()
             if result["admin_function_security"] != (
-                    True, "investment_deletion_executor", ["search_path=pg_catalog, public"], True, False,
-                    True, "investment_deletion_executor", ["search_path=pg_catalog, public"], True, False,
+                    True, "investment_deletion_executor", ["search_path=pg_catalog, public"], False, False,
+                    True, "investment_deletion_executor", ["search_path=pg_catalog, public"], False, False,
                     False, False, False):
                 raise AssertionError("Fronteira SECURITY DEFINER ou grants administrativos divergiu no restore")
             result["invitation_send_grants"] = connection.execute(text("""
@@ -134,7 +135,7 @@ def snapshot(url: str) -> dict:
                        has_table_privilege('anon','public.account_invitation_send_attempts','SELECT'),
                        has_table_privilege('authenticated','public.account_invitation_send_attempts','SELECT')
             """)).one()
-            if result["invitation_send_grants"] != (True, True, False, False, True, False, False):
+            if result["invitation_send_grants"] != (False, False, False, False, False, False, False):
                 raise AssertionError("Grants da auditoria de envio de convites estão incorretos")
             result["invitation_send_sequence_grants"] = connection.execute(text("""
                 SELECT has_sequence_privilege('investment_runtime','public.account_invitation_send_attempts_id_seq','USAGE'),
@@ -143,7 +144,7 @@ def snapshot(url: str) -> dict:
                        has_sequence_privilege('authenticated','public.account_invitation_send_attempts_id_seq','USAGE'),
                        has_sequence_privilege('service_role','public.account_invitation_send_attempts_id_seq','USAGE')
             """)).one()
-            if result["invitation_send_sequence_grants"] != (True, True, False, False, False):
+            if result["invitation_send_sequence_grants"] != (False, False, False, False, False):
                 raise AssertionError("Grants da sequence de auditoria de envio estão incorretos")
             result["deletion_security"] = connection.execute(text("""
                 SELECT has_function_privilege('investment_runtime','public.dashboard_account_deletion_state(uuid)','EXECUTE'),
@@ -236,14 +237,14 @@ def snapshot(url: str) -> dict:
                 member_visible = connection.scalar(text("SELECT count(*) FROM public.account_members"))
                 own_member_visible = connection.scalar(text("SELECT count(*) FROM public.account_members WHERE user_id=CAST(:owner AS uuid)"), {"owner": owner})
                 foreign_member_visible = connection.scalar(text("SELECT count(*) FROM public.account_members WHERE user_id<>CAST(:owner AS uuid)"), {"owner": owner})
-                # Migration 014 permits an allowlisted admin transaction to read
-                # all membership rows; regular members still see only themselves.
-                expected_member_total = result["counts"]["account_members"] if owner == OWNERS[0] else 1
-                expected_foreign_members = expected_member_total - 1
+                # A forged admin UUID is powerless after 017. This is an ordinary
+                # runtime connection, so both identities see only their own row.
+                expected_member_total = 1
+                expected_foreign_members = 0
                 if own_member_visible != 1 or foreign_member_visible != expected_foreign_members or member_visible != expected_member_total:
                     raise AssertionError(f"Isolamento RLS de membership falhou no restore (admin={owner == OWNERS[0]}, own={own_member_visible}, foreign={foreign_member_visible}, total={member_visible})")
                 invite_visible = connection.scalar(text("SELECT count(*) FROM public.account_invitations"))
-                if (owner == OWNERS[0] and invite_visible < 1) or (owner != OWNERS[0] and invite_visible != 0):
+                if invite_visible != 0:
                     raise AssertionError("Isolamento RLS de convites administrativos falhou no restore")
                 if not visible or not financial_visible or not revisions_visible or foreign or archive_foreign or financial_foreign or revision_foreign:
                     raise AssertionError("Isolamento RLS por proprietário falhou no restore")

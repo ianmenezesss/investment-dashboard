@@ -12,24 +12,8 @@ from uuid import uuid4
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from backup_archive import MAGIC, MAGIC_010, MAGIC_011, MAGIC_012, MAGIC_013, MAGIC_014, MAGIC_015, SUPPORTED_MAGICS, decrypt_stream, sha256_file
-
-
-REQUIRED_TABLES_009 = {
-    "alembic_version", "operations", "fixed_income_investments", "fixed_income_lots",
-    "fixed_income_movements", "fixed_income_observations", "fixed_income_investment_archives",
-    "fixed_income_application_revisions", "financial_events", "financial_event_revisions",
-}
-REQUIRED_TABLES_010 = REQUIRED_TABLES_009 | {"portfolio_valuation_observations"}
-REQUIRED_TABLES_011 = REQUIRED_TABLES_010 | {"account_members", "account_invitations"}
-REQUIRED_TABLES_012 = REQUIRED_TABLES_011 | {"account_deletion_jobs", "account_deletion_audit", "account_fixture_loads"}
-REQUIRED_TABLES_013 = REQUIRED_TABLES_012 | {"account_access_requests", "account_access_request_limits"}
-REQUIRED_TABLES_014 = REQUIRED_TABLES_013
-REQUIRED_TABLES_015 = REQUIRED_TABLES_014 | {"account_invitation_send_attempts"}
-VERSIONS = {MAGIC: ("009", REQUIRED_TABLES_009), MAGIC_010: ("010", REQUIRED_TABLES_010),
-            MAGIC_011: ("011", REQUIRED_TABLES_011), MAGIC_012: ("012", REQUIRED_TABLES_012),
-            MAGIC_013: ("013", REQUIRED_TABLES_013), MAGIC_014: ("014", REQUIRED_TABLES_014),
-            MAGIC_015: ("015", REQUIRED_TABLES_015)}
+from backup_archive import MAGIC, decrypt_stream, sha256_file
+from backup_profiles import VERSIONS, executor_function_signatures
 EVENTS = {"financial_events", "financial_event_revisions"}
 
 
@@ -72,7 +56,7 @@ def validate_backup(path, expected_hash=None):
             raise RuntimeError("SHA-256 do arquivo criptografado não confere")
     with backup.open("rb") as source:
         if source.read(len(MAGIC)) not in VERSIONS:
-            raise RuntimeError("Cabeçalho do backup não corresponde a um formato IDBKP009–IDBKP015 suportado")
+            raise RuntimeError("Cabeçalho do backup não corresponde aos formatos IDBKP009–IDBKP015 ou IDBKP018 suportados")
     return backup
 
 
@@ -185,27 +169,30 @@ CREATE ROLE authenticator NOLOGIN NOINHERIT;
 CREATE ROLE investment_runtime LOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
 CREATE ROLE investment_test_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS;
 CREATE ROLE investment_deletion_executor NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
-CREATE SCHEMA auth;
+CREATE ROLE investment_access_admin NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
+"""
+        run_docker("exec", "-i", "-e", f"PGPASSWORD={password}", name, "psql", "-X", "-v", "ON_ERROR_STOP=1",
+                   "-h", "127.0.0.1", "-p", "5432", "-U", "postgres", "-d", "postgres",
+                   input_data=roles_sql, env=env)
+        database_shims = """CREATE SCHEMA auth;
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT NULLIF(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
 CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT COALESCE(NULLIF(current_setting('request.jwt.claims',true),'')::jsonb,'{}'::jsonb) $$;
 CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT NULLIF(current_setting('request.jwt.claim.role',true),'') $$;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
         run_docker("exec", "-i", "-e", f"PGPASSWORD={password}", name, "psql", "-X", "-v", "ON_ERROR_STOP=1",
-                   "-h", "127.0.0.1", "-p", "5432", "-U", "postgres", "-d", "postgres",
-                   input_data=roles_sql, env=env)
+                   "-h", "127.0.0.1", "-p", "5432", "-U", "postgres", "-d", database,
+                   input_data=database_shims, env=env)
         # Keep GRANT/REVOKE entries from the archive; ownership is recreated by the disposable superuser.
         docker("exec", name, "pg_restore", "--exit-on-error", "--schema=public", "--no-owner", "-d", database, "/restore/input.dump")
-        if version in ("012", "013", "014", "015"):
-            for signature in (
-                "dashboard_account_deletion_state(uuid)", "begin_dashboard_account_deletion(uuid,text)",
-                "purge_dashboard_account_data(uuid)", "mark_dashboard_auth_identity_deleted(uuid)",
-                "finish_dashboard_account_deletion(uuid)",
-            ):
-                psql(f"ALTER FUNCTION public.{signature} OWNER TO investment_deletion_executor")
+        for signature in executor_function_signatures(version):
+            psql(f"ALTER FUNCTION public.{signature} OWNER TO investment_deletion_executor")
+            if psql(f"SELECT prosecdef AND pg_get_userbyid(proowner)='investment_deletion_executor' "
+                    f"FROM pg_proc WHERE oid='public.{signature}'::regprocedure") != "t":
+                raise RuntimeError("Ownership/SECURITY DEFINER da função restrita não foi preservado")
         psql("GRANT SELECT ON public.financial_events, public.financial_event_revisions "
              "TO investment_test_runtime")
-        if version in ("010", "011", "012", "013", "014", "015"):
+        if int(version) >= 10:
             psql("GRANT SELECT ON public.portfolio_valuation_observations TO investment_test_runtime")
 
         restored_version = psql("SELECT version_num FROM public.alembic_version")
@@ -223,12 +210,33 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
         policies = int(psql("SELECT count(*) FROM pg_policy WHERE polrelid IN (SELECT oid FROM pg_class WHERE relnamespace='public'::regnamespace AND relname <> 'alembic_version')"))
         if policies < len(rls_tables):
             raise RuntimeError("Policies RLS insuficientes após o restore")
+        if version == "018":
+            access_boundary = psql("""SELECT
+                NOT has_function_privilege('investment_runtime','public.dashboard_admin_authorized()','EXECUTE')
+                AND NOT has_function_privilege('investment_runtime','public.revoke_dashboard_account(uuid,uuid)','EXECUTE')
+                AND NOT has_function_privilege('investment_runtime','public.reserve_dashboard_reactivation(uuid,uuid,uuid,text)','EXECUTE')
+                AND NOT has_table_privilege('investment_runtime','public.account_access_administrators','SELECT')
+                AND NOT has_table_privilege('investment_runtime','public.account_access_audit','SELECT')
+                AND NOT has_table_privilege('investment_runtime','public.account_invitation_send_attempts','SELECT')
+                AND NOT has_table_privilege('investment_access_admin','public.operations','SELECT')
+                AND NOT has_table_privilege('investment_access_admin','public.account_members','UPDATE')
+                AND NOT has_schema_privilege('investment_access_admin','public','CREATE')
+                AND NOT has_schema_privilege('investment_deletion_executor','public','CREATE')
+                AND has_function_privilege('investment_runtime','public.reserve_dashboard_assistant_request(uuid,uuid,integer,integer,integer)','EXECUTE')
+                AND has_function_privilege('investment_runtime','public.release_dashboard_assistant_request(uuid,uuid)','EXECUTE')""")
+            if access_boundary != "t":
+                raise RuntimeError("Fronteira administrativa ou permissões das quotas não foram preservadas")
+            lease_columns = int(psql("""SELECT count(*) FROM information_schema.columns
+                WHERE table_schema='public' AND table_name='account_members'
+                AND column_name IN ('assistant_last_started_at','assistant_in_flight_until','assistant_request_id')"""))
+            if lease_columns != 3:
+                raise RuntimeError("O estado de uso e concorrência do assistente não foi restaurado")
         grant_targets = [
             ("public.financial_events", "public.financial_events_id_seq"),
             ("public.financial_event_revisions", "public.financial_event_revisions_id_seq"),
             ("public.fixed_income_application_revisions", "public.fixed_income_application_revisions_id_seq"),
         ]
-        if version in ("010", "011", "012", "013", "014", "015"):
+        if int(version) >= 10:
             grant_targets.append(("public.portfolio_valuation_observations", "public.portfolio_valuation_observations_id_seq"))
         for table, sequence in grant_targets:
             grants = psql("SELECT has_table_privilege('investment_runtime', '" + table + "', 'SELECT') || '|' || "
@@ -247,7 +255,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
                              "SELECT count(*) FROM public.financial_events WHERE owner_id <> current_setting('app.user_id')::uuid; ROLLBACK;")
             if not isolation.splitlines()[-2].endswith("0"):
                 raise RuntimeError("Falha no teste RLS sintético por proprietário")
-            if version in ("010", "011", "012", "013", "014", "015"):
+            if int(version) >= 10:
                 wealth = psql("BEGIN; SET LOCAL ROLE investment_test_runtime; "
                     "SELECT set_config('app.auth_mode','supabase',true); "
                     f"SELECT set_config('app.user_id','{owner}',true); "
@@ -261,6 +269,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";"""
             "financial_events/revisions restaurados; contagens preservadas (podem estar vazias)=PASS",
             "RLS/FORCE RLS e policies=PASS; grants runtime SELECT/INSERT sem UPDATE/DELETE/TRUNCATE=PASS",
             "isolamento RLS para dois proprietários fictícios=PASS",
+            *(["fronteira administrativa e quotas/leases do assistente restauradas=PASS"] if version == "018" else []),
             "sha256_encrypted=" + sha256_file(backup),
             "sha256_decrypted_archive=" + plaintext_hash,
             "row_counts=" + ",".join(f"{table}:{counts[table]}" for table in sorted(counts)),

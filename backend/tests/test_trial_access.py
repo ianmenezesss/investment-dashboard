@@ -74,23 +74,23 @@ def test_public_request_rejects_malformed_email(monkeypatch):
     engine.dispose()
 
 
-def test_production_ip_uses_render_edge_client_header_and_ignores_spoofable_x_forwarded_for(monkeypatch):
+def test_production_ip_uses_asgi_peer_and_ignores_untrusted_forwarding_headers(monkeypatch):
     access_settings(monkeypatch, environment="production")
     from starlette.requests import Request
     request_with_headers = Request({"type": "http", "method": "POST", "path": "/api/access-requests",
         "headers": [(b"cf-connecting-ip", b"198.51.100.42"),
                     (b"x-forwarded-for", b"203.0.113.99, 198.51.100.42")],
         "client": ("10.0.0.8", 1234), "server": ("testserver", 80), "scheme": "https"})
-    assert accounts._request_ip(request_with_headers) == "198.51.100.42"
+    assert accounts._request_ip(request_with_headers) == "10.0.0.8"
 
 
-def test_production_ip_fails_closed_when_render_client_header_is_missing_or_invalid(monkeypatch):
+def test_production_ip_fails_closed_when_asgi_peer_is_missing_or_invalid(monkeypatch):
     access_settings(monkeypatch, environment="production")
     from starlette.requests import Request
-    for headers in ([(b"x-forwarded-for", b"198.51.100.42")],
-                    [(b"cf-connecting-ip", b"198.51.100.42, 203.0.113.9")]):
+    for peer in (None, ("invalid-host", 1234)):
         req = Request({"type": "http", "method": "POST", "path": "/api/access-requests",
-            "headers": headers, "client": ("10.0.0.8", 1234), "server": ("testserver", 80), "scheme": "https"})
+            "headers": [(b"cf-connecting-ip", b"198.51.100.42")], "client": peer,
+            "server": ("testserver", 80), "scheme": "https"})
         with pytest.raises(HTTPException) as error:
             accounts._request_ip(req)
         assert error.value.status_code == 503
@@ -150,8 +150,10 @@ def test_admin_approval_creates_seven_day_invite_and_records_status(monkeypatch)
     async def send(email, invitation_id): sent.append((email, invitation_id)); return "invite", 200
     monkeypatch.setattr(accounts, "_send_supabase_invitation", send)
     with Session(engine) as db:
-        assert run_immediate(accounts.approve_access_request(item_id, Principal(ADMIN), db)) == {
-            "status": "approved", "email_send_status": "requested", "delivery_confirmed": False}
+        result = run_immediate(accounts.approve_access_request(item_id, Principal(ADMIN), db))
+        assert result["status"] == "approved" and result["email_send_status"] == "requested"
+        assert result["delivery_confirmed"] is False
+        assert result["invitation_id"] == str(db.get(accounts.AccountAccessRequest, item_id).invitation_id)
     with Session(engine) as db:
         item = db.get(accounts.AccountAccessRequest, item_id)
         invite = db.scalar(select(accounts.AccountInvitation))
@@ -165,7 +167,7 @@ def test_admin_approval_creates_seven_day_invite_and_records_status(monkeypatch)
     engine.dispose()
 
 
-def test_failed_supabase_invite_reverts_request_and_revokes_pending_invite(monkeypatch):
+def test_failed_supabase_invite_preserves_approval_and_pending_invite(monkeypatch):
     access_settings(monkeypatch, supabase_service_role_key=SecretStr("fictional-service-key"))
     engine = database()
     item_id = uuid4(); now = datetime.now(timezone.utc)
@@ -180,8 +182,8 @@ def test_failed_supabase_invite_reverts_request_and_revokes_pending_invite(monke
     with Session(engine) as db:
         item = db.get(accounts.AccountAccessRequest, item_id)
         invite = db.scalar(select(accounts.AccountInvitation))
-        assert item.status == "pending" and item.invitation_id is None
-        assert invite.revoked_at is not None
+        assert item.status == "approved" and item.invitation_id == invite.id
+        assert invite.revoked_at is None
         attempt = db.scalar(select(accounts.AccountInvitationSendAttempt))
         assert attempt.outcome == "failed" and attempt.provider_code == "not_configured"
     engine.dispose()

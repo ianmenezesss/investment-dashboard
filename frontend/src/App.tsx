@@ -22,7 +22,7 @@ import { FinancialHint } from './components/FinancialHint'
 import { WorkspaceSidebar, workspaceNavItems } from './components/WorkspaceSidebar'
 import { MyAccountPage } from './accounts/MyAccountPage'
 import { loadGoals } from './goals/goalStorage'
-import { InvitePasswordPage } from './auth/InvitePasswordPage'
+import { InvitationOriginError, InviteAcceptPage } from './auth/InviteAcceptPage'
 import { AccessRequestPage } from './auth/AccessRequestPage'
 const FixedIncomePage = lazy(() => import('./fixed-income/FixedIncomePage').then(module => ({ default: module.FixedIncomePage })))
 const PortfolioInsights = lazy(() => import('./portfolio/PortfolioInsights').then(module => ({ default: module.PortfolioInsights })))
@@ -47,6 +47,8 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const demo = PUBLIC_DEMO || location.pathname === '/demo' || location.pathname.startsWith('/demo/')
+  const invitationRoute = location.pathname === '/invite/accept'
+  const publicRequestRoute = location.pathname === '/solicitar-acesso'
   const [token, setToken] = useState('')
   const [localConnected, setConnected] = useState(false)
   const [modal, setModal] = useState(false)
@@ -68,7 +70,7 @@ export default function App() {
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
   const client = useQueryClient()
   const clearPrivate = useCallback(() => { void client.cancelQueries(); client.clear(); setModal(false); setConfirmation(null); setConfirmError(''); setError(''); setFixedAccessError(null); setFixedNewRequest(0) }, [client])
-  const auth = useAuth(!demo && SUPABASE_AUTH && !PUBLIC_DEMO, clearPrivate, location.pathname === '/invite/accept')
+  const auth = useAuth(!demo && SUPABASE_AUTH && !PUBLIC_DEMO && !invitationRoute && !publicRequestRoute, clearPrivate)
   const connected = !demo && (SUPABASE_AUTH ? auth.status === 'authenticated' && !!auth.session : localConnected)
   const activeToken = SUPABASE_AUTH ? auth.session?.access_token ?? '' : token
   const identity = SUPABASE_AUTH ? auth.session?.user.id ?? 'anonymous' : 'local'
@@ -87,7 +89,7 @@ export default function App() {
   useEffect(() => { setMobileNavigationOpen(false) }, [location.pathname])
   useEffect(() => { if (page === '/cdbs') setModal(false) }, [page])
   const routeTo = (path: string) => demo && !PUBLIC_DEMO ? '/demo' + (path === '/' ? '' : path) : path
-  const financialAccess = connected && auth.accessStatus !== 'trial_expired'
+  const financialAccess = connected && !invitationRoute && !publicRequestRoute && auth.accessStatus !== 'trial_expired'
   const summary = useQuery({ queryKey: ['summary', identity], queryFn: ({ signal }) => privateRepository.summary(signal), enabled: financialAccess && !demo && !accountPage, retry: false, staleTime: 30 * 60 * 1000, refetchInterval: false })
   const operations = useQuery({ queryKey: ['operations', identity], queryFn: ({ signal }) => privateRepository.list(signal), enabled: financialAccess && !demo && !accountPage, retry: false })
   const fixtureStatus = useQuery({ queryKey: ['fixture-status', identity], queryFn: ({ signal }) => privateRepository.fixtureStatus(signal), enabled: financialAccess && !demo && SUPABASE_AUTH && !accountPage, retry: false, staleTime: 30 * 60 * 1000 })
@@ -149,16 +151,12 @@ export default function App() {
       else setConfirmError((cause as Error).message)
     } finally { setConfirmBusy(false) }
   }
+  if (PUBLIC_DEMO && invitationRoute) return <InvitationOriginError/>
   if (PUBLIC_DEMO && location.pathname === '/login') return <DemoAccessPage/>
   if (demo && location.pathname === '/solicitar-acesso') return <Navigate to={routeTo('/')} replace/>
   if (!demo && location.pathname === '/solicitar-acesso') return <AccessRequestPage/>
   if (demo && accountPage) return <Navigate to={routeTo('/')} replace/>
-  if (!demo && location.pathname === '/invite/accept') {
-    if (auth.status === 'loading') return <main className="session-gate" role="status">Validando convite…</main>
-    if (!auth.session) return <main className="session-gate"><p role="alert">O convite expirou ou não pôde ser validado. Solicite um novo ao administrador.</p><Button onClick={() => navigate('/login')}>Ir para o login</Button></main>
-    const invitationId = new URLSearchParams(location.search).get('invitation_id') ?? ''
-    return <InvitePasswordPage invitationId={invitationId} token={auth.session.access_token} onComplete={() => navigate('/', { replace: true })}/>
-  }
+  if (!demo && invitationRoute) return <InviteAcceptPage key={location.key}/>
   const accessDenied = apiError instanceof ApiError && (apiError.status === 401 || apiError.status === 403)
   const authorized = connected && (accountPage && SUPABASE_AUTH ? auth.status === 'authenticated' : auth.accessStatus === 'trial_expired' ? false : summary.data !== undefined && operations.data !== undefined) && (!accessDenied || auth.accessStatus === 'trial_expired' && accountPage)
   const logout = () => { clearPrivate(); setConnected(false); setToken(''); if (SUPABASE_AUTH) void auth.logout(); navigate('/login', { replace: true }) }

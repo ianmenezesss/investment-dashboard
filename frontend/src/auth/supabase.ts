@@ -17,7 +17,8 @@ export function getSupabase(): SupabaseClient | null {
     storageKey: 'investment-auth-session',
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    // The dedicated invitation route consumes and removes URL credentials once.
+    detectSessionInUrl: false,
   } })
   return instance
 }

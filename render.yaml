@@ -18,6 +18,8 @@ services:
         value: supabase
       - key: DATABASE_URL
         sync: false
+      - key: ADMIN_DATABASE_URL
+        sync: false
       - key: PGSSLROOTCERT
         value: /etc/secrets/supabase-ca.crt
       - key: CORS_ORIGIN
@@ -26,6 +28,16 @@ services:
         sync: false
       - key: ALLOWED_USER_IDS
         sync: false
+      - key: INVITATION_ADMIN_IDS
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: APP_PUBLIC_URL
+        sync: false
+      - key: INVITATION_SMTP_MODE
+        value: builtin
+      - key: INVITATION_EMAILS_PER_HOUR
+        value: 2
       # Historical equity prices remain opt-in until the source and its terms are validated.
       - key: EQUITY_HISTORY_ENABLED
         value: false

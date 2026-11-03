@@ -170,7 +170,7 @@ test('aprovação de solicitação passa pelo backend e atualiza o estado visív
     const path = new URL(input, 'http://localhost').pathname
     if (path.endsWith('/members') || path.endsWith('/invitations')) return new Response(JSON.stringify(paged()), { status: 200 })
     if (path.endsWith('/access-requests')) return new Response(JSON.stringify(paged([request], 1)), { status: 200 })
-    if (path.endsWith('/approve')) return new Response('{"status":"approved","delivery_confirmed":false}', { status: 200 })
+    if (path.endsWith('/approve')) return new Response('{"status":"approved","email_send_status":"requested","delivery_confirmed":false}', { status: 200 })
     return new Response('{}', { status: 200 })
   }))
   await renderAdmin()
@@ -181,4 +181,65 @@ test('aprovação de solicitação passa pelo backend e atualiza o estado visív
   await vi.waitFor(() => expect(host.textContent).toContain('entrega não confirmada'))
   expect(calls.some(call => call.url.endsWith('/access-requests/request-1/approve') && call.init?.method === 'POST')).toBe(true)
   expect(calls.filter(call => new URL(call.url, 'http://localhost').pathname.endsWith('/access-requests')).length).toBeGreaterThan(before)
+})
+
+test('falha na lista de contas não oculta solicitações registradas', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+    const path = new URL(input, 'http://localhost').pathname
+    if (path.endsWith('/members')) return new Response('{"detail":"Identidades temporariamente indisponíveis"}', { status: 503 })
+    if (path.endsWith('/access-requests')) return new Response(JSON.stringify(paged([{ id: 'request-visible', email: 'visible@example.test', requested_at: '2026-11-01T10:00:00Z', status: 'pending' }])))
+    return new Response(JSON.stringify(paged()))
+  }))
+  await renderAdmin()
+  await vi.waitFor(() => expect(host.textContent).toContain('Identidades temporariamente indisponíveis'))
+  await act(async () => host.querySelector<HTMLButtonElement>('#admin-tab-requests')!.click())
+  expect(host.textContent).toContain('visible@example.test')
+  expect(host.textContent).not.toContain('Identidades temporariamente indisponíveis')
+})
+
+test('falha de envio após aprovação preserva estado aprovado e mostra mensagem estruturada', async () => {
+  let approved = false
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+    const path = new URL(input, 'http://localhost').pathname
+    if (path.endsWith('/approve')) {
+      approved = true
+      return new Response(JSON.stringify({ detail: { message: 'Aprovação preservada; envio recusado pelo provedor.', invitation_id: 'invite-preserved', email_send_status: 'failed', retryable: true } }), { status: 502 })
+    }
+    if (path.endsWith('/access-requests')) return new Response(JSON.stringify(paged([{
+      id: 'request-1', email: 'visitor@example.test', requested_at: '2026-11-01T10:00:00Z',
+      status: approved ? 'approved' : 'pending', invitation_id: approved ? 'invite-preserved' : null, email_send_status: approved ? 'failed' : undefined,
+    }])))
+    return new Response(JSON.stringify(paged()))
+  }))
+  await renderAdmin()
+  await act(async () => host.querySelector<HTMLButtonElement>('#admin-tab-requests')!.click())
+  await vi.waitFor(() => expect(host.textContent).toContain('visitor@example.test'))
+  await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Aprovar e enviar convite')!.click())
+  await vi.waitFor(() => expect(host.textContent).toContain('Aprovação preservada; envio recusado'))
+  expect(host.textContent).toContain('Aprovada')
+  expect(host.textContent).toContain('Consultar convite e tentativas')
+  expect(host.textContent).not.toContain('pedido de envio foi aceito')
+})
+
+test('duplo clique simultâneo cria um único convite e não presume envio de resposta sem estado', async () => {
+  let release!: (value: Response) => void
+  let writes = 0
+  vi.stubGlobal('fetch', vi.fn(async (_input: string, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      writes++
+      return new Promise<Response>(resolve => { release = resolve })
+    }
+    return new Response(JSON.stringify(paged()))
+  }))
+  await renderAdmin()
+  await act(async () => host.querySelector<HTMLButtonElement>('#admin-tab-invitations')!.click())
+  await changeInput(host.querySelector<HTMLInputElement>('#invite-email')!, 'one@example.test')
+  await act(async () => {
+    host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+  })
+  expect(writes).toBe(1)
+  await act(async () => release(new Response('{"id":"invite-prepared"}', { status: 201 })))
+  expect(host.textContent).toContain('Consulte o estado do envio')
+  expect(host.textContent).not.toContain('O Supabase aceitou')
 })

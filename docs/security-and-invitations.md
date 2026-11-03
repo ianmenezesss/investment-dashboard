@@ -1,5 +1,7 @@
 # Segurança e operações administrativas v3.0
 
+> Atualização 03/11/2026: o contrato atual de convites, autorização e publicação está em [Reconstrução do acesso](access-reconstruction.md), migrations 017–018. Ele substitui as instruções de publicação até 016 e a compensação antiga de aprovação/envio descritas abaixo. A administração exige `ADMIN_DATABASE_URL` restrita e distinta do runtime. As seções históricas são mantidas como referência da exclusão de conta e fixtures.
+
 ## Identidade e isolamento
 
 O acesso privado usa Supabase Auth sem cadastro público. O backend confirma no Admin Auth API que convites pertencem ao e-mail confirmado; memberships e registros financeiros são owner-scoped, com RLS/FORCE RLS. A administração pode gerir convites, mas não ganha acesso às carteiras. `INVITATION_ADMIN_IDS` no Render define os administradores; `VITE_INVITATION_ADMIN_IDS` na Vercel privada serve apenas para exibir controles. Não configure essa variável no projeto público.

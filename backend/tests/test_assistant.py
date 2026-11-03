@@ -12,6 +12,9 @@ from app.database import Settings
 @pytest.fixture
 def client():
     assistant._requests.clear()
+    assistant._daily_requests.clear()
+    assistant._last_started.clear()
+    assistant._active_requests.clear()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.pop(authenticate, None)
@@ -107,4 +110,111 @@ def test_per_user_limit(client, monkeypatch):
     identity=assistant.Principal(uuid4())
     app.dependency_overrides[authenticate]=lambda: identity
     assistant._requests[str(identity.user_id)]=deque([assistant.monotonic()]*5)
-    assert client.post('/api/assistant/chat',json={'message':'CDI?'}).status_code==429
+    response = client.post('/api/assistant/chat',json={'message':'CDI?'})
+    assert response.status_code == 429
+    assert response.headers['Retry-After'] == '60'
+
+
+def test_configurable_admin_and_private_limits(monkeypatch):
+    admin_id, user_id = uuid4(), uuid4()
+    monkeypatch.setattr(assistant.settings, 'invitation_admin_ids', [admin_id])
+    monkeypatch.setattr(assistant.settings, 'assistant_admin_per_minute', 12)
+    monkeypatch.setattr(assistant.settings, 'assistant_admin_per_day', 600)
+    monkeypatch.setattr(assistant.settings, 'assistant_user_per_day', 120)
+    assert assistant._limits(Principal(admin_id)) == (12, 600)
+    assert assistant._limits(Principal(None)) == (12, 600)
+    assert assistant._limits(Principal(user_id)) == (5, 120)
+
+
+def test_limits_read_environment_and_reject_unbounded_values(monkeypatch):
+    from pydantic import ValidationError
+    monkeypatch.setenv('ASSISTANT_ADMIN_PER_DAY', '750')
+    monkeypatch.setenv('ASSISTANT_USER_PER_DAY', '150')
+    config = Settings(_env_file=None)
+    assert config.assistant_admin_per_day == 750
+    assert config.assistant_user_per_day == 150
+    monkeypatch.setenv('ASSISTANT_ADMIN_PER_DAY', '0')
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+def test_daily_limit_resets_at_utc_date_change(client, monkeypatch):
+    from datetime import timedelta
+    identity = Principal(uuid4())
+    app.dependency_overrides[authenticate] = lambda: identity
+    monkeypatch.setattr(assistant.settings, 'groq_api_key', type(assistant.settings.groq_api_key)('mock-key'))
+    monkeypatch.setattr(assistant.settings, 'assistant_user_per_day', 1)
+    key = str(identity.user_id)
+    today = assistant.datetime.now(assistant.timezone.utc).date()
+    assistant._daily_requests[key] = (today, 1)
+    response = client.post('/api/assistant/chat', json={'message': 'CDI?'})
+    assert response.status_code == 429 and 'diário' in response.json()['detail']
+    assistant._daily_requests[key] = (today - timedelta(days=1), 1)
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    with Session(engine) as db:
+        lease = assistant._reserve_request(identity, db)
+        assert assistant._daily_requests[key] == (today, 1)
+        assistant._release_request(identity, lease, db)
+
+
+def test_inflight_and_cooldown_block_duplicate_provider_calls(client, monkeypatch):
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    identity = Principal(uuid4())
+    monkeypatch.setattr(assistant.settings, 'assistant_cooldown_seconds', 3)
+    now = [100.0]
+    monkeypatch.setattr(assistant, 'monotonic', lambda: now[0])
+    with Session(engine) as db:
+        lease = assistant._reserve_request(identity, db)
+        with pytest.raises(assistant.HTTPException) as busy:
+            assistant._reserve_request(identity, db)
+        assert busy.value.status_code == 429 and 'respondendo' in busy.value.detail
+        assistant._release_request(identity, lease, db)
+        with pytest.raises(assistant.HTTPException) as cooldown:
+            assistant._reserve_request(identity, db)
+        assert cooldown.value.status_code == 429 and cooldown.value.headers['Retry-After'] == '3'
+        now[0] += 3
+        second = assistant._reserve_request(identity, db)
+        assert len(assistant._requests[str(identity.user_id)]) == 2
+        assistant._release_request(identity, second, db)
+
+
+def test_provider_quota_is_not_retried_and_releases_inflight(client, monkeypatch):
+    identity = Principal(uuid4())
+    app.dependency_overrides[authenticate] = lambda: identity
+    monkeypatch.setattr(assistant.settings, 'groq_api_key', type(assistant.settings.groq_api_key)('mock-key'))
+    calls = []
+    class FakeClient:
+        def __init__(self, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        async def post(self, *args, **kwargs):
+            calls.append(kwargs)
+            return httpx.Response(429, headers={'Retry-After': '120'})
+    monkeypatch.setattr(assistant.httpx, 'AsyncClient', FakeClient)
+    response = client.post('/api/assistant/chat', json={'message': 'CDI?'})
+    assert response.status_code == 503
+    assert response.headers['Retry-After'] == '120'
+    assert len(calls) == 1
+    assert str(identity.user_id) not in assistant._active_requests
+    assert assistant._daily_requests[str(identity.user_id)][1] == 1
+
+
+def test_postgresql_uses_shared_reservation_and_releases_same_lease(client):
+    from types import SimpleNamespace
+    identity = Principal(uuid4())
+    class Database:
+        bind = SimpleNamespace(dialect=SimpleNamespace(name='postgresql'))
+        def __init__(self): self.calls = []; self.commits = 0
+        def execute(self, statement, params): self.calls.append((str(statement), params))
+        def scalar(self, statement, params): self.calls.append((str(statement), params)); return 'allowed'
+        def commit(self): self.commits += 1
+    db = Database()
+    lease = assistant._reserve_request(identity, db)
+    assistant._release_request(identity, lease, db)
+    assert db.commits == 2
+    reserve = next(params for statement, params in db.calls if 'reserve_dashboard' in statement)
+    release = next(params for statement, params in db.calls if 'release_dashboard' in statement)
+    assert reserve['request_id'] == release['request_id'] == lease
+    assert reserve['per_minute'] == 5 and reserve['per_day'] == 100

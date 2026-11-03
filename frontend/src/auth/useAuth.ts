@@ -5,6 +5,9 @@ import { apiBase } from '../runtime'
 
 type Status = 'loading' | 'anonymous' | 'authenticated'
 type AccessStatus = 'active' | 'trial_expired'
+class ActivationError extends Error {
+  constructor(public status: number) { super('account_activation_failed') }
+}
 export function useAuth(enabled: boolean, clearPrivate: () => void, skipActivation = false) {
   const [session, setSession] = useState<Session | null>(null)
   const [status, setStatus] = useState<Status>('loading')
@@ -18,6 +21,7 @@ export function useAuth(enabled: boolean, clearPrivate: () => void, skipActivati
   clear.current = clearPrivate
   const activeSession = useRef<Session | null>(null)
   const blocked = useRef(false)
+  const verifyLogin = useRef<((next: Session, revision: number) => Promise<void>) | null>(null)
 
   const accept = useCallback((next: Session | null) => {
     // SIGNED_IN also reconfirms a session on tab focus; it is not an account switch.
@@ -27,13 +31,13 @@ export function useAuth(enabled: boolean, clearPrivate: () => void, skipActivati
   }, [])
 
   const ending = useRef(false)
-  const expire = useCallback(() => {
+  const endSession = useCallback((message: string) => {
     if (ending.current) return
     const current = ++generation.current
     blocked.current = true
     ending.current = true
     activeSession.current = null
-    setSession(null); setStatus('loading'); setError('Sua sessão expirou. Entre novamente.'); clear.current()
+    setSession(null); setStatus('loading'); setError(message); clear.current()
     void (async () => {
       try { await client.current?.auth.signOut({ scope: 'local' }) } catch { /* falhar fechado */ }
       finally {
@@ -42,6 +46,7 @@ export function useAuth(enabled: boolean, clearPrivate: () => void, skipActivati
       }
     })()
   }, [])
+  const expire = useCallback(() => endSession('Sua sessão expirou. Entre novamente.'), [endSession])
 
   const markTrialExpired = useCallback(() => {
     if (accessStatus === 'trial_expired') return
@@ -51,7 +56,7 @@ export function useAuth(enabled: boolean, clearPrivate: () => void, skipActivati
   useEffect(() => {
     const current = ++generation.current
     let alive = true
-    if (!enabled) { accept(null); return }
+    if (!enabled) { verifyLogin.current = null; accept(null); return }
     blocked.current = false
     let sdk: SupabaseClient | null
     try { sdk = getSupabase(); client.current = sdk } catch (e) { setError((e as Error).message); setStatus('anonymous'); return }
@@ -68,15 +73,21 @@ export function useAuth(enabled: boolean, clearPrivate: () => void, skipActivati
           return
         }
         const activation = await fetch(`${apiBase()}/api/account/activate`, { method: 'POST', headers: { Authorization: `Bearer ${next.access_token}` } })
-        if (!activation.ok) throw new Error('account_not_invited')
+        if (!activation.ok) throw new ActivationError(activation.status)
         const activationState = await activation.json() as { status?: string; trial_expires_at?: string; activated_at?: string }
         accept(next); setAccessStatus(activationState.status === 'trial_expired' || activationState.status === 'expired' ? 'trial_expired' : 'active')
         const expiration = activationState.trial_expires_at ? Date.parse(activationState.trial_expires_at) : NaN
         setTrialExpiresAt(Number.isFinite(expiration) ? expiration : null); setAccessActivatedAt(activationState.activated_at ?? null); setError('')
-      } catch {
-        if (alive && revision === generation.current && !blocked.current) expire()
+      } catch (cause) {
+        if (!alive || revision !== generation.current || blocked.current) return
+        if (cause instanceof ActivationError && cause.status === 403) {
+          endSession('Sua conta não está autorizada a acessar esta carteira. Solicite acesso ao administrador.')
+        } else if (cause instanceof TypeError || cause instanceof ActivationError && cause.status !== 401) {
+          accept(null); setError('Não foi possível confirmar a autorização da conta. Tente entrar novamente em instantes.')
+        } else expire()
       }
     }
+    verifyLogin.current = verify
     // Callback síncrono: não chamar operações async do SDK dentro do lock de auth.
     const { data: { subscription } } = sdk.auth.onAuthStateChange((event, next) => {
       if (!alive || ending.current || event === 'INITIAL_SESSION') return
@@ -108,8 +119,8 @@ export function useAuth(enabled: boolean, clearPrivate: () => void, skipActivati
         if (alive && current === generation.current) expire()
       }
     })()
-    return () => { alive = false; generation.current++; pending.forEach(timer => window.clearTimeout(timer)); subscription.unsubscribe() }
-  }, [enabled, expire, accept, skipActivation])
+    return () => { alive = false; verifyLogin.current = null; generation.current++; pending.forEach(timer => window.clearTimeout(timer)); subscription.unsubscribe() }
+  }, [enabled, expire, endSession, accept, skipActivation])
 
   useEffect(() => {
     if (!session?.expires_at) return
@@ -138,7 +149,7 @@ export function useAuth(enabled: boolean, clearPrivate: () => void, skipActivati
         return
       }
       // SIGNED_IN pode atualizar o estado antes desta Promise retornar.
-      if (current === generation.current) accept(data.session)
+      if (current === generation.current) await verifyLogin.current?.(data.session, current)
     } catch {
       if (current === generation.current) { setStatus('anonymous'); setError('Não foi possível conectar ao serviço de autenticação.') }
     }

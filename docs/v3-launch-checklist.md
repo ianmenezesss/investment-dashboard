@@ -1,5 +1,7 @@
 # Checklist operacional v3.0.0
 
+> Para a reconstrução de 03/11/2026, usar primeiro o [procedimento e checklist 017–018](access-reconstruction.md#publicação-manual-futura). Confirmar domínio privado, SMTP e login administrativo separado. Os resultados e comandos abaixo referentes a 016 são históricos; não comprovam o estado remoto atual.
+
 ## Validação local
 
 - [x] Convites restritos, confirmação do e-mail pelo Supabase Auth e memberships por UUID.
